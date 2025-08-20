@@ -347,7 +347,10 @@ def transactions():
                     'color': category['color'],
                     'icon': category['icon']
                 }
-            transaction.pop('_id', None)  # Remove _id do MongoDB
+            # Convert _id to id for frontend compatibility
+            if '_id' in transaction:
+                transaction['id'] = transaction['_id']
+                transaction.pop('_id', None)
         
         return jsonify(transactions_list)
     
