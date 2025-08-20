@@ -692,5 +692,140 @@ def import_transactions():
     except Exception as e:
         return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
 
+# Rotas de OAuth (Google, Microsoft, Apple)
+
+@app.route('/api/auth/google/login', methods=['GET'])
+def google_login():
+    """Inicia processo de login com Google"""
+    google = oauth.create_client('google')
+    redirect_uri = request.url_root + 'api/auth/google/callback'
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/api/auth/google/callback', methods=['GET'])
+def google_callback():
+    """Callback do login com Google"""
+    if GOOGLE_CLIENT_ID.startswith('placeholder'):
+        return jsonify({
+            'error': 'Configuração OAuth do Google não definida',
+            'message': 'Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env'
+        }), 400
+    
+    try:
+        google = oauth.create_client('google')
+        token = google.authorize_access_token()
+        
+        # Obtém dados do usuário do Google
+        resp = google.parse_id_token(token)
+        google_user = {
+            'sub': resp['sub'],
+            'email': resp['email'],
+            'name': resp['name'],
+            'picture': resp.get('picture'),
+            'email_verified': resp.get('email_verified', False)
+        }
+        
+        # Verifica se usuário já existe
+        user = users_collection.find_one({
+            '$or': [
+                {'email': google_user['email']},
+                {'auth_providers.provider': 'google', 'auth_providers.sub': google_user['sub']}
+            ]
+        })
+        
+        if user:
+            # Usuário existente - atualiza dados do provedor
+            provider_exists = any(p['provider'] == 'google' and p['sub'] == google_user['sub'] 
+                                for p in user.get('auth_providers', []))
+            
+            if not provider_exists:
+                users_collection.update_one(
+                    {'_id': user['_id']},
+                    {'$push': {
+                        'auth_providers': {
+                            'provider': 'google',
+                            'sub': google_user['sub'],
+                            'email_verified': google_user['email_verified']
+                        }
+                    }}
+                )
+        else:
+            # Novo usuário via Google
+            user_data = {
+                '_id': str(uuid.uuid4()),
+                'name': google_user['name'],
+                'email': google_user['email'],
+                'password': None,  # Não tem senha local
+                'settings': {
+                    'currency': 'BRL',
+                    'theme': 'light',
+                    'language': 'pt'
+                },
+                'auth_providers': [{
+                    'provider': 'google',
+                    'sub': google_user['sub'],
+                    'email_verified': google_user['email_verified']
+                }],
+                'profile_picture': google_user.get('picture'),
+                'created_at': datetime.utcnow()
+            }
+            
+            users_collection.insert_one(user_data)
+            user = user_data
+            
+            # Cria categorias padrão para novo usuário
+            default_categories = [
+                {'_id': str(uuid.uuid4()), 'user_id': user['_id'], 'name': 'Alimentação', 'type': 'expense', 'color': '#FF6B6B', 'icon': 'basket'},
+                {'_id': str(uuid.uuid4()), 'user_id': user['_id'], 'name': 'Transporte', 'type': 'expense', 'color': '#4ECDC4', 'icon': 'car-front'},
+                {'_id': str(uuid.uuid4()), 'user_id': user['_id'], 'name': 'Casa', 'type': 'expense', 'color': '#45B7D1', 'icon': 'house'},
+                {'_id': str(uuid.uuid4()), 'user_id': user['_id'], 'name': 'Saúde', 'type': 'expense', 'color': '#96CEB4', 'icon': 'heart-pulse'},
+                {'_id': str(uuid.uuid4()), 'user_id': user['_id'], 'name': 'Salário', 'type': 'income', 'color': '#52C41A', 'icon': 'currency-dollar'},
+                {'_id': str(uuid.uuid4()), 'user_id': user['_id'], 'name': 'Freelance', 'type': 'income', 'color': '#1890FF', 'icon': 'briefcase'}
+            ]
+            categories_collection.insert_many(default_categories)
+        
+        # Gera token JWT
+        jwt_token = generate_jwt(user['_id'])
+        
+        # Em produção, redirecionar para frontend com token
+        return jsonify({
+            'success': True,
+            'token': jwt_token,
+            'user': {
+                'id': user['_id'],
+                'name': user['name'],
+                'email': user['email']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro no login com Google: {str(e)}'}), 500
+
+@app.route('/api/auth/microsoft/login', methods=['GET'])
+def microsoft_login():
+    """Placeholder para login com Microsoft"""
+    return jsonify({
+        'error': 'Login com Microsoft não implementado ainda',
+        'message': 'Configure as credenciais do Microsoft OAuth no arquivo .env'
+    }), 501
+
+@app.route('/api/auth/apple/login', methods=['GET'])
+def apple_login():
+    """Placeholder para login com Apple"""
+    return jsonify({
+        'error': 'Login com Apple não implementado ainda',
+        'message': 'Configure as credenciais do Apple OAuth no arquivo .env'
+    }), 501
+
+# Configuração OAuth clients
+oauth.register(
+    name='google',
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    server_metadata_url='https://accounts.google.com/.well-known/openid_configuration',
+    client_kwargs={
+        'scope': 'openid email profile'
+    }
+)
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001, debug=True)
