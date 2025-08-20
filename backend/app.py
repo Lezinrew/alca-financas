@@ -237,9 +237,11 @@ def categories():
     """Gerenciamento de categorias"""
     if request.method == 'GET':
         user_categories = list(categories_collection.find({'user_id': request.user_id}))
-        # Remove _id do MongoDB para evitar problemas de serialização
+        # Convert _id to id for frontend compatibility
         for category in user_categories:
-            category.pop('_id', None)
+            if '_id' in category:
+                category['id'] = category['_id']
+                category.pop('_id', None)
         return jsonify(user_categories)
     
     # POST - Criar nova categoria
