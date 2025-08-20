@@ -471,5 +471,226 @@ def transaction_detail(transaction_id):
     
     return jsonify({'message': 'Transação atualizada com sucesso'})
 
+# Rota do Dashboard
+
+@app.route('/api/dashboard', methods=['GET'])
+@require_auth
+def dashboard():
+    """Dados do dashboard"""
+    # Parâmetros de período (padrão: mês atual)
+    month = int(request.args.get('month', datetime.now().month))
+    year = int(request.args.get('year', datetime.now().year))
+    
+    # Data inicial e final do período
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+    
+    # Filtro base para o período
+    period_filter = {
+        'user_id': request.user_id,
+        'date': {'$gte': start_date, '$lt': end_date}
+    }
+    
+    # Busca todas as transações do período
+    transactions_list = list(transactions_collection.find(period_filter))
+    
+    # Calcula totais
+    total_income = sum(t['amount'] for t in transactions_list if t['type'] == 'income')
+    total_expense = sum(t['amount'] for t in transactions_list if t['type'] == 'expense')
+    balance = total_income - total_expense
+    
+    # Transações recentes (últimas 10)
+    recent_transactions = list(transactions_collection.find(
+        {'user_id': request.user_id}
+    ).sort('date', -1).limit(10))
+    
+    # Inclui dados das categorias nas transações recentes
+    for transaction in recent_transactions:
+        category = categories_collection.find_one({'_id': transaction['category_id']})
+        if category:
+            transaction['category'] = {
+                'name': category['name'],
+                'color': category['color'],
+                'icon': category['icon']
+            }
+        transaction.pop('_id', None)
+    
+    # Análise por categoria (despesas)
+    expense_pipeline = [
+        {'$match': {**period_filter, 'type': 'expense'}},
+        {'$group': {
+            '_id': '$category_id',
+            'total': {'$sum': '$amount'},
+            'count': {'$sum': 1}
+        }},
+        {'$sort': {'total': -1}}
+    ]
+    
+    expense_by_category = []
+    for item in transactions_collection.aggregate(expense_pipeline):
+        category = categories_collection.find_one({'_id': item['_id']})
+        if category:
+            expense_by_category.append({
+                'category_id': item['_id'],
+                'category_name': category['name'],
+                'category_color': category['color'],
+                'category_icon': category['icon'],
+                'total': item['total'],
+                'count': item['count'],
+                'percentage': (item['total'] / total_expense * 100) if total_expense > 0 else 0
+            })
+    
+    # Análise por categoria (receitas)
+    income_pipeline = [
+        {'$match': {**period_filter, 'type': 'income'}},
+        {'$group': {
+            '_id': '$category_id',
+            'total': {'$sum': '$amount'},
+            'count': {'$sum': 1}
+        }},
+        {'$sort': {'total': -1}}
+    ]
+    
+    income_by_category = []
+    for item in transactions_collection.aggregate(income_pipeline):
+        category = categories_collection.find_one({'_id': item['_id']})
+        if category:
+            income_by_category.append({
+                'category_id': item['_id'],
+                'category_name': category['name'],
+                'category_color': category['color'],
+                'category_icon': category['icon'],
+                'total': item['total'],
+                'count': item['count'],
+                'percentage': (item['total'] / total_income * 100) if total_income > 0 else 0
+            })
+    
+    return jsonify({
+        'period': {
+            'month': month,
+            'year': year,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat()
+        },
+        'summary': {
+            'total_income': total_income,
+            'total_expense': total_expense,
+            'balance': balance,
+            'transactions_count': len(transactions_list)
+        },
+        'recent_transactions': recent_transactions,
+        'expense_by_category': expense_by_category,
+        'income_by_category': income_by_category
+    })
+
+# Rota de Importação CSV
+
+@app.route('/api/transactions/import', methods=['POST'])
+@require_auth
+def import_transactions():
+    """Importar transações via CSV"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Arquivo CSV é obrigatório'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+    
+    if not file.filename.lower().endswith('.csv'):
+        return jsonify({'error': 'Apenas arquivos CSV são aceitos'}), 400
+    
+    try:
+        # Lê arquivo CSV
+        stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = pd.read_csv(stream)
+        
+        # Valida colunas obrigatórias
+        required_columns = ['description', 'amount', 'type', 'category_name', 'date']
+        missing_columns = [col for col in required_columns if col not in csv_input.columns]
+        
+        if missing_columns:
+            return jsonify({
+                'error': f'Colunas obrigatórias ausentes: {", ".join(missing_columns)}',
+                'required_columns': required_columns,
+                'found_columns': list(csv_input.columns)
+            }), 400
+        
+        # Busca categorias do usuário para mapeamento
+        user_categories = {cat['name']: cat['_id'] for cat in categories_collection.find({'user_id': request.user_id})}
+        
+        imported_transactions = []
+        errors = []
+        
+        for index, row in csv_input.iterrows():
+            try:
+                # Valida tipo
+                if row['type'] not in ['income', 'expense']:
+                    errors.append(f'Linha {index + 2}: Tipo deve ser income ou expense')
+                    continue
+                
+                # Mapeia categoria
+                category_id = user_categories.get(row['category_name'])
+                if not category_id:
+                    errors.append(f'Linha {index + 2}: Categoria "{row["category_name"]}" não encontrada')
+                    continue
+                
+                # Valida e converte data
+                try:
+                    transaction_date = pd.to_datetime(row['date']).to_pydatetime()
+                except:
+                    errors.append(f'Linha {index + 2}: Data inválida "{row["date"]}"')
+                    continue
+                
+                # Valida e converte valor
+                try:
+                    amount = float(row['amount'])
+                    if amount <= 0:
+                        errors.append(f'Linha {index + 2}: Valor deve ser positivo')
+                        continue
+                except:
+                    errors.append(f'Linha {index + 2}: Valor inválido "{row["amount"]}"')
+                    continue
+                
+                # Cria transação
+                transaction_data = {
+                    '_id': str(uuid.uuid4()),
+                    'user_id': request.user_id,
+                    'description': str(row['description']).strip(),
+                    'amount': amount,
+                    'type': row['type'],
+                    'category_id': category_id,
+                    'date': transaction_date,
+                    'is_recurring': False,
+                    'installment_info': None,
+                    'imported': True,
+                    'created_at': datetime.utcnow()
+                }
+                
+                imported_transactions.append(transaction_data)
+                
+            except Exception as e:
+                errors.append(f'Linha {index + 2}: Erro inesperado - {str(e)}')
+        
+        # Insere transações válidas no banco
+        if imported_transactions:
+            transactions_collection.insert_many(imported_transactions)
+        
+        result = {
+            'message': f'{len(imported_transactions)} transações importadas com sucesso',
+            'imported_count': len(imported_transactions),
+            'error_count': len(errors)
+        }
+        
+        if errors:
+            result['errors'] = errors
+        
+        return jsonify(result), 201 if imported_transactions else 400
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001, debug=True)
