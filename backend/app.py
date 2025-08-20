@@ -229,5 +229,247 @@ def user_settings():
     
     return jsonify({'message': 'Configurações atualizadas com sucesso'})
 
+# Rotas de Categorias
+
+@app.route('/api/categories', methods=['GET', 'POST'])
+@require_auth
+def categories():
+    """Gerenciamento de categorias"""
+    if request.method == 'GET':
+        user_categories = list(categories_collection.find({'user_id': request.user_id}))
+        # Remove _id do MongoDB para evitar problemas de serialização
+        for category in user_categories:
+            category.pop('_id', None)
+        return jsonify(user_categories)
+    
+    # POST - Criar nova categoria
+    data = request.get_json()
+    
+    if not data.get('name') or not data.get('type'):
+        return jsonify({'error': 'Nome e tipo da categoria são obrigatórios'}), 400
+    
+    if data['type'] not in ['income', 'expense']:
+        return jsonify({'error': 'Tipo deve ser income ou expense'}), 400
+    
+    category_data = {
+        '_id': str(uuid.uuid4()),
+        'user_id': request.user_id,
+        'name': data['name'],
+        'type': data['type'],
+        'color': data.get('color', '#6C757D'),
+        'icon': data.get('icon', 'circle'),
+        'created_at': datetime.utcnow()
+    }
+    
+    categories_collection.insert_one(category_data)
+    category_data.pop('_id')  # Remove _id para retorno
+    
+    return jsonify(category_data), 201
+
+@app.route('/api/categories/<category_id>', methods=['PUT', 'DELETE'])
+@require_auth
+def category_detail(category_id):
+    """Atualizar ou deletar categoria"""
+    category = categories_collection.find_one({'_id': category_id, 'user_id': request.user_id})
+    if not category:
+        return jsonify({'error': 'Categoria não encontrada'}), 404
+    
+    if request.method == 'DELETE':
+        # Verifica se há transações usando esta categoria
+        transaction_count = transactions_collection.count_documents({'category_id': category_id})
+        if transaction_count > 0:
+            return jsonify({'error': f'Não é possível deletar. Existem {transaction_count} transações nesta categoria'}), 400
+        
+        categories_collection.delete_one({'_id': category_id})
+        return jsonify({'message': 'Categoria deletada com sucesso'})
+    
+    # PUT - Atualizar categoria
+    data = request.get_json()
+    update_data = {}
+    
+    allowed_fields = ['name', 'color', 'icon']
+    for field in allowed_fields:
+        if field in data:
+            update_data[field] = data[field]
+    
+    if update_data:
+        categories_collection.update_one(
+            {'_id': category_id, 'user_id': request.user_id},
+            {'$set': update_data}
+        )
+    
+    return jsonify({'message': 'Categoria atualizada com sucesso'})
+
+# Rotas de Transações
+
+@app.route('/api/transactions', methods=['GET', 'POST'])
+@require_auth
+def transactions():
+    """Gerenciamento de transações"""
+    if request.method == 'GET':
+        # Parâmetros de filtro opcionais
+        month = request.args.get('month')
+        year = request.args.get('year')
+        category_id = request.args.get('category_id')
+        transaction_type = request.args.get('type')
+        
+        # Constrói filtro
+        filter_query = {'user_id': request.user_id}
+        
+        if month and year:
+            start_date = datetime(int(year), int(month), 1)
+            if int(month) == 12:
+                end_date = datetime(int(year) + 1, 1, 1)
+            else:
+                end_date = datetime(int(year), int(month) + 1, 1)
+            
+            filter_query['date'] = {'$gte': start_date, '$lt': end_date}
+        
+        if category_id:
+            filter_query['category_id'] = category_id
+        
+        if transaction_type:
+            filter_query['type'] = transaction_type
+        
+        # Busca transações
+        transactions_list = list(transactions_collection.find(filter_query).sort('date', -1))
+        
+        # Busca dados das categorias para incluir na resposta
+        for transaction in transactions_list:
+            category = categories_collection.find_one({'_id': transaction['category_id']})
+            if category:
+                transaction['category'] = {
+                    'name': category['name'],
+                    'color': category['color'],
+                    'icon': category['icon']
+                }
+            transaction.pop('_id', None)  # Remove _id do MongoDB
+        
+        return jsonify(transactions_list)
+    
+    # POST - Criar nova transação
+    data = request.get_json()
+    
+    # Validação de dados obrigatórios
+    required_fields = ['description', 'amount', 'type', 'category_id', 'date']
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({'error': f'Campo {field} é obrigatório'}), 400
+    
+    if data['type'] not in ['income', 'expense']:
+        return jsonify({'error': 'Tipo deve ser income ou expense'}), 400
+    
+    # Verifica se a categoria existe e pertence ao usuário
+    category = categories_collection.find_one({
+        '_id': data['category_id'], 
+        'user_id': request.user_id
+    })
+    if not category:
+        return jsonify({'error': 'Categoria não encontrada'}), 404
+    
+    # Verifica se o tipo da transação combina com o tipo da categoria
+    if data['type'] != category['type']:
+        return jsonify({'error': 'Tipo da transação não combina com tipo da categoria'}), 400
+    
+    # Processa recorrência/parcelamento
+    installments = data.get('installments', 1)
+    is_recurring = data.get('is_recurring', False)
+    
+    transactions_to_create = []
+    base_date = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+    
+    if installments > 1:
+        # Parcelamento
+        installment_amount = float(data['amount']) / installments
+        
+        for i in range(installments):
+            transaction_date = base_date.replace(month=base_date.month + i) if base_date.month + i <= 12 else base_date.replace(year=base_date.year + 1, month=(base_date.month + i) - 12)
+            
+            transaction_data = {
+                '_id': str(uuid.uuid4()),
+                'user_id': request.user_id,
+                'description': f"{data['description']} ({i+1}/{installments})",
+                'amount': installment_amount,
+                'type': data['type'],
+                'category_id': data['category_id'],
+                'date': transaction_date,
+                'is_recurring': False,
+                'installment_info': {
+                    'current': i + 1,
+                    'total': installments,
+                    'parent_id': str(uuid.uuid4()) if i == 0 else transactions_to_create[0]['installment_info']['parent_id']
+                },
+                'created_at': datetime.utcnow()
+            }
+            
+            if i == 0:
+                transaction_data['installment_info']['parent_id'] = transaction_data['_id']
+            
+            transactions_to_create.append(transaction_data)
+    
+    else:
+        # Transação única ou recorrente
+        transaction_data = {
+            '_id': str(uuid.uuid4()),
+            'user_id': request.user_id,
+            'description': data['description'],
+            'amount': float(data['amount']),
+            'type': data['type'],
+            'category_id': data['category_id'],
+            'date': base_date,
+            'is_recurring': is_recurring,
+            'installment_info': None,
+            'created_at': datetime.utcnow()
+        }
+        
+        transactions_to_create.append(transaction_data)
+    
+    # Insere transações no banco
+    if transactions_to_create:
+        transactions_collection.insert_many(transactions_to_create)
+    
+    return jsonify({
+        'message': f'{len(transactions_to_create)} transação(ões) criada(s) com sucesso',
+        'count': len(transactions_to_create)
+    }), 201
+
+@app.route('/api/transactions/<transaction_id>', methods=['PUT', 'DELETE'])
+@require_auth
+def transaction_detail(transaction_id):
+    """Atualizar ou deletar transação"""
+    transaction = transactions_collection.find_one({
+        '_id': transaction_id, 
+        'user_id': request.user_id
+    })
+    
+    if not transaction:
+        return jsonify({'error': 'Transação não encontrada'}), 404
+    
+    if request.method == 'DELETE':
+        transactions_collection.delete_one({'_id': transaction_id})
+        return jsonify({'message': 'Transação deletada com sucesso'})
+    
+    # PUT - Atualizar transação
+    data = request.get_json()
+    update_data = {}
+    
+    allowed_fields = ['description', 'amount', 'category_id', 'date']
+    for field in allowed_fields:
+        if field in data:
+            if field == 'date':
+                update_data[field] = datetime.fromisoformat(data[field].replace('Z', '+00:00'))
+            elif field == 'amount':
+                update_data[field] = float(data[field])
+            else:
+                update_data[field] = data[field]
+    
+    if update_data:
+        transactions_collection.update_one(
+            {'_id': transaction_id, 'user_id': request.user_id},
+            {'$set': update_data}
+        )
+    
+    return jsonify({'message': 'Transação atualizada com sucesso'})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001, debug=True)
