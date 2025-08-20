@@ -243,7 +243,22 @@ class MobillsAPITester:
             self.log_test("Find Expense Category", False, "No expense category found")
             return False
         
+        # Debug: print category structure
+        print(f"   Category structure: {expense_category}")
+        
+        # Try different possible ID fields
         category_id = expense_category.get('id') or expense_category.get('_id')
+        
+        if not category_id:
+            # If no ID found, try to find it by looking for any field that looks like an ID
+            for key, value in expense_category.items():
+                if 'id' in key.lower() and isinstance(value, str):
+                    category_id = value
+                    break
+        
+        if not category_id:
+            self.log_test("Find Category ID", False, f"No ID found in category: {expense_category}")
+            return False
         
         # Test POST - Create transaction
         transaction_data = {
