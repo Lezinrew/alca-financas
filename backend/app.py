@@ -523,7 +523,10 @@ def dashboard():
                 'color': category['color'],
                 'icon': category['icon']
             }
-        transaction.pop('_id', None)
+        # Convert _id to id for frontend compatibility
+        if '_id' in transaction:
+            transaction['id'] = transaction['_id']
+            transaction.pop('_id', None)
     
     # Análise por categoria (despesas)
     expense_pipeline = [
