@@ -264,6 +264,8 @@ def categories():
     }
     
     categories_collection.insert_one(category_data)
+    # Convert _id to id for frontend compatibility
+    category_data['id'] = category_data['_id']
     category_data.pop('_id')  # Remove _id para retorno
     
     return jsonify(category_data), 201
