@@ -363,10 +363,23 @@ class MobillsAPITester:
         # Test invalid endpoint
         success, response = self.make_request('GET', 'invalid-endpoint', expected_status=404)
         
+        # Flask returns 404 for invalid endpoints, so success=False with 404 status is correct
         if not success and "404" in str(response):
             self.log_test("Invalid Endpoint 404", True)
         else:
-            self.log_test("Invalid Endpoint 404", False, "Should return 404")
+            # Check if we actually got a 404 response
+            try:
+                url = f"{self.base_url}/api/invalid-endpoint"
+                headers = {'Content-Type': 'application/json'}
+                if self.token:
+                    headers['Authorization'] = f'Bearer {self.token}'
+                resp = requests.get(url, headers=headers)
+                if resp.status_code == 404:
+                    self.log_test("Invalid Endpoint 404", True)
+                else:
+                    self.log_test("Invalid Endpoint 404", False, f"Got status {resp.status_code} instead of 404")
+            except Exception as e:
+                self.log_test("Invalid Endpoint 404", False, f"Exception: {str(e)}")
         
         # Test protected endpoint without token
         old_token = self.token
@@ -374,10 +387,21 @@ class MobillsAPITester:
         
         success, response = self.make_request('GET', 'me', expected_status=401)
         
+        # Similar logic for 401
         if not success and "401" in str(response):
             self.log_test("Protected Endpoint Without Token", True)
         else:
-            self.log_test("Protected Endpoint Without Token", False, "Should return 401")
+            # Check if we actually got a 401 response
+            try:
+                url = f"{self.base_url}/api/me"
+                headers = {'Content-Type': 'application/json'}
+                resp = requests.get(url, headers=headers)
+                if resp.status_code == 401:
+                    self.log_test("Protected Endpoint Without Token", True)
+                else:
+                    self.log_test("Protected Endpoint Without Token", False, f"Got status {resp.status_code} instead of 401")
+            except Exception as e:
+                self.log_test("Protected Endpoint Without Token", False, f"Exception: {str(e)}")
         
         # Restore token
         self.token = old_token
