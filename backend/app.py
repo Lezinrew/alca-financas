@@ -837,5 +837,302 @@ oauth.register(
     }
 )
 
+# Rotas de Contas/Carteiras
+
+@app.route('/api/accounts', methods=['GET', 'POST'])
+@require_auth
+def accounts():
+    """Gerenciamento de contas/carteiras"""
+    if request.method == 'GET':
+        user_accounts = list(accounts_collection.find({'user_id': request.user_id}))
+        # Convert _id to id for frontend compatibility
+        for account in user_accounts:
+            if '_id' in account:
+                account['id'] = account['_id']
+                account.pop('_id', None)
+        return jsonify(user_accounts)
+    
+    # POST - Criar nova conta
+    data = request.get_json()
+    
+    if not data.get('name') or not data.get('type'):
+        return jsonify({'error': 'Nome e tipo da conta são obrigatórios'}), 400
+    
+    if data['type'] not in ['wallet', 'checking', 'savings', 'credit_card', 'investment']:
+        return jsonify({'error': 'Tipo de conta inválido'}), 400
+    
+    account_data = {
+        '_id': str(uuid.uuid4()),
+        'user_id': request.user_id,
+        'name': data['name'],
+        'type': data['type'],
+        'institution': data.get('institution', ''),
+        'initial_balance': float(data.get('initial_balance', 0)),
+        'current_balance': float(data.get('initial_balance', 0)),
+        'color': data.get('color', '#6366f1'),
+        'icon': data.get('icon', 'wallet2'),
+        'is_active': True,
+        'created_at': datetime.utcnow()
+    }
+    
+    accounts_collection.insert_one(account_data)
+    # Convert _id to id for frontend compatibility
+    account_data['id'] = account_data['_id']
+    account_data.pop('_id')  # Remove _id para retorno
+    
+    return jsonify(account_data), 201
+
+@app.route('/api/accounts/<account_id>', methods=['PUT', 'DELETE'])
+@require_auth
+def account_detail(account_id):
+    """Atualizar ou deletar conta"""
+    account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
+    if not account:
+        return jsonify({'error': 'Conta não encontrada'}), 404
+    
+    if request.method == 'DELETE':
+        # Verifica se há transações usando esta conta
+        transaction_count = transactions_collection.count_documents({'account_id': account_id})
+        if transaction_count > 0:
+            return jsonify({'error': f'Não é possível deletar. Existem {transaction_count} transações nesta conta'}), 400
+        
+        accounts_collection.delete_one({'_id': account_id})
+        return jsonify({'message': 'Conta deletada com sucesso'})
+    
+    # PUT - Atualizar conta
+    data = request.get_json()
+    update_data = {}
+    
+    allowed_fields = ['name', 'institution', 'color', 'icon', 'is_active']
+    for field in allowed_fields:
+        if field in data:
+            update_data[field] = data[field]
+    
+    if update_data:
+        accounts_collection.update_one(
+            {'_id': account_id, 'user_id': request.user_id},
+            {'$set': update_data}
+        )
+    
+    return jsonify({'message': 'Conta atualizada com sucesso'})
+
+# Configurações do Dashboard
+
+@app.route('/api/dashboard-settings', methods=['GET', 'PUT'])
+@require_auth
+def dashboard_settings():
+    """Configurações personalizáveis do dashboard"""
+    if request.method == 'GET':
+        user = users_collection.find_one({'_id': request.user_id})
+        dashboard_config = user.get('dashboard_settings', {
+            'show_expenses_by_category': True,
+            'show_income_by_category': True,
+            'show_expense_frequency': True,
+            'show_balance_chart': True,
+            'show_monthly_balance': True,
+            'show_quarterly_balance': False,
+            'show_pending_transactions': True,
+            'show_credit_card_info': False,
+            'show_budget_summary': False,
+            'show_goals': False,
+            'show_savings_info': False,
+            'show_profile_info': True,
+            'show_accounts_summary': True
+        })
+        return jsonify(dashboard_config)
+    
+    # PUT - Atualizar configurações
+    data = request.get_json()
+    allowed_settings = [
+        'show_expenses_by_category', 'show_income_by_category', 
+        'show_expense_frequency', 'show_balance_chart',
+        'show_monthly_balance', 'show_quarterly_balance',
+        'show_pending_transactions', 'show_credit_card_info',
+        'show_budget_summary', 'show_goals', 'show_savings_info',
+        'show_profile_info', 'show_accounts_summary'
+    ]
+    
+    update_data = {}
+    for key in allowed_settings:
+        if key in data:
+            update_data[f'dashboard_settings.{key}'] = data[key]
+    
+    if update_data:
+        users_collection.update_one(
+            {'_id': request.user_id},
+            {'$set': update_data}
+        )
+    
+    return jsonify({'message': 'Configurações do dashboard atualizadas com sucesso'})
+
+# Dashboard Avançado com Configurações
+
+@app.route('/api/dashboard-advanced', methods=['GET'])
+@require_auth
+def dashboard_advanced():
+    """Dashboard avançado com todas as funcionalidades"""
+    # Parâmetros de período (padrão: mês atual)
+    month = int(request.args.get('month', datetime.now().month))
+    year = int(request.args.get('year', datetime.now().year))
+    
+    # Data inicial e final do período
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+    
+    # Filtro base para o período
+    period_filter = {
+        'user_id': request.user_id,
+        'date': {'$gte': start_date, '$lt': end_date}
+    }
+    
+    # Configurações do dashboard
+    user = users_collection.find_one({'_id': request.user_id})
+    dashboard_config = user.get('dashboard_settings', {})
+    
+    # Dados base
+    result = {
+        'period': {
+            'month': month,
+            'year': year,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat()
+        },
+        'config': dashboard_config
+    }
+    
+    # Busca todas as transações do período
+    transactions_list = list(transactions_collection.find(period_filter))
+    
+    # Calcula totais básicos
+    total_income = sum(t['amount'] for t in transactions_list if t['type'] == 'income')
+    total_expense = sum(t['amount'] for t in transactions_list if t['type'] == 'expense')
+    balance = total_income - total_expense
+    
+    result['summary'] = {
+        'total_income': total_income,
+        'total_expense': total_expense,
+        'balance': balance,
+        'transactions_count': len(transactions_list)
+    }
+    
+    # Contas/Carteiras
+    if dashboard_config.get('show_accounts_summary', True):
+        accounts_list = list(accounts_collection.find({'user_id': request.user_id, 'is_active': True}))
+        for account in accounts_list:
+            account['id'] = account['_id']
+            account.pop('_id', None)
+        result['accounts'] = accounts_list
+    
+    # Transações recentes
+    recent_transactions = list(transactions_collection.find(
+        {'user_id': request.user_id}
+    ).sort('date', -1).limit(5))
+    
+    for transaction in recent_transactions:
+        category = categories_collection.find_one({'_id': transaction['category_id']})
+        if category:
+            transaction['category'] = {
+                'name': category['name'],
+                'color': category['color'],
+                'icon': category['icon']
+            }
+        transaction['id'] = transaction['_id']
+        transaction.pop('_id', None)
+    
+    result['recent_transactions'] = recent_transactions
+    
+    # Análise por categoria (despesas)
+    if dashboard_config.get('show_expenses_by_category', True):
+        expense_pipeline = [
+            {'$match': {**period_filter, 'type': 'expense'}},
+            {'$group': {
+                '_id': '$category_id',
+                'total': {'$sum': '$amount'},
+                'count': {'$sum': 1}
+            }},
+            {'$sort': {'total': -1}}
+        ]
+        
+        expense_by_category = []
+        for item in transactions_collection.aggregate(expense_pipeline):
+            category = categories_collection.find_one({'_id': item['_id']})
+            if category:
+                expense_by_category.append({
+                    'category_id': item['_id'],
+                    'category_name': category['name'],
+                    'category_color': category['color'],
+                    'category_icon': category['icon'],
+                    'total': item['total'],
+                    'count': item['count'],
+                    'percentage': (item['total'] / total_expense * 100) if total_expense > 0 else 0
+                })
+        
+        result['expense_by_category'] = expense_by_category
+    
+    # Análise por categoria (receitas)
+    if dashboard_config.get('show_income_by_category', True):
+        income_pipeline = [
+            {'$match': {**period_filter, 'type': 'income'}},
+            {'$group': {
+                '_id': '$category_id',
+                'total': {'$sum': '$amount'},
+                'count': {'$sum': 1}
+            }},
+            {'$sort': {'total': -1}}
+        ]
+        
+        income_by_category = []
+        for item in transactions_collection.aggregate(income_pipeline):
+            category = categories_collection.find_one({'_id': item['_id']})
+            if category:
+                income_by_category.append({
+                    'category_id': item['_id'],
+                    'category_name': category['name'],
+                    'category_color': category['color'],
+                    'category_icon': category['icon'],
+                    'total': item['total'],
+                    'count': item['count'],
+                    'percentage': (item['total'] / total_income * 100) if total_income > 0 else 0
+                })
+        
+        result['income_by_category'] = income_by_category
+    
+    # Evolução mensal (últimos 6 meses)
+    if dashboard_config.get('show_balance_chart', True):
+        monthly_evolution = []
+        for i in range(5, -1, -1):  # Últimos 6 meses
+            target_date = start_date - timedelta(days=30 * i)
+            month_start = target_date.replace(day=1)
+            if target_date.month == 12:
+                month_end = target_date.replace(year=target_date.year + 1, month=1, day=1)
+            else:
+                month_end = target_date.replace(month=target_date.month + 1, day=1)
+            
+            month_filter = {
+                'user_id': request.user_id,
+                'date': {'$gte': month_start, '$lt': month_end}
+            }
+            
+            month_transactions = list(transactions_collection.find(month_filter))
+            month_income = sum(t['amount'] for t in month_transactions if t['type'] == 'income')
+            month_expense = sum(t['amount'] for t in month_transactions if t['type'] == 'expense')
+            
+            monthly_evolution.append({
+                'month': target_date.strftime('%m/%Y'),
+                'income': month_income,
+                'expense': month_expense,
+                'balance': month_income - month_expense
+            })
+        
+        result['monthly_evolution'] = monthly_evolution
+    
+    return jsonify(result)
+
+# Coleção de contas no MongoDB
+accounts_collection = db.accounts
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001, debug=True)
