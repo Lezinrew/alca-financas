@@ -1131,6 +1131,330 @@ def dashboard_advanced():
     
     return jsonify(result)
 
+# Rotas de Relatórios
+
+@app.route('/api/reports/overview', methods=['GET'])
+@require_auth
+def reports_overview():
+    """Relatórios gerais - visão geral"""
+    month = int(request.args.get('month', datetime.now().month))
+    year = int(request.args.get('year', datetime.now().year))
+    report_type = request.args.get('type', 'expenses_by_category')  # expenses_by_category, expenses_by_account, income_by_category, etc.
+    
+    # Data inicial e final do período
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+    
+    period_filter = {
+        'user_id': request.user_id,
+        'date': {'$gte': start_date, '$lt': end_date}
+    }
+    
+    result = {
+        'period': {
+            'month': month,
+            'year': year,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat()
+        },
+        'report_type': report_type
+    }
+    
+    if report_type == 'expenses_by_category':
+        # Despesas por categoria
+        pipeline = [
+            {'$match': {**period_filter, 'type': 'expense'}},
+            {'$group': {
+                '_id': '$category_id',
+                'total': {'$sum': '$amount'},
+                'count': {'$sum': 1}
+            }},
+            {'$sort': {'total': -1}}
+        ]
+        
+        total_amount = 0
+        categories_data = []
+        for item in transactions_collection.aggregate(pipeline):
+            category = categories_collection.find_one({'_id': item['_id']})
+            if category:
+                total_amount += item['total']
+                categories_data.append({
+                    'category_id': item['_id'],
+                    'category_name': category['name'],
+                    'category_color': category['color'],
+                    'category_icon': category['icon'],
+                    'total': item['total'],
+                    'count': item['count']
+                })
+        
+        # Calcula porcentagens
+        for item in categories_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+        
+        result['data'] = categories_data
+        result['total_amount'] = total_amount
+        
+    elif report_type == 'income_by_category':
+        # Receitas por categoria
+        pipeline = [
+            {'$match': {**period_filter, 'type': 'income'}},
+            {'$group': {
+                '_id': '$category_id',
+                'total': {'$sum': '$amount'},
+                'count': {'$sum': 1}
+            }},
+            {'$sort': {'total': -1}}
+        ]
+        
+        total_amount = 0
+        categories_data = []
+        for item in transactions_collection.aggregate(pipeline):
+            category = categories_collection.find_one({'_id': item['_id']})
+            if category:
+                total_amount += item['total']
+                categories_data.append({
+                    'category_id': item['_id'],
+                    'category_name': category['name'],
+                    'category_color': category['color'],
+                    'category_icon': category['icon'],
+                    'total': item['total'],
+                    'count': item['count']
+                })
+        
+        # Calcula porcentagens
+        for item in categories_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+        
+        result['data'] = categories_data
+        result['total_amount'] = total_amount
+        
+    elif report_type == 'expenses_by_account':
+        # Despesas por conta
+        pipeline = [
+            {'$match': {**period_filter, 'type': 'expense'}},
+            {'$group': {
+                '_id': '$account_id',
+                'total': {'$sum': '$amount'},
+                'count': {'$sum': 1}
+            }},
+            {'$sort': {'total': -1}}
+        ]
+        
+        total_amount = 0
+        accounts_data = []
+        for item in transactions_collection.aggregate(pipeline):
+            account = accounts_collection.find_one({'_id': item['_id']}) if item['_id'] else None
+            account_name = account['name'] if account else 'Conta Padrão'
+            account_color = account['color'] if account else '#6c757d'
+            account_icon = account['icon'] if account else 'wallet2'
+            
+            total_amount += item['total']
+            accounts_data.append({
+                'account_id': item['_id'],
+                'account_name': account_name,
+                'account_color': account_color,
+                'account_icon': account_icon,
+                'total': item['total'],
+                'count': item['count']
+            })
+        
+        # Calcula porcentagens
+        for item in accounts_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+        
+        result['data'] = accounts_data
+        result['total_amount'] = total_amount
+        
+    elif report_type == 'income_by_account':
+        # Receitas por conta
+        pipeline = [
+            {'$match': {**period_filter, 'type': 'income'}},
+            {'$group': {
+                '_id': '$account_id',
+                'total': {'$sum': '$amount'},
+                'count': {'$sum': 1}
+            }},
+            {'$sort': {'total': -1}}
+        ]
+        
+        total_amount = 0
+        accounts_data = []
+        for item in transactions_collection.aggregate(pipeline):
+            account = accounts_collection.find_one({'_id': item['_id']}) if item['_id'] else None
+            account_name = account['name'] if account else 'Conta Padrão'
+            account_color = account['color'] if account else '#6c757d'
+            account_icon = account['icon'] if account else 'wallet2'
+            
+            total_amount += item['total']
+            accounts_data.append({
+                'account_id': item['_id'],
+                'account_name': account_name,
+                'account_color': account_color,
+                'account_icon': account_icon,
+                'total': item['total'],
+                'count': item['count']
+            })
+        
+        # Calcula porcentagens
+        for item in accounts_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+        
+        result['data'] = accounts_data
+        result['total_amount'] = total_amount
+        
+    elif report_type == 'balance_by_account':
+        # Saldos por conta
+        accounts_list = list(accounts_collection.find({'user_id': request.user_id, 'is_active': True}))
+        accounts_data = []
+        
+        for account in accounts_list:
+            # Calcula saldo baseado nas transações
+            account_transactions = list(transactions_collection.find({
+                'user_id': request.user_id,
+                'account_id': account['_id']
+            }))
+            
+            income_total = sum(t['amount'] for t in account_transactions if t['type'] == 'income')
+            expense_total = sum(t['amount'] for t in account_transactions if t['type'] == 'expense')
+            current_balance = account.get('initial_balance', 0) + income_total - expense_total
+            
+            accounts_data.append({
+                'account_id': account['_id'],
+                'account_name': account['name'],
+                'account_color': account['color'],
+                'account_icon': account['icon'],
+                'account_type': account['type'],
+                'initial_balance': account.get('initial_balance', 0),
+                'current_balance': current_balance,
+                'total_income': income_total,
+                'total_expense': expense_total
+            })
+        
+        result['data'] = accounts_data
+        result['total_amount'] = sum(item['current_balance'] for item in accounts_data)
+    
+    return jsonify(result)
+
+@app.route('/api/reports/evolution', methods=['GET'])
+@require_auth
+def reports_evolution():
+    """Relatório de evolução temporal"""
+    period = request.args.get('period', 'monthly')  # monthly, weekly, yearly
+    months_back = int(request.args.get('months_back', 6))  # Últimos N meses
+    chart_type = request.args.get('chart_type', 'line')  # line, bar
+    
+    evolution_data = []
+    current_date = datetime.now()
+    
+    if period == 'monthly':
+        for i in range(months_back - 1, -1, -1):
+            # Calcula a data do mês
+            target_date = current_date - timedelta(days=30 * i)
+            month_start = target_date.replace(day=1)
+            if target_date.month == 12:
+                month_end = target_date.replace(year=target_date.year + 1, month=1, day=1)
+            else:
+                month_end = target_date.replace(month=target_date.month + 1, day=1)
+            
+            # Filtro para o mês
+            month_filter = {
+                'user_id': request.user_id,
+                'date': {'$gte': month_start, '$lt': month_end}
+            }
+            
+            # Busca transações do mês
+            month_transactions = list(transactions_collection.find(month_filter))
+            month_income = sum(t['amount'] for t in month_transactions if t['type'] == 'income')
+            month_expense = sum(t['amount'] for t in month_transactions if t['type'] == 'expense')
+            
+            evolution_data.append({
+                'period': target_date.strftime('%m/%Y'),
+                'month': target_date.month,
+                'year': target_date.year,
+                'income': month_income,
+                'expense': month_expense,
+                'balance': month_income - month_expense,
+                'transactions_count': len(month_transactions)
+            })
+    
+    return jsonify({
+        'period_type': period,
+        'chart_type': chart_type,
+        'data': evolution_data
+    })
+
+@app.route('/api/reports/comparison', methods=['GET'])
+@require_auth
+def reports_comparison():
+    """Relatório de comparação entre períodos"""
+    current_month = int(request.args.get('current_month', datetime.now().month))
+    current_year = int(request.args.get('current_year', datetime.now().year))
+    
+    # Período atual
+    current_start = datetime(current_year, current_month, 1)
+    if current_month == 12:
+        current_end = datetime(current_year + 1, 1, 1)
+    else:
+        current_end = datetime(current_year, current_month + 1, 1)
+    
+    # Período anterior (mês anterior)
+    if current_month == 1:
+        prev_start = datetime(current_year - 1, 12, 1)
+        prev_end = datetime(current_year, 1, 1)
+    else:
+        prev_start = datetime(current_year, current_month - 1, 1)
+        prev_end = current_start
+    
+    # Dados do período atual
+    current_transactions = list(transactions_collection.find({
+        'user_id': request.user_id,
+        'date': {'$gte': current_start, '$lt': current_end}
+    }))
+    
+    current_income = sum(t['amount'] for t in current_transactions if t['type'] == 'income')
+    current_expense = sum(t['amount'] for t in current_transactions if t['type'] == 'expense')
+    
+    # Dados do período anterior  
+    prev_transactions = list(transactions_collection.find({
+        'user_id': request.user_id,
+        'date': {'$gte': prev_start, '$lt': prev_end}
+    }))
+    
+    prev_income = sum(t['amount'] for t in prev_transactions if t['type'] == 'income')
+    prev_expense = sum(t['amount'] for t in prev_transactions if t['type'] == 'expense')
+    
+    # Calcula variações percentuais
+    income_variation = ((current_income - prev_income) / prev_income * 100) if prev_income > 0 else 0
+    expense_variation = ((current_expense - prev_expense) / prev_expense * 100) if prev_expense > 0 else 0
+    
+    return jsonify({
+        'current_period': {
+            'start_date': current_start.isoformat(),
+            'end_date': current_end.isoformat(),
+            'income': current_income,
+            'expense': current_expense,
+            'balance': current_income - current_expense,
+            'transactions_count': len(current_transactions)
+        },
+        'previous_period': {
+            'start_date': prev_start.isoformat(),
+            'end_date': prev_end.isoformat(),
+            'income': prev_income,
+            'expense': prev_expense,
+            'balance': prev_income - prev_expense,
+            'transactions_count': len(prev_transactions)
+        },
+        'variations': {
+            'income_variation': income_variation,
+            'expense_variation': expense_variation,
+            'balance_variation': ((current_income - current_expense) - (prev_income - prev_expense)),
+            'transactions_variation': len(current_transactions) - len(prev_transactions)
+        }
+    })
+
 # Coleção de contas no MongoDB
 accounts_collection = db.accounts
 
