@@ -15,6 +15,8 @@ import Categories from './components/categories/Categories';
 import Settings from './components/settings/Settings';
 import Profile from './components/profile/Profile';
 import Import from './components/import/Import';
+import Reports from './components/reports/Reports';
+import Accounts from './components/accounts/Accounts';
 
 // Componente de Loading
 const LoadingSpinner = () => (
@@ -85,6 +87,8 @@ const AppContent = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="categories" element={<Categories />} />
+          <Route path="accounts" element={<Accounts />} />
+          <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="import" element={<Import />} />
