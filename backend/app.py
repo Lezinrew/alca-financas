@@ -378,6 +378,16 @@ def transactions():
     if data['type'] != category['type']:
         return jsonify({'error': 'Tipo da transação não combina com tipo da categoria'}), 400
     
+    # Verifica se a conta existe (opcional)
+    account_id = data.get('account_id')
+    if account_id:
+        account = accounts_collection.find_one({
+            '_id': account_id,
+            'user_id': request.user_id
+        })
+        if not account:
+            return jsonify({'error': 'Conta não encontrada'}), 404
+    
     # Processa recorrência/parcelamento
     installments = data.get('installments', 1)
     is_recurring = data.get('is_recurring', False)
@@ -399,6 +409,7 @@ def transactions():
                 'amount': installment_amount,
                 'type': data['type'],
                 'category_id': data['category_id'],
+                'account_id': account_id,  # Adiciona suporte a conta
                 'date': transaction_date,
                 'is_recurring': False,
                 'installment_info': {
@@ -423,6 +434,7 @@ def transactions():
             'amount': float(data['amount']),
             'type': data['type'],
             'category_id': data['category_id'],
+            'account_id': account_id,  # Adiciona suporte a conta
             'date': base_date,
             'is_recurring': is_recurring,
             'installment_info': None,
@@ -434,6 +446,18 @@ def transactions():
     # Insere transações no banco
     if transactions_to_create:
         transactions_collection.insert_many(transactions_to_create)
+        
+        # Atualiza saldo das contas se especificado
+        if account_id:
+            for transaction in transactions_to_create:
+                amount_change = transaction['amount']
+                if transaction['type'] == 'expense':
+                    amount_change = -amount_change
+                
+                accounts_collection.update_one(
+                    {'_id': account_id},
+                    {'$inc': {'current_balance': amount_change}}
+                )
     
     return jsonify({
         'message': f'{len(transactions_to_create)} transação(ões) criada(s) com sucesso',
