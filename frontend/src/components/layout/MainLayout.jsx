@@ -26,6 +26,16 @@ const MainLayout = () => {
       label: t('navigation.categories')
     },
     {
+      path: '/accounts',
+      icon: 'bi-wallet2',
+      label: 'Contas'
+    },
+    {
+      path: '/reports',
+      icon: 'bi-bar-chart',
+      label: 'Relatórios'
+    },
+    {
       path: '/import',
       icon: 'bi-upload',
       label: t('navigation.import')
