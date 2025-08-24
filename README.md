@@ -304,3 +304,36 @@ GOOGLE_CLIENT_SECRET=real-google-secret
 ---
 
 **Desenvolvido com ❤️ para gestão financeira inteligente**
+
+---
+
+## 🔒 OAuth Google (fix OIDC `nonce`) — atualização
+- Passos aplicados no `backend/app.py`:
+  - Em `/api/auth/google/login`: gerar `nonce` com `secrets.token_urlsafe`, salvar em `session["__google_oidc_nonce__"]` e enviar no `authorize_redirect(..., nonce=nonce)`.
+  - Em `/api/auth/google/callback`: validar com `google.parse_id_token(token, nonce=session.get("__google_oidc_nonce__"))`.
+  - Opcional: `session.pop("__google_oidc_nonce__", None)` após uso.
+- Rebuild do backend: `docker compose up -d --build backend`.
+- Teste: abrir `http://localhost:5000/api/auth/google/login`.
+
+
+---
+
+## 🔒 OAuth Google (fix OIDC `nonce`) — atualização
+- Passos aplicados no `backend/app.py`:
+  - Em `/api/auth/google/login`: gerar `nonce` com `secrets.token_urlsafe`, salvar em `session["__google_oidc_nonce__"]` e enviar no `authorize_redirect(..., nonce=nonce)`.
+  - Em `/api/auth/google/callback`: validar com `google.parse_id_token(token, nonce=session.get("__google_oidc_nonce__"))`.
+  - Opcional: `session.pop("__google_oidc_nonce__", None)` após uso.
+- Rebuild do backend: `docker compose up -d --build backend`.
+- Teste: abrir `http://localhost:5000/api/auth/google/login`.
+
+
+---
+
+## 🔒 OAuth Google (fix OIDC `nonce`) — atualização
+- Passos aplicados no `backend/app.py`:
+  - Em `/api/auth/google/login`: gerar `nonce` com `secrets.token_urlsafe`, salvar em `session["__google_oidc_nonce__"]` e enviar no `authorize_redirect(..., nonce=nonce)`.
+  - Em `/api/auth/google/callback`: validar com `google.parse_id_token(token, nonce=session.get("__google_oidc_nonce__"))`.
+  - Opcional: `session.pop("__google_oidc_nonce__", None)` após uso.
+- Rebuild do backend: `docker compose up -d --build backend`.
+- Teste: abrir `http://localhost:5000/api/auth/google/login`.
+
