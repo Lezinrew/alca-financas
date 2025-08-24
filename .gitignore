@@ -1,0 +1,4 @@
+backend/.env
+backend/.env.local
+debug_google_login.sh
+fix_google_login.sh
