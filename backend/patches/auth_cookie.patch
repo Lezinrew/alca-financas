@@ -1,0 +1,126 @@
+*** a/backend/app.py
+--- b/backend/app.py
+***************
+*** 1,12 ****
+- from flask import Flask, jsonify, request
++ from flask import Flask, jsonify, request, redirect, make_response, g, session
+  import os
+  # ... seus imports existentes ...
+  
+  app = Flask(__name__)
+  
+! # CORS anterior (se existir) pode ser substituído por este:
+  from flask_cors import CORS
+  ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+  CORS(
+      app,
+      resources={r"/api/*": {"origins": ALLOWED_ORIGINS or ["http://localhost:5173"]}},
+      supports_credentials=True,
+  )
+  
++ # =========================
++ # Helpers de autenticação
++ # =========================
++ import jwt
++ 
++ def _cookie_name():
++     return os.getenv("COOKIE_NAME", "auth_token")
++ 
++ def _cookie_opts():
++     return {
++         "max_age": int(os.getenv("COOKIE_MAX_AGE", "86400")),
++         "httponly": True,
++         "secure": os.getenv("COOKIE_SECURE", "false").lower() == "true",
++         "samesite": os.getenv("COOKIE_SAMESITE", "Lax"),
++         "domain": (os.getenv("COOKIE_DOMAIN") or None),
++         "path": "/",
++     }
++ 
++ def _get_token_from_cookie():
++     return request.cookies.get(_cookie_name())
++ 
++ def current_user_from_cookie():
++     token = _get_token_from_cookie()
++     if not token:
++         return None
++     try:
++         payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
++         # ajuste aqui se você busca no Mongo:
++         return {"id": payload.get("sub"), "email": payload.get("email"), "name": payload.get("name")}
++     except jwt.ExpiredSignatureError:
++         return None
++     except jwt.InvalidTokenError:
++         return None
++ 
++ from functools import wraps
++ def login_required(f):
++     @wraps(f)
++     def wrapper(*args, **kwargs):
++         user = current_user_from_cookie()
++         if not user:
++             return jsonify({"error": "unauthorized"}), 401
++         g.current_user = user
++         return f(*args, **kwargs)
++     return wrapper
++ 
++ # =========================
++ # Endpoints utilitários
++ # =========================
++ @app.get("/api/auth/me")
++ def auth_me():
++     user = current_user_from_cookie()
++     if not user:
++         return jsonify({"authenticated": False}), 200
++     return jsonify({"authenticated": True, "user": user}), 200
++ 
++ @app.post("/api/auth/logout")
++ def auth_logout():
++     resp = make_response(jsonify({"success": True}))
++     resp.set_cookie(_cookie_name(), "", max_age=0, httponly=True, path="/", domain=_cookie_opts()["domain"])
++     return resp, 200
++ 
+***************
+*** 720,780 ****
+- @app.route("/api/auth/google/callback")
+- def google_callback():
+-     """
+-     Implementação antiga retornava JSON com token e user.
+-     """
+-     # ... você obtém 'token' e 'user_doc' aqui ...
+-     return jsonify({"success": True, "token": token, "user": user_doc}), 200
++ @app.route("/api/auth/google/callback")
++ def google_callback():
++     """
++     Após sucesso no OAuth:
++       - gere seu JWT 'token' como já faz hoje
++       - ao invés de devolver JSON, seta cookie HttpOnly e redireciona ao frontend
++     """
++     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
++     # aqui permanece sua lógica atual de troca 'code'->tokens + criação de usuário
++     # e geração do JWT 'token' (HS256 com SECRET_KEY ou conforme seu padrão)
++     # Exemplo ilustrativo:
++     # token = jwt.encode({"sub": str(user_id), "email": email, "name": name, "exp": ...}, os.getenv("SECRET_KEY"), algorithm="HS256")
++     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
++ 
++     cookie_opts = _cookie_opts()
++     frontend = os.getenv("FRONTEND_REDIRECT_URL", "http://localhost:5173")
++     resp = make_response(redirect(frontend))
++     resp.set_cookie(
++         _cookie_name(),
++         token,
++         max_age=cookie_opts["max_age"],
++         httponly=cookie_opts["httponly"],
++         secure=cookie_opts["secure"],
++         samesite=cookie_opts["samesite"],
++         domain=cookie_opts["domain"],
++         path=cookie_opts["path"],
++     )
++ 
++     # (opcional) limpar nonce salvo em sessão, se você o usa:
++     try:
++         if "__google_oidc_nonce__" in session:
++             session.pop("__google_oidc_nonce__", None)
++     except Exception:
++         pass
++ 
++     return resp
