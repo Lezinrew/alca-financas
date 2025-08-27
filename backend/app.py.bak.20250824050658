@@ -742,6 +742,9 @@ def google_login():
 def google_callback():
     """Callback do login com Google"""
     if GOOGLE_CLIENT_ID.startswith('placeholder'):
+    session.pop("__google_oidc_nonce__", None)
+    session.pop("__google_oidc_nonce__", None)
+    session.pop("__google_oidc_nonce__", None)
         return jsonify({
             'error': 'Configuração OAuth do Google não definida',
             'message': 'Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env'
@@ -753,7 +756,6 @@ def google_callback():
         
         # Obtém dados do usuário do Google
         resp = google.parse_id_token(token, nonce=session.get("__google_oidc_nonce__"))
-        session.pop("__google_oidc_nonce__", None)
         google_user = {
             'sub': resp['sub'],
             'email': resp['email'],
