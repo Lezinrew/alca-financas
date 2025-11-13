@@ -9,6 +9,10 @@ def list_categories(categories_collection, user_id: str) -> List[Dict[str, Any]]
         if '_id' in category:
             category['id'] = category['_id']
             category.pop('_id', None)
+        # Garantir serialização segura de datetime
+        created_at = category.get('created_at')
+        if isinstance(created_at, datetime):
+            category['created_at'] = created_at.isoformat()
     return user_categories
 
 

@@ -19,7 +19,8 @@ from routes.reports import bp as reports_bp
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY')
+# SECRET_KEY necessário para sessões (ex.: OAuth). Usa default seguro em dev se não definido.
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
 
 CORS(app, origins=os.getenv('CORS_ORIGINS', '*').split(','))
 
@@ -34,8 +35,12 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-mongo_client = MongoClient(os.getenv('MONGO_URI'))
-db = mongo_client[os.getenv('MONGO_DB')]
+# Configuração segura do MongoDB com defaults locais
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/alca_financas')
+MONGO_DB = os.getenv('MONGO_DB', 'alca_financas')
+
+mongo_client = MongoClient(MONGO_URI)
+db = mongo_client[MONGO_DB]
 app.config['DB'] = db
 app.config['USERS'] = db.users
 app.config['CATEGORIES'] = db.categories

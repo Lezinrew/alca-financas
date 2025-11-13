@@ -1,55 +1,11 @@
 services:
-  mongo:
-    image: mongo:4.4
-    container_name: alca_mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    environment:
-      MONGO_INITDB_DATABASE: ${MONGO_DB:-finance}
-
-  mongo-express:
-    image: mongo-express:1
-    container_name: alca_mongo_express
-    depends_on:
-      - mongo
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-      ME_CONFIG_BASICAUTH_USERNAME: ${ME_USER:-admin}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASS:-admin}
-
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: alca_backend
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      MONGO_URL: mongodb://mongo:27017/alca_financas
     depends_on:
       - mongo
-    environment:
-      FLASK_ENV: production
-      SECRET_KEY: ${SECRET_KEY:-change_me}
-      MONGO_URI: mongodb://mongo:27017
-      MONGO_DB: ${MONGO_DB:-finance}
-      JWT_EXPIRES_HOURS: ${JWT_EXPIRES_HOURS:-24}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost}
     ports:
-      - "5000:5000"
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: alca_frontend
-    depends_on:
-      - backend
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
-    ports:
-      - "5173:80"
-
-volumes:
-  mongo_data:
+      - "8000:5000"   # host:container
