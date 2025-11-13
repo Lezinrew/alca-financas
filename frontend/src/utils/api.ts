@@ -41,35 +41,35 @@ api.interceptors.response.use(
 
 // Funções de autenticação
 export const authAPI = {
-  login: (credentials) => api.post('/login', credentials),
-  register: (userData) => api.post('/register', userData),
-  forgotPassword: (email) => api.post('/forgot-password', { email }),
-  getMe: () => api.get('/me'),
-  updateSettings: (settings) => api.put('/settings', settings),
-  getSettings: () => api.get('/settings'),
+  login: (credentials: { email: string; password: string }) => api.post('/auth/login', credentials),
+  register: (userData: { name: string; email: string; password: string }) => api.post('/auth/register', userData),
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  getMe: () => api.get('/auth/me'),
+  updateSettings: (settings: any) => api.put('/auth/settings', settings),
+  getSettings: () => api.get('/auth/settings'),
 };
 
 // Funções de categorias
 export const categoriesAPI = {
   getAll: () => api.get('/categories'),
-  create: (categoryData) => api.post('/categories', categoryData),
-  update: (id, categoryData) => api.put(`/categories/${id}`, categoryData),
-  delete: (id) => api.delete(`/categories/${id}`),
+  create: (categoryData: any) => api.post('/categories', categoryData),
+  update: (id: string, categoryData: any) => api.put(`/categories/${id}`, categoryData),
+  delete: (id: string) => api.delete(`/categories/${id}`),
 };
 
 // Funções de transações
 export const transactionsAPI = {
-  getAll: (filters = {}) => {
+  getAll: (filters: Record<string, any> = {}) => {
     const params = new URLSearchParams();
     Object.keys(filters).forEach(key => {
       if (filters[key]) params.append(key, filters[key]);
     });
     return api.get(`/transactions?${params.toString()}`);
   },
-  create: (transactionData) => api.post('/transactions', transactionData),
-  update: (id, transactionData) => api.put(`/transactions/${id}`, transactionData),
-  delete: (id) => api.delete(`/transactions/${id}`),
-  import: (csvFile) => {
+  create: (transactionData: any) => api.post('/transactions', transactionData),
+  update: (id: string, transactionData: any) => api.put(`/transactions/${id}`, transactionData),
+  delete: (id: string) => api.delete(`/transactions/${id}`),
+  import: (csvFile: File) => {
     const formData = new FormData();
     formData.append('file', csvFile);
     return api.post('/transactions/import', formData, {
@@ -82,7 +82,7 @@ export const transactionsAPI = {
 
 // Funções do dashboard
 export const dashboardAPI = {
-  getData: (month, year) => {
+  getData: (month?: string, year?: string) => {
     const params = new URLSearchParams();
     if (month) params.append('month', month);
     if (year) params.append('year', year);
@@ -98,18 +98,18 @@ export const oauthAPI = {
 };
 
 // Utilitários
-export const formatCurrency = (value, currency = 'BRL') => {
+export const formatCurrency = (value: number, currency = 'BRL') => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: currency,
   }).format(value);
 };
 
-export const formatDate = (date) => {
+export const formatDate = (date: string | Date) => {
   return new Date(date).toLocaleDateString('pt-BR');
 };
 
-export const formatDateTime = (date) => {
+export const formatDateTime = (date: string | Date) => {
   return new Date(date).toLocaleString('pt-BR');
 };
 

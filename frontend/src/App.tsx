@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { useTranslation } from 'react-i18next';
 
 // Componentes de Autenticação
 import Login from './components/auth/Login';
@@ -18,6 +17,11 @@ import Import from './components/import/Import';
 import Reports from './components/reports/Reports';
 import Accounts from './components/accounts/Accounts';
 
+// Type definitions
+interface RouteWrapperProps {
+  children: React.ReactNode;
+}
+
 // Componente de Loading
 const LoadingSpinner = () => (
   <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
@@ -29,7 +33,7 @@ const LoadingSpinner = () => (
 );
 
 // Componente de Rota Protegida
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute: React.FC<RouteWrapperProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -44,7 +48,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 // Componente de Rota Pública (apenas para usuários não autenticados)
-const PublicRoute = ({ children }) => {
+const PublicRoute: React.FC<RouteWrapperProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -59,8 +63,9 @@ const PublicRoute = ({ children }) => {
 };
 
 // Componente Principal da Aplicação
-const AppContent = () => {
-  const { i18n } = useTranslation();
+const AppContent: React.FC = () => {
+  // Remove unused variable
+  // const { i18n } = useTranslation();
 
   return (
     <Router>
@@ -102,7 +107,7 @@ const AppContent = () => {
 };
 
 // Componente App Principal
-function App() {
+const App: React.FC = () => {
   return (
     <AuthProvider>
       <div className="App">
@@ -110,6 +115,6 @@ function App() {
       </div>
     </AuthProvider>
   );
-}
+};
 
 export default App;

@@ -4,13 +4,26 @@ import { formatCurrency } from '../../utils/api';
 import AccountForm from './AccountForm';
 import AccountCard from './AccountCard';
 
-const Accounts = () => {
+// Type definitions
+interface Account {
+  id: number;
+  name: string;
+  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+  current_balance: number;
+  initial_balance: number;
+  institution?: string;
+  color: string;
+  icon?: string;
+  is_active: boolean;
+}
+
+const Accounts: React.FC = () => {
   const { t } = useTranslation();
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editingAccount, setEditingAccount] = useState(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [showForm, setShowForm] = useState<boolean>(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -46,12 +59,12 @@ const Accounts = () => {
     setShowForm(true);
   };
 
-  const handleEditAccount = (account) => {
+  const handleEditAccount = (account: Account) => {
     setEditingAccount(account);
     setShowForm(true);
   };
 
-  const handleDeleteAccount = async (accountId) => {
+  const handleDeleteAccount = async (accountId: number) => {
     if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
 
     try {
@@ -69,12 +82,12 @@ const Accounts = () => {
 
       await loadAccounts(); // Recarrega lista
     } catch (err) {
-      setError(err.message || 'Erro ao deletar conta');
+      setError((err as Error).message || 'Erro ao deletar conta');
       console.error('Delete account error:', err);
     }
   };
 
-  const handleFormSubmit = async (formData) => {
+  const handleFormSubmit = async (formData: Omit<Account, 'id'>) => {
     try {
       const url = editingAccount 
         ? `${process.env.REACT_APP_BACKEND_URL}/api/accounts/${editingAccount.id}`

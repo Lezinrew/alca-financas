@@ -1,8 +1,27 @@
 import React from 'react';
 import { formatCurrency } from '../../utils/api';
 
-const AccountCard = ({ account, onEdit, onDelete }) => {
-  const getAccountTypeIcon = (type) => {
+// Type definitions
+interface Account {
+  id: number;
+  name: string;
+  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+  current_balance: number;
+  initial_balance: number;
+  institution?: string;
+  color: string;
+  icon?: string;
+  is_active: boolean;
+}
+
+interface AccountCardProps {
+  account: Account;
+  onEdit: (account: Account) => void;
+  onDelete: (accountId: number) => void;
+}
+
+const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) => {
+  const getAccountTypeIcon = (type: Account['type']): string => {
     switch (type) {
       case 'wallet':
         return 'bi-wallet2';
@@ -19,7 +38,7 @@ const AccountCard = ({ account, onEdit, onDelete }) => {
     }
   };
 
-  const getAccountTypeName = (type) => {
+  const getAccountTypeName = (type: Account['type']): string => {
     switch (type) {
       case 'wallet':
         return 'Carteira';
@@ -36,7 +55,7 @@ const AccountCard = ({ account, onEdit, onDelete }) => {
     }
   };
 
-  const getBalanceColor = () => {
+  const getBalanceColor = (): string => {
     if (account.current_balance > 0) {
       return 'text-success';
     } else if (account.current_balance < 0) {

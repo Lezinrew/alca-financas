@@ -36,7 +36,8 @@ const Transactions = () => {
       ]);
       
       setTransactions(transactionsRes.data);
-      setCategories(categoriesRes.data);
+      // Backend devolve categorias com 'id' string; garantir string
+      setCategories(categoriesRes.data.map((c: any) => ({ ...c, id: String(c.id) })));
     } catch (err) {
       setError('Erro ao carregar transações');
       console.error('Load transactions error:', err);

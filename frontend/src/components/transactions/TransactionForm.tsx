@@ -1,9 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const TransactionForm = ({ show, onHide, onSubmit, categories, transaction }) => {
+// Type definitions
+interface Category {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  color?: string;
+}
+
+interface InstallmentInfo {
+  total: number;
+  current: number;
+}
+
+interface Transaction {
+  id?: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category_id: string;
+  date: string;
+  is_recurring?: boolean;
+  installment_info?: InstallmentInfo;
+}
+
+interface TransactionFormData {
+  description: string;
+  amount: string;
+  type: 'income' | 'expense';
+  category_id: string;
+  date: string;
+  is_recurring: boolean;
+  installments: number;
+}
+
+interface TransactionFormProps {
+  show: boolean;
+  onHide: () => void;
+  onSubmit: (transaction: Omit<Transaction, 'id'> & { installments: number }) => Promise<void>;
+  categories: Category[];
+  transaction?: Transaction | null;
+}
+
+const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmit, categories, transaction }) => {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<TransactionFormData>({
     description: '',
     amount: '',
     type: 'expense',
@@ -12,17 +54,17 @@ const TransactionForm = ({ show, onHide, onSubmit, categories, transaction }) =>
     is_recurring: false,
     installments: 1
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
   // Preenche o formulário se estiver editando
   useEffect(() => {
     if (transaction) {
       setFormData({
         description: transaction.description || '',
-        amount: transaction.amount || '',
+        amount: transaction.amount?.toString() || '',
         type: transaction.type || 'expense',
-        category_id: transaction.category_id || '',
+        category_id: transaction.category_id?.toString() || '',
         date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : '',
         is_recurring: transaction.is_recurring || false,
         installments: transaction.installment_info?.total || 1
@@ -41,7 +83,7 @@ const TransactionForm = ({ show, onHide, onSubmit, categories, transaction }) =>
     }
   }, [transaction]);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type, checked } = e.target;
     
     setFormData(prev => ({
@@ -52,7 +94,7 @@ const TransactionForm = ({ show, onHide, onSubmit, categories, transaction }) =>
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -87,7 +129,7 @@ const TransactionForm = ({ show, onHide, onSubmit, categories, transaction }) =>
       };
 
       await onSubmit(submitData);
-    } catch (err) {
+    } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Erro ao salvar transação');
     } finally {
       setLoading(false);

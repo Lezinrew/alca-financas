@@ -1,7 +1,42 @@
 import React, { useState, useEffect } from 'react';
 
-const AccountForm = ({ show, onHide, onSubmit, account }) => {
-  const [formData, setFormData] = useState({
+// Type definitions
+interface Account {
+  id?: number;
+  name: string;
+  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+  institution?: string;
+  initial_balance: number;
+  color: string;
+  icon: string;
+  is_active: boolean;
+}
+
+interface AccountFormData {
+  name: string;
+  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+  institution: string;
+  initial_balance: string;
+  color: string;
+  icon: string;
+  is_active: boolean;
+}
+
+interface AccountFormProps {
+  show: boolean;
+  onHide: () => void;
+  onSubmit: (account: Omit<Account, 'id'>) => Promise<void>;
+  account?: Account | null;
+}
+
+interface AccountType {
+  value: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+  label: string;
+  icon: string;
+}
+
+const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, account }) => {
+  const [formData, setFormData] = useState<AccountFormData>({
     name: '',
     type: 'wallet',
     institution: '',
@@ -10,10 +45,10 @@ const AccountForm = ({ show, onHide, onSubmit, account }) => {
     icon: 'wallet2',
     is_active: true
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  const accountTypes = [
+  const accountTypes: AccountType[] = [
     { value: 'wallet', label: 'Carteira', icon: 'wallet2' },
     { value: 'checking', label: 'Conta Corrente', icon: 'bank' },
     { value: 'savings', label: 'Poupança', icon: 'piggy-bank' },
@@ -21,13 +56,13 @@ const AccountForm = ({ show, onHide, onSubmit, account }) => {
     { value: 'investment', label: 'Investimento', icon: 'graph-up-arrow' }
   ];
 
-  const availableColors = [
+  const availableColors: string[] = [
     '#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
     '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280',
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57'
   ];
 
-  const availableIcons = [
+  const availableIcons: string[] = [
     'wallet2', 'bank', 'credit-card', 'piggy-bank', 'cash-coin',
     'currency-dollar', 'graph-up-arrow', 'briefcase', 'house',
     'car-front', 'phone', 'laptop', 'gift'
@@ -59,7 +94,7 @@ const AccountForm = ({ show, onHide, onSubmit, account }) => {
     }
   }, [account]);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string | boolean; type?: string; checked?: boolean } }) => {
     const { name, value, type, checked } = e.target;
     
     setFormData(prev => ({
@@ -81,7 +116,7 @@ const AccountForm = ({ show, onHide, onSubmit, account }) => {
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -97,7 +132,7 @@ const AccountForm = ({ show, onHide, onSubmit, account }) => {
       }
 
       // Prepara dados para envio
-      const submitData = {
+      const submitData: Omit<Account, 'id'> = {
         name: formData.name.trim(),
         type: formData.type,
         institution: formData.institution.trim(),
@@ -109,7 +144,7 @@ const AccountForm = ({ show, onHide, onSubmit, account }) => {
 
       await onSubmit(submitData);
     } catch (err) {
-      setError(err.message || 'Erro ao salvar conta');
+      setError((err as Error).message || 'Erro ao salvar conta');
     } finally {
       setLoading(false);
     }
