@@ -3,7 +3,7 @@ import uuid
 from typing import Dict, Any, List, Optional
 
 
-def build_filter(user_id: str, month: Optional[str], year: Optional[str], category_id: Optional[str], transaction_type: Optional[str]):
+def build_filter(user_id: str, month: Optional[str], year: Optional[str], category_id: Optional[str], transaction_type: Optional[str], account_id: Optional[str] = None):
     filter_query = {'user_id': user_id}
     if month and year:
         start_date = datetime(int(year), int(month), 1)
@@ -16,6 +16,8 @@ def build_filter(user_id: str, month: Optional[str], year: Optional[str], catego
         filter_query['category_id'] = category_id
     if transaction_type:
         filter_query['type'] = transaction_type
+    if account_id:
+        filter_query['account_id'] = account_id
     return filter_query
 
 
@@ -37,6 +39,8 @@ def list_transactions(transactions_collection, categories_collection, filter_que
 
 def create_installments(data: Dict[str, Any], request_user_id: str, base_date: datetime, account_id: Optional[str]) -> List[Dict[str, Any]]:
     installments = data.get('installments', 1)
+    status = data.get('status', 'pending')
+    responsible_person = data.get('responsible_person', 'Leandro')
     transactions_to_create = []
     if installments > 1:
         installment_amount = float(data['amount']) / installments
@@ -52,6 +56,8 @@ def create_installments(data: Dict[str, Any], request_user_id: str, base_date: d
                 'account_id': account_id,
                 'date': transaction_date,
                 'is_recurring': False,
+                'status': status,
+                'responsible_person': responsible_person,
                 'installment_info': {
                     'current': i + 1,
                     'total': installments,
@@ -73,6 +79,8 @@ def create_installments(data: Dict[str, Any], request_user_id: str, base_date: d
             'account_id': account_id,
             'date': base_date,
             'is_recurring': data.get('is_recurring', False),
+            'status': status,
+            'responsible_person': responsible_person,
             'installment_info': None,
             'created_at': datetime.utcnow()
         }

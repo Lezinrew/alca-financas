@@ -22,7 +22,17 @@ app = Flask(__name__)
 # SECRET_KEY necessário para sessões (ex.: OAuth). Usa default seguro em dev se não definido.
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
 
-CORS(app, origins=os.getenv('CORS_ORIGINS', '*').split(','))
+# CORS configuration - permite localhost e IPs locais
+cors_origins = os.getenv('CORS_ORIGINS', '*')
+if cors_origins == '*':
+    # Se não especificado, permite localhost em portas comuns
+    cors_origins = 'http://localhost:3000,http://localhost:5173,http://localhost:3001,http://127.0.0.1:3000'
+
+CORS(app,
+     origins=cors_origins.split(','),
+     supports_credentials=True,
+     allow_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 oauth = OAuth(app)
 app.config['OAUTH'] = oauth

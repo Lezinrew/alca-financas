@@ -70,17 +70,17 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
 
   // Preenche o formulário se estiver editando
   useEffect(() => {
-    if (account) {
+    if (account && show) {
       setFormData({
         name: account.name || '',
         type: account.type || 'wallet',
         institution: account.institution || '',
-        initial_balance: account.initial_balance?.toString() || '',
+        initial_balance: account.initial_balance?.toString() || '0',
         color: account.color || '#6366f1',
         icon: account.icon || 'wallet2',
         is_active: account.is_active !== false
       });
-    } else {
+    } else if (!account && show) {
       // Reset form for new account
       setFormData({
         name: '',
@@ -92,7 +92,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
         is_active: true
       });
     }
-  }, [account]);
+  }, [account, show]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string | boolean; type?: string; checked?: boolean } }) => {
     const { name, value, type, checked } = e.target;
@@ -159,91 +159,99 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
   if (!show) return null;
 
   return (
-    <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog">
-      <div className="modal-backdrop fade show" onClick={handleClose}></div>
-      <div className="modal-dialog modal-lg" role="document">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">
-              {account ? 'Editar Conta' : 'Nova Conta'}
-            </h5>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={handleClose}
-              disabled={loading}
-            ></button>
-          </div>
+    <>
+      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }} onClick={handleClose}></div>
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+        <div className="modal-dialog modal-lg" role="document" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">
+                {account ? 'Editar Conta' : 'Nova Conta'}
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={handleClose}
+                disabled={loading}
+              ></button>
+            </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-              {error && (
-                <div className="alert alert-danger" role="alert">
-                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                  {error}
-                </div>
-              )}
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger" role="alert">
+                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                    {error}
+                  </div>
+                )}
 
-              {/* Preview da Conta */}
-              <div className="text-center mb-4">
-                <div 
-                  className="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-2"
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    backgroundColor: formData.color,
-                    color: 'white'
-                  }}
-                >
-                  <i className={`bi bi-${formData.icon}`} style={{ fontSize: '2rem' }}></i>
-                </div>
-                <h5 className="mb-0">{formData.name || 'Nome da Conta'}</h5>
-                <small className="text-muted">
-                  {accountTypes.find(t => t.value === formData.type)?.label}
-                </small>
-              </div>
-
-              <div className="row g-3">
-                {/* Nome */}
-                <div className="col-12">
-                  <label className="form-label">Nome da Conta</label>
-                  <input
-                    type="text"
-                    name="name"
-                    className="form-control"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    disabled={loading}
-                    placeholder="Ex: Carteira Principal, Banco do Brasil"
-                  />
-                </div>
-
-                {/* Tipo */}
-                <div className="col-md-6">
-                  <label className="form-label">Tipo de Conta</label>
-                  <select
-                    name="type"
-                    className="form-select"
-                    value={formData.type}
-                    onChange={handleChange}
-                    disabled={loading}
+                {/* Preview da Conta */}
+                <div className="text-center mb-4">
+                  <div 
+                    className="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-2"
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      backgroundColor: formData.color,
+                      color: 'white'
+                    }}
                   >
-                    {accountTypes.map(type => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
+                    <i className={`bi bi-${formData.icon}`} style={{ fontSize: '2rem' }}></i>
+                  </div>
+                  <h5 className="mb-0">{formData.name || 'Nome da Conta'}</h5>
+                  <small className="text-muted">
+                    {accountTypes.find(t => t.value === formData.type)?.label}
+                  </small>
                 </div>
+
+                <div className="row g-3">
+                  {/* Nome */}
+                  <div className="col-12">
+                    <label htmlFor="account-name" className="form-label">Nome da Conta</label>
+                    <input
+                      type="text"
+                      id="account-name"
+                      name="name"
+                      className="form-control"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      disabled={loading}
+                      placeholder="Ex: Carteira Principal, Banco do Brasil"
+                      autoComplete="organization"
+                      aria-required="true"
+                    />
+                  </div>
+
+                  {/* Tipo */}
+                  <div className="col-md-6">
+                    <label htmlFor="account-type" className="form-label">Tipo de Conta</label>
+                    <select
+                      id="account-type"
+                      name="type"
+                      className="form-select"
+                      value={formData.type}
+                      onChange={handleChange}
+                      disabled={loading}
+                      autoComplete="off"
+                      aria-required="true"
+                    >
+                      {accountTypes.map(type => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                 {/* Saldo Inicial */}
                 <div className="col-md-6">
-                  <label className="form-label">Saldo Inicial</label>
+                  <label htmlFor="account-initial-balance" className="form-label">Saldo Inicial</label>
                   <div className="input-group">
                     <span className="input-group-text">R$</span>
                     <input
                       type="number"
+                      id="account-initial-balance"
                       name="initial_balance"
                       className="form-control"
                       value={formData.initial_balance}
@@ -251,32 +259,39 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                       step="0.01"
                       disabled={loading}
                       placeholder="0,00"
+                      autoComplete="off"
+                      aria-label="Saldo inicial da conta"
                     />
                   </div>
                 </div>
 
                 {/* Instituição */}
                 <div className="col-12">
-                  <label className="form-label">Instituição (Opcional)</label>
+                  <label htmlFor="account-institution" className="form-label">Instituição (Opcional)</label>
                   <input
                     type="text"
+                    id="account-institution"
                     name="institution"
                     className="form-control"
                     value={formData.institution}
                     onChange={handleChange}
                     disabled={loading}
                     placeholder="Ex: Banco do Brasil, Nubank, Caixa"
+                    autoComplete="organization"
+                    aria-label="Instituição financeira (opcional)"
                   />
                 </div>
 
                 {/* Cor */}
                 <div className="col-md-6">
-                  <label className="form-label">Cor</label>
-                  <div className="d-flex flex-wrap gap-2 mb-2">
+                  <label htmlFor="account-color" className="form-label">Cor</label>
+                  <div className="d-flex flex-wrap gap-2 mb-2" role="group" aria-label="Selecionar cor">
                     {availableColors.map((color) => (
                       <button
                         key={color}
                         type="button"
+                        name={`account-color-${color}`}
+                        aria-label={`Selecionar cor ${color}`}
                         className={`btn p-0 border ${formData.color === color ? 'border-dark border-3' : 'border-2'}`}
                         style={{
                           width: '32px',
@@ -291,22 +306,27 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                   </div>
                   <input
                     type="color"
+                    id="account-color"
                     name="color"
                     className="form-control form-control-color"
                     value={formData.color}
                     onChange={handleChange}
                     disabled={loading}
+                    aria-label="Escolher cor personalizada"
+                    title="Escolher cor personalizada"
                   />
                 </div>
 
                 {/* Ícone */}
                 <div className="col-md-6">
                   <label className="form-label">Ícone</label>
-                  <div className="d-flex flex-wrap gap-1">
+                  <div className="d-flex flex-wrap gap-1" role="group" aria-label="Selecionar ícone">
                     {availableIcons.map((icon) => (
                       <button
                         key={icon}
                         type="button"
+                        name={`account-icon-${icon}`}
+                        aria-label={`Selecionar ícone ${icon}`}
                         className={`btn btn-outline-secondary btn-sm ${formData.icon === icon ? 'active' : ''}`}
                         style={{ width: '40px', height: '40px' }}
                         onClick={() => handleChange({ target: { name: 'icon', value: icon } })}
@@ -316,6 +336,13 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                       </button>
                     ))}
                   </div>
+                  {/* Campo oculto para associar o label */}
+                  <input
+                    type="hidden"
+                    id="account-icon"
+                    name="icon"
+                    value={formData.icon}
+                  />
                 </div>
 
                 {/* Status Ativo */}
@@ -338,40 +365,41 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
-            </div>
 
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleClose}
-                disabled={loading}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="loading-spinner me-2"></span>
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-check me-2"></i>
-                    Salvar
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleClose}
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="loading-spinner me-2"></span>
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check me-2"></i>
+                      Salvar
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

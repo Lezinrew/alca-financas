@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../utils/api';
 
-// Type definitions
 interface Account {
   id: number;
   name: string;
@@ -21,6 +21,40 @@ interface AccountCardProps {
 }
 
 const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) => {
+  const navigate = useNavigate();
+  const [openMenu, setOpenMenu] = useState(false);
+
+  // Fecha o menu ao clicar fora
+  useEffect(() => {
+    if (!openMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Não fecha se o clique foi dentro do menu dropdown ou no botão do menu
+      const clickedInsideMenu = target.closest('.dropdown-menu');
+      const clickedOnMenuButton = target.closest('.account-menu');
+      const clickedOnDropdownItem = target.closest('.dropdown-item');
+      
+      if (clickedInsideMenu || clickedOnMenuButton || clickedOnDropdownItem) {
+        return;
+      }
+      
+      // Fecha o menu se o clique foi fora
+      setOpenMenu(false);
+    };
+
+    // Adiciona o listener no próximo tick para não interferir com o clique do botão
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [openMenu]);
+
   const getAccountTypeIcon = (type: Account['type']): string => {
     switch (type) {
       case 'wallet':
@@ -55,113 +89,151 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
     }
   };
 
-  const getBalanceColor = (): string => {
-    if (account.current_balance > 0) {
-      return 'text-success';
-    } else if (account.current_balance < 0) {
-      return 'text-danger';
-    }
-    return 'text-muted';
+  const variance = (account.current_balance || 0) - (account.initial_balance || 0);
+  const isPositiveVariance = variance >= 0;
+  // Saldo previsto = saldo atual (pode ser melhorado com transações futuras)
+  const projectedBalance = account.current_balance || 0;
+
+  const handleAddExpense = () => {
+    navigate('/transactions', {
+      state: {
+        openForm: true,
+        transactionType: 'expense',
+        accountId: account.id
+      }
+    });
   };
 
   return (
-    <div className="card account-card h-100" style={{ borderLeft: `4px solid ${account.color}` }}>
-      <div className="card-body">
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className="d-flex align-items-center">
-            <div 
-              className="rounded-circle d-flex align-items-center justify-content-center me-3"
-              style={{
-                width: '40px',
-                height: '40px',
-                backgroundColor: account.color,
-                color: 'white'
-              }}
-            >
-              <i className={`bi ${account.icon || getAccountTypeIcon(account.type)}`}></i>
-            </div>
-            <div>
-              <h6 className="card-title mb-0">{account.name}</h6>
-              <small className="text-muted">{getAccountTypeName(account.type)}</small>
-            </div>
+          <div className="card-base p-4 hover:shadow-md">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3 flex-1">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+            style={{ backgroundColor: account.color }}
+          >
+            <i className={`bi ${account.icon || getAccountTypeIcon(account.type)} text-lg`}></i>
           </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm truncate">{account.name}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{getAccountTypeName(account.type)}</p>
+          </div>
+        </div>
+
+        {/* Actions Menu */}
+        <div className="relative account-menu flex-shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpenMenu(!openMenu);
+            }}
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Opções da conta"
+          >
+            <i className="bi bi-three-dots-vertical text-sm"></i>
+          </button>
           
-          <div className="dropdown">
-            <button
-              className="btn btn-link btn-sm text-muted p-0"
-              type="button"
-              data-bs-toggle="dropdown"
-            >
-              <i className="bi bi-three-dots-vertical"></i>
-            </button>
-            <ul className="dropdown-menu dropdown-menu-end">
-              <li>
-                <button 
-                  className="dropdown-item" 
-                  onClick={() => onEdit(account)}
-                >
-                  <i className="bi bi-pencil me-2"></i>
-                  Editar
-                </button>
-              </li>
-              <li><hr className="dropdown-divider" /></li>
-              <li>
-                <button 
-                  className="dropdown-item text-danger" 
-                  onClick={() => onDelete(account.id)}
-                >
-                  <i className="bi bi-trash me-2"></i>
-                  Excluir
-                </button>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Instituição */}
-        {account.institution && (
-          <div className="mb-3">
-            <small className="text-muted">Instituição:</small>
-            <div>{account.institution}</div>
-          </div>
-        )}
-
-        {/* Saldo */}
-        <div className="mb-3">
-          <small className="text-muted">Saldo Atual:</small>
-          <div className={`h5 mb-0 ${getBalanceColor()}`}>
-            {formatCurrency(account.current_balance || 0)}
-          </div>
-        </div>
-
-        {/* Saldo Inicial vs Atual */}
-        {account.initial_balance !== account.current_balance && (
-          <div className="row text-center">
-            <div className="col-6">
-              <small className="text-muted">Inicial</small>
-              <div className="fw-bold">
-                {formatCurrency(account.initial_balance || 0)}
-              </div>
+          {openMenu && (
+                            <div className="dropdown-menu absolute right-0 top-full mt-1 w-48 py-1 z-50">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('AccountCard: Botão editar clicado para conta:', account.id);
+                  setOpenMenu(false);
+                  // Usa setTimeout para garantir que o menu seja fechado antes de chamar onEdit
+                  setTimeout(() => {
+                    onEdit(account);
+                  }, 0);
+                }}
+                className="dropdown-item w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+              >
+                <i className="bi bi-pencil text-blue-600 dark:text-blue-400"></i>
+                <span>Editar</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('AccountCard: Botão transações clicado para conta:', account.id);
+                  setOpenMenu(false);
+                  // Usa setTimeout para garantir que o menu seja fechado antes de navegar
+                  setTimeout(() => {
+                    navigate(`/transactions?account_id=${account.id}`);
+                  }, 0);
+                }}
+                className="dropdown-item w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+              >
+                <i className="bi bi-list-ul text-blue-600 dark:text-blue-400"></i>
+                <span>Transações</span>
+              </button>
+              <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('AccountCard: Botão excluir clicado para conta:', account.id);
+                  setOpenMenu(false);
+                  // Usa setTimeout para garantir que o menu seja fechado antes de chamar onDelete
+                  setTimeout(() => {
+                    onDelete(account.id);
+                  }, 0);
+                }}
+                className="dropdown-item w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+              >
+                <i className="bi bi-trash"></i>
+                <span>Excluir</span>
+              </button>
             </div>
-            <div className="col-6">
-              <small className="text-muted">Variação</small>
-              <div className={`fw-bold ${
-                (account.current_balance - account.initial_balance) >= 0 ? 'text-success' : 'text-danger'
-              }`}>
-                {(account.current_balance - account.initial_balance) >= 0 ? '+' : ''}
-                {formatCurrency((account.current_balance || 0) - (account.initial_balance || 0))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Status */}
-        <div className="mt-3">
-          <span className={`badge ${account.is_active ? 'bg-success' : 'bg-secondary'}`}>
-            {account.is_active ? 'Ativa' : 'Inativa'}
-          </span>
+          )}
         </div>
       </div>
+
+      {/* Saldos */}
+      <div className="space-y-3 mb-4">
+        {/* Saldo Atual */}
+        <div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Saldo atual</p>
+          <p className={`text-xl font-bold ${
+            account.current_balance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+            account.current_balance < 0 ? 'text-red-600 dark:text-red-400' :
+            'text-slate-600 dark:text-slate-400'
+          }`}>
+            {formatCurrency(account.current_balance || 0)}
+          </p>
+        </div>
+
+        {/* Saldo Previsto */}
+        <div>
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Saldo previsto</p>
+            <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Projeção do saldo futuro"></i>
+          </div>
+          <p className={`text-lg font-semibold ${
+            projectedBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+            projectedBalance < 0 ? 'text-red-600 dark:text-red-400' :
+            'text-slate-600 dark:text-slate-400'
+          }`}>
+            {formatCurrency(projectedBalance)}
+          </p>
+        </div>
+      </div>
+
+      {/* Botão Adicionar Despesa */}
+      <button
+        type="button"
+        onClick={handleAddExpense}
+        className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+      >
+        <i className="bi bi-plus-circle text-sm"></i>
+        Adicionar Despesa
+      </button>
     </div>
   );
 };

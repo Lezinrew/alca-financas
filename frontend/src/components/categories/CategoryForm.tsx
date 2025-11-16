@@ -31,15 +31,17 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
 
   // Preenche o formulário se estiver editando
   useEffect(() => {
-    if (category) {
+    if (category && show) {
+      console.log('CategoryForm: Preenchendo formulário com categoria:', category);
       setFormData({
         name: category.name || '',
         type: category.type || 'expense',
         color: category.color || '#6366f1',
         icon: category.icon || 'circle'
       });
-    } else {
+    } else if (!category && show) {
       // Reset form for new category
+      console.log('CategoryForm: Resetando formulário para nova categoria');
       setFormData({
         name: '',
         type: 'expense',
@@ -47,7 +49,7 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
         icon: 'circle'
       });
     }
-  }, [category]);
+  }, [category, show]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -96,30 +98,31 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
   if (!show) return null;
 
   return (
-    <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog">
-      <div className="modal-backdrop fade show" onClick={handleClose}></div>
-      <div className="modal-dialog modal-lg" role="document">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">
-              {category ? t('categories.edit') : t('categories.add')}
-            </h5>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={handleClose}
-              disabled={loading}
-            ></button>
-          </div>
+    <>
+      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }} onClick={handleClose}></div>
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+        <div className="modal-dialog modal-lg" role="document" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">
+                {category ? t('categories.edit') : t('categories.add')}
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={handleClose}
+                disabled={loading}
+              ></button>
+            </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-              {error && (
-                <div className="alert alert-danger" role="alert">
-                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                  {error}
-                </div>
-              )}
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger" role="alert">
+                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                    {error}
+                  </div>
+                )}
 
               {/* Preview da Categoria */}
               <div className="text-center mb-4">
@@ -140,137 +143,146 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
               </div>
 
               <div className="row g-3">
-                {/* Nome */}
-                <div className="col-12">
-                  <label className="form-label">{t('categories.name')}</label>
-                  <input
-                    type="text"
-                    name="name"
-                    className="form-control"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    disabled={loading}
-                    placeholder="Ex: Alimentação, Salário, etc."
-                  />
-                </div>
-
-                {/* Tipo */}
-                <div className="col-md-6">
-                  <label className="form-label">{t('categories.type')}</label>
-                  <div className="btn-group w-100" role="group">
+                  {/* Nome */}
+                  <div className="col-12">
+                    <label htmlFor="category-name" className="form-label">{t('categories.name')}</label>
                     <input
-                      type="radio"
-                      className="btn-check"
-                      name="type"
-                      id="income_cat"
-                      value="income"
-                      checked={formData.type === 'income'}
+                      type="text"
+                      id="category-name"
+                      name="name"
+                      className="form-control"
+                      value={formData.name}
                       onChange={handleChange}
+                      required
                       disabled={loading}
+                      placeholder="Ex: Alimentação, Salário, etc."
+                      autoComplete="category-name"
                     />
-                    <label className="btn btn-outline-success" htmlFor="income_cat">
-                      <i className="bi bi-arrow-up-circle me-2"></i>
-                      {t('categories.income')}
-                    </label>
-
-                    <input
-                      type="radio"
-                      className="btn-check"
-                      name="type"
-                      id="expense_cat"
-                      value="expense"
-                      checked={formData.type === 'expense'}
-                      onChange={handleChange}
-                      disabled={loading}
-                    />
-                    <label className="btn btn-outline-danger" htmlFor="expense_cat">
-                      <i className="bi bi-arrow-down-circle me-2"></i>
-                      {t('categories.expense')}
-                    </label>
                   </div>
-                </div>
 
-                {/* Cor */}
-                <div className="col-md-6">
-                  <label className="form-label">{t('categories.color')}</label>
-                  <div className="d-flex flex-wrap gap-2">
-                    {availableColors.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        className={`btn p-0 border ${formData.color === color ? 'border-dark border-3' : 'border-2'}`}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          backgroundColor: color,
-                          borderRadius: '50%'
-                        }}
-                        onClick={() => handleChange({ target: { name: 'color', value: color } })}
+                  {/* Tipo */}
+                  <div className="col-md-6">
+                    <label className="form-label">{t('categories.type')}</label>
+                    <div className="btn-group w-100" role="group" aria-label="Tipo de categoria">
+                      <input
+                        type="radio"
+                        className="btn-check"
+                        name="type"
+                        id="income_cat"
+                        value="income"
+                        checked={formData.type === 'income'}
+                        onChange={handleChange}
                         disabled={loading}
                       />
-                    ))}
-                  </div>
-                  <input
-                    type="color"
-                    name="color"
-                    className="form-control form-control-color mt-2"
-                    value={formData.color}
-                    onChange={handleChange}
-                    disabled={loading}
-                    title="Escolher cor personalizada"
-                  />
-                </div>
+                      <label className="btn btn-outline-success" htmlFor="income_cat">
+                        <i className="bi bi-arrow-up-circle me-2"></i>
+                        {t('categories.income')}
+                      </label>
 
-                {/* Ícone */}
-                <div className="col-12">
-                  <label className="form-label">{t('categories.icon')}</label>
-                  <div className="d-flex flex-wrap gap-2">
-                    {availableIcons.map((icon) => (
-                      <button
-                        key={icon}
-                        type="button"
-                        className={`btn btn-outline-secondary ${formData.icon === icon ? 'active' : ''}`}
-                        style={{ width: '50px', height: '50px' }}
-                        onClick={() => handleChange({ target: { name: 'icon', value: icon } })}
+                      <input
+                        type="radio"
+                        className="btn-check"
+                        name="type"
+                        id="expense_cat"
+                        value="expense"
+                        checked={formData.type === 'expense'}
+                        onChange={handleChange}
                         disabled={loading}
-                      >
-                        <i className={`bi bi-${icon}`}></i>
-                      </button>
-                    ))}
+                      />
+                      <label className="btn btn-outline-danger" htmlFor="expense_cat">
+                        <i className="bi bi-arrow-down-circle me-2"></i>
+                        {t('categories.expense')}
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Cor */}
+                  <div className="col-md-6">
+                    <label className="form-label">{t('categories.color')}</label>
+                    <div className="d-flex flex-wrap gap-2">
+                      {availableColors.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          name={`color-${color}`}
+                          aria-label={`Selecionar cor ${color}`}
+                          className={`btn p-0 border ${formData.color === color ? 'border-dark border-3' : 'border-2'}`}
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            backgroundColor: color,
+                            borderRadius: '50%'
+                          }}
+                          onClick={() => handleChange({ target: { name: 'color', value: color } })}
+                          disabled={loading}
+                        />
+                      ))}
+                    </div>
+                    <input
+                      type="color"
+                      id="category-color"
+                      name="color"
+                      className="form-control form-control-color mt-2"
+                      value={formData.color}
+                      onChange={handleChange}
+                      disabled={loading}
+                      title="Escolher cor personalizada"
+                      aria-label="Escolher cor personalizada"
+                    />
+                  </div>
+
+                  {/* Ícone */}
+                  <div className="col-12">
+                    <label className="form-label">{t('categories.icon')}</label>
+                    <div className="d-flex flex-wrap gap-2" role="group" aria-label="Selecionar ícone">
+                      {availableIcons.map((icon) => (
+                        <button
+                          key={icon}
+                          type="button"
+                          name={`icon-${icon}`}
+                          aria-label={`Selecionar ícone ${icon}`}
+                          className={`btn btn-outline-secondary ${formData.icon === icon ? 'active' : ''}`}
+                          style={{ width: '50px', height: '50px' }}
+                          onClick={() => handleChange({ target: { name: 'icon', value: icon } })}
+                          disabled={loading}
+                        >
+                          <i className={`bi bi-${icon}`}></i>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleClose}
-                disabled={loading}
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="loading-spinner me-2"></span>
-                    {t('common.loading')}
-                  </>
-                ) : (
-                  t('common.save')
-                )}
-              </button>
-            </div>
-          </form>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleClose}
+                  disabled={loading}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="loading-spinner me-2"></span>
+                      {t('common.loading')}
+                    </>
+                  ) : (
+                    t('common.save')
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -22,7 +22,8 @@ def transactions():
         year = request.args.get('year')
         category_id = request.args.get('category_id')
         transaction_type = request.args.get('type')
-        filter_query = build_filter(request.user_id, month, year, category_id, transaction_type)
+        account_id = request.args.get('account_id')
+        filter_query = build_filter(request.user_id, month, year, category_id, transaction_type, account_id)
         return jsonify(list_transactions(transactions_collection, categories_collection, filter_query))
 
     data = request.get_json()
@@ -66,7 +67,7 @@ def transaction_detail(transaction_id: str):
         return jsonify({'message': 'Transação deletada com sucesso'})
 
     data = request.get_json()
-    allowed_fields = ['description', 'amount', 'category_id', 'date']
+    allowed_fields = ['description', 'amount', 'category_id', 'date', 'status', 'responsible_person']
     update_data = {}
     for field in allowed_fields:
         if field in data:
@@ -84,66 +85,202 @@ def transaction_detail(transaction_id: str):
 @bp.route('/import', methods=['POST'])
 @require_auth
 def import_transactions():
+    from services.import_service import parse_import_file
+    
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
+    accounts_collection = current_app.config['ACCOUNTS']
+    
     if 'file' not in request.files:
-        return jsonify({'error': 'Arquivo CSV é obrigatório'}), 400
+        return jsonify({'error': 'Arquivo é obrigatório'}), 400
+    
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
-    if not file.filename.lower().endswith('.csv'):
-        return jsonify({'error': 'Apenas arquivos CSV são aceitos'}), 400
+    
+    # Aceita CSV e OFX
+    filename_lower = file.filename.lower()
+    if not (filename_lower.endswith('.csv') or filename_lower.endswith('.ofx')):
+        return jsonify({'error': 'Apenas arquivos CSV e OFX são aceitos'}), 400
+    
+    # Lê o conteúdo do arquivo uma vez
+    file_content = file.read()
+    
+    # Obtém account_id do formulário (opcional)
+    account_id = request.form.get('account_id')
+    account_created = False
+    created_account_name = None
+    
+    # Se não forneceu account_id, tenta detectar/criar automaticamente
+    if not account_id:
+        from services.account_detector import (
+            extract_account_info_from_ofx,
+            extract_account_info_from_csv,
+            find_or_create_account
+        )
+        
+        try:
+            account_info = None
+            if filename_lower.endswith('.ofx'):
+                account_info = extract_account_info_from_ofx(file_content)
+            elif filename_lower.endswith('.csv'):
+                account_info = extract_account_info_from_csv(file.filename, file_content)
+            
+            if account_info:
+                account_id, account_created = find_or_create_account(
+                    accounts_collection,
+                    request.user_id,
+                    account_info,
+                    file.filename
+                )
+                if account_created and account_id:
+                    account = accounts_collection.find_one({'_id': account_id})
+                    created_account_name = account.get('name') if account else None
+        except Exception as e:
+            # Se falhar na detecção, continua sem account_id
+            pass
+    
+    # Se account_id foi fornecido, valida se existe
+    if account_id:
+        account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
+        if not account:
+            return jsonify({'error': 'Conta não encontrada'}), 404
+    
     try:
-        stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
-        csv_input = pd.read_csv(stream)
-        required_columns = ['description', 'amount', 'type', 'category_name', 'date']
-        missing_columns = [col for col in required_columns if col not in csv_input.columns]
-        if missing_columns:
-            return jsonify({'error': f'Colunas obrigatórias ausentes: {", ".join(missing_columns)}', 'required_columns': required_columns, 'found_columns': list(csv_input.columns)}), 400
+        
+        # Detecta formato e parseia
+        try:
+            file_format, parsed_transactions = parse_import_file(file.filename, file_content)
+        except Exception as e:
+            return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 400
+        
+        if not parsed_transactions:
+            return jsonify({'error': 'Nenhuma transação encontrada no arquivo'}), 400
+        
+        # Importa serviço de detecção de categorias
+        from services.category_detector import detect_category_from_description, get_or_create_category
+        
+        # Busca categorias do usuário
         user_categories = {cat['name']: cat['_id'] for cat in categories_collection.find({'user_id': request.user_id})}
+        
+        # Busca categorias padrão
+        default_income_category = categories_collection.find_one({'user_id': request.user_id, 'type': 'income'})
+        default_expense_category = categories_collection.find_one({'user_id': request.user_id, 'type': 'expense'})
+        
         imported_transactions = []
         errors = []
-        for index, row in csv_input.iterrows():
+        created_categories = []  # Para rastrear categorias criadas
+        
+        for idx, tx in enumerate(parsed_transactions):
             try:
-                if row['type'] not in ['income', 'expense']:
-                    errors.append(f'Linha {index + 2}: Tipo deve ser income ou expense')
+                category_id = None
+                
+                # Para CSV padrão, usa category_name se disponível
+                if file_format == 'csv' and 'category_name' in tx and tx['category_name']:
+                    category_id = user_categories.get(tx['category_name'])
+                    if not category_id:
+                        # Tenta criar a categoria se não existir
+                        try:
+                            category_id = get_or_create_category(
+                                categories_collection,
+                                request.user_id,
+                                tx['category_name'],
+                                tx['type']
+                            )
+                            # Atualiza o dicionário de categorias
+                            user_categories[tx['category_name']] = category_id
+                            created_categories.append(tx['category_name'])
+                        except Exception as e:
+                            errors.append(f'Linha {idx + 2}: Erro ao criar categoria "{tx["category_name"]}": {str(e)}')
+                            continue
+                else:
+                    # Para Nubank/OFX, detecta categoria automaticamente pela descrição
+                    detected = detect_category_from_description(tx['description'])
+                    
+                    if detected:
+                        category_name, color, icon = detected
+                        try:
+                            category_id = get_or_create_category(
+                                categories_collection,
+                                request.user_id,
+                                category_name,
+                                tx['type'],
+                                color,
+                                icon
+                            )
+                            # Atualiza o dicionário de categorias
+                            if category_name not in user_categories:
+                                user_categories[category_name] = category_id
+                                created_categories.append(category_name)
+                        except Exception as e:
+                            errors.append(f'Transação {idx + 1}: Erro ao criar categoria "{category_name}": {str(e)}')
+                            # Usa categoria padrão como fallback
+                            if tx['type'] == 'income' and default_income_category:
+                                category_id = default_income_category['_id']
+                            elif tx['type'] == 'expense' and default_expense_category:
+                                category_id = default_expense_category['_id']
+                            else:
+                                errors.append(f'Transação {idx + 1}: Não foi possível determinar a categoria')
+                                continue
+                    
+                    # Se não conseguiu detectar, usa categoria padrão
+                    if not category_id:
+                        if tx['type'] == 'income' and default_income_category:
+                            category_id = default_income_category['_id']
+                        elif tx['type'] == 'expense' and default_expense_category:
+                            category_id = default_expense_category['_id']
+                        else:
+                            errors.append(f'Transação {idx + 1}: Nenhuma categoria padrão encontrada para tipo {tx["type"]}')
+                            continue
+                
+                # Validações
+                if tx['amount'] <= 0:
+                    errors.append(f'Transação {idx + 1}: Valor deve ser positivo')
                     continue
-                category_id = user_categories.get(row['category_name'])
-                if not category_id:
-                    errors.append(f'Linha {index + 2}: Categoria "{row["category_name"]}" não encontrada')
-                    continue
-                try:
-                    transaction_date = pd.to_datetime(row['date']).to_pydatetime()
-                except Exception:
-                    errors.append(f'Linha {index + 2}: Data inválida "{row["date"]}"')
-                    continue
-                try:
-                    amount = float(row['amount'])
-                    if amount <= 0:
-                        errors.append(f'Linha {index + 2}: Valor deve ser positivo')
-                        continue
-                except Exception:
-                    errors.append(f'Linha {index + 2}: Valor inválido "{row["amount"]}"')
-                    continue
+                
                 transaction_data = {
                     '_id': str(uuid.uuid4()),
                     'user_id': request.user_id,
-                    'description': str(row['description']).strip(),
-                    'amount': amount,
-                    'type': row['type'],
+                    'description': tx['description'],
+                    'amount': tx['amount'],
+                    'type': tx['type'],
                     'category_id': category_id,
-                    'date': transaction_date,
+                    'date': tx['date'],
                     'is_recurring': False,
+                    'status': 'paid',  # Transações importadas geralmente são pagas
+                    'responsible_person': 'Leandro',
                     'installment_info': None,
                     'imported': True,
+                    'import_source': file_format,
                     'created_at': pd.Timestamp.now().to_pydatetime()
                 }
+                
+                # Associa a conta se fornecida
+                if account_id:
+                    transaction_data['account_id'] = account_id
+                
                 imported_transactions.append(transaction_data)
             except Exception as e:
-                errors.append(f'Linha {index + 2}: Erro inesperado - {str(e)}')
+                errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
+        
         if imported_transactions:
             transactions_collection.insert_many(imported_transactions)
-        result = {'message': f'{len(imported_transactions)} transações importadas com sucesso', 'imported_count': len(imported_transactions), 'error_count': len(errors)}
+            
+            # Atualiza o saldo da conta se account_id foi fornecido
+            if account_id:
+                from services.transaction_service import apply_account_balance_updates
+                apply_account_balance_updates(accounts_collection, account_id, imported_transactions)
+        
+        result = {
+            'message': f'{len(imported_transactions)} transações importadas com sucesso',
+            'imported_count': len(imported_transactions),
+            'error_count': len(errors),
+            'file_format': file_format,
+            'categories_created': len(created_categories),
+            'categories_created_list': list(set(created_categories)),  # Remove duplicatas
+            'account_created': account_created,
+            'account_name': created_account_name
+        }
         if errors:
             result['errors'] = errors
         return jsonify(result), 201 if imported_transactions else 400

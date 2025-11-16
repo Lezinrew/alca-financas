@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Configuração base da API
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+// Suporta ambas as variáveis: VITE_API_URL (Vite) e REACT_APP_BACKEND_URL (fallback)
+const API_BASE_URL = import.meta.env.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 // Instância do Axios com configurações padrão
 const api = axios.create({
@@ -31,9 +32,19 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expirado ou inválido
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-      window.location.href = '/login';
+      // Só redireciona se não estiver já na página de login
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        // Verifica se há um token antes de remover (pode ser uma requisição antes do login)
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          // Token existe mas é inválido - limpa e redireciona
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_data');
+          window.location.href = '/login';
+        }
+        // Se não há token, apenas rejeita o erro (pode ser uma requisição antes do login)
+      }
     }
     return Promise.reject(error);
   }
@@ -57,6 +68,25 @@ export const categoriesAPI = {
   delete: (id: string) => api.delete(`/categories/${id}`),
 };
 
+// Transaction types
+export interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category_id: string;
+  date: string;
+  status?: 'paid' | 'pending' | 'overdue' | 'cancelled';
+  responsiblePerson?: string;
+  is_recurring?: boolean;
+  account_id?: string;
+  installment_info?: {
+    current: number;
+    total: number;
+    parent_id: string;
+  };
+}
+
 // Funções de transações
 export const transactionsAPI = {
   getAll: (filters: Record<string, any> = {}) => {
@@ -69,9 +99,12 @@ export const transactionsAPI = {
   create: (transactionData: any) => api.post('/transactions', transactionData),
   update: (id: string, transactionData: any) => api.put(`/transactions/${id}`, transactionData),
   delete: (id: string) => api.delete(`/transactions/${id}`),
-  import: (csvFile: File) => {
+  import: (csvFile: File, accountId?: string) => {
     const formData = new FormData();
     formData.append('file', csvFile);
+    if (accountId) {
+      formData.append('account_id', accountId);
+    }
     return api.post('/transactions/import', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -87,6 +120,13 @@ export const dashboardAPI = {
     if (month) params.append('month', month);
     if (year) params.append('year', year);
     return api.get(`/dashboard?${params.toString()}`);
+  },
+  getAdvanced: (month?: string, year?: string, showEvolution = true) => {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month);
+    if (year) params.append('year', year);
+    if (showEvolution) params.append('show_evolution', 'true');
+    return api.get(`/dashboard-advanced?${params.toString()}`);
   },
 };
 
@@ -111,6 +151,11 @@ export const formatDate = (date: string | Date) => {
 
 export const formatDateTime = (date: string | Date) => {
   return new Date(date).toLocaleString('pt-BR');
+};
+
+export const formatPercent = (value: number): string => {
+  const signal = value >= 0 ? '+' : '';
+  return `${signal}${value.toFixed(1)}%`;
 };
 
 export default api;

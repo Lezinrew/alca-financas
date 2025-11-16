@@ -1,4 +1,4 @@
-### Checklist de QA – Backend API (Mobills Pro)
+### Checklist de QA – Backend API (Alça Finanças)
 
 Use este checklist para validar os endpoints principais após mudanças/refatorações.
 

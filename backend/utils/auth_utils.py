@@ -6,7 +6,7 @@ import jwt
 import os
 
 
-JWT_SECRET = os.getenv('SECRET_KEY')
+JWT_SECRET = os.getenv('SECRET_KEY', 'dev-secret-key')
 JWT_EXPIRES_HOURS = int(os.getenv('JWT_EXPIRES_HOURS', 24))
 
 

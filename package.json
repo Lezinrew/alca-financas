@@ -1,0 +1,34 @@
+{
+  "name": "alca-financas",
+  "version": "1.0.0",
+  "description": "Aplicação de controle financeiro inteligente",
+  "scripts": {
+    "start": "./scripts/quick-start.sh",
+    "dev": "./scripts/quick-start.sh",
+    "dev:docker": "./scripts/deploy-local.sh",
+    "stop": "./scripts/stop-local.sh",
+    "mongo": "./scripts/start-mongodb.sh",
+    "test": "./scripts/run-tests.sh all local",
+    "test:unit": "./scripts/run-tests.sh unit local",
+    "test:integration": "./scripts/run-tests.sh integration local",
+    "test:e2e": "./scripts/run-tests.sh e2e local",
+    "test:e2e:prod": "./scripts/run-tests.sh e2e production",
+    "setup:secrets": "./scripts/setup-github-secrets.sh",
+    "deploy:prod": "./scripts/deploy-production.sh",
+    "backup": "./scripts/backup.sh",
+    "help": "cat GUIA-RAPIDO.md"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lezinrew/alca-financas"
+  },
+  "keywords": [
+    "financas",
+    "controle-financeiro",
+    "react",
+    "flask",
+    "mongodb"
+  ],
+  "author": "Alça Finanças Team",
+  "license": "MIT"
+}

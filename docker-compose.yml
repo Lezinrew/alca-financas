@@ -4,8 +4,36 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      MONGO_URL: mongodb://mongo:27017/alca_financas
+      MONGO_URI: mongodb://mongo:27017/alca_financas
+      MONGO_DB: alca_financas
+      SECRET_KEY: dev-secret-key
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002
     depends_on:
       - mongo
     ports:
-      - "8000:5000"   # host:container
+      - "8001:8001"   # host:container - updated to match new port
+    volumes:
+      - ./backend:/app/backend
+    command: python app.py
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:8001
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/frontend
+    command: npm run dev
+
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

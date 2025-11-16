@@ -60,12 +60,12 @@ const MainLayout = () => {
   return (
     <div className="main-layout d-flex">
       {/* Sidebar */}
-      <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} style={{ width: sidebarCollapsed ? '80px' : '250px' }}>
+      <div className={`sidebar dark:bg-slate-800 ${sidebarCollapsed ? 'collapsed' : ''}`} style={{ width: sidebarCollapsed ? '80px' : '250px' }}>
         <div className="p-4">
           <div className="d-flex align-items-center mb-4">
             <i className="bi bi-wallet2 text-white fs-3 me-2"></i>
             {!sidebarCollapsed && (
-              <span className="text-white fw-bold fs-5">Mobills</span>
+              <span className="text-white fw-bold fs-5">Alça Finanças</span>
             )}
           </div>
 
@@ -109,9 +109,9 @@ const MainLayout = () => {
       </div>
 
       {/* Main Content */}
-      <div className="main-content flex-grow-1">
+      <div className="main-content flex-grow-1 bg-slate-50 dark:bg-slate-900">
         {/* Header */}
-        <header className="header d-flex align-items-center justify-content-between p-3">
+        <header className="header d-flex align-items-center justify-content-between p-3 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
           <div className="d-flex align-items-center">
             <button
               onClick={toggleSidebar}
@@ -121,7 +121,7 @@ const MainLayout = () => {
               <i className={`bi ${sidebarCollapsed ? 'bi-list' : 'bi-chevron-left'}`}></i>
             </button>
             
-            <h1 className="h4 mb-0 text-capitalize">
+            <h1 className="h4 mb-0 text-capitalize text-slate-900 dark:text-slate-100">
               {location.pathname.replace('/', '') || 'dashboard'}
             </h1>
           </div>
