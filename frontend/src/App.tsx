@@ -1,13 +1,14 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 // Componentes de Autenticação
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 
 // Componentes Principais
-import MainLayout from './components/layout/MainLayout';
+import AppShell from './components/layout/AppShell';
 import Dashboard from './components/dashboard/Dashboard';
 import Transactions from './components/transactions/Transactions';
 import Categories from './components/categories/Categories';
@@ -16,6 +17,9 @@ import Profile from './components/profile/Profile';
 import Import from './components/import/Import';
 import Reports from './components/reports/Reports';
 import Accounts from './components/accounts/Accounts';
+import Planning from './components/planning/Planning';
+import CreditCards from './components/credit-cards/CreditCards';
+import CreditCardDetail from './components/credit-cards/CreditCardDetail';
 
 // Type definitions
 interface RouteWrapperProps {
@@ -59,61 +63,72 @@ const PublicRoute: React.FC<RouteWrapperProps> = ({ children }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 };
 
-// Componente Principal da Aplicação
-const AppContent: React.FC = () => {
-  // Remove unused variable
-  // const { i18n } = useTranslation();
-
+// Componente que cria as rotas dentro do contexto do AuthProvider
+const AppRoutes: React.FC = () => {
   return (
-    <Router>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
-        {/* Rotas Públicas (Auth) */}
-        <Route path="/login" element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        } />
-        <Route path="/register" element={
-          <PublicRoute>
-            <Register />
-          </PublicRoute>
-        } />
+        {/* Rotas Públicas */}
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          }
+        />
 
         {/* Rotas Protegidas */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }>
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="categories" element={<Categories />} />
           <Route path="accounts" element={<Accounts />} />
+          <Route path="planning" element={<Planning />} />
+          <Route path="credit-cards" element={<CreditCards />} />
+          <Route path="credit-cards/:cardId" element={<CreditCardDetail />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="import" element={<Import />} />
         </Route>
 
-        {/* Rota de Fallback */}
+        {/* Redirecionar qualquer outra rota */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 };
 
 // Componente App Principal
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <div className="App">
-        <AppContent />
-      </div>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <div className="App">
+          <AppRoutes />
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Mobills Pro Backend API Testing Suite
+Alça Finanças Backend API Testing Suite
 Tests all API endpoints for the financial control application
 """
 
@@ -11,14 +11,14 @@ from datetime import datetime, timedelta
 import uuid
 import os
 
-class MobillsAPITester:
+class AlcaFinancasAPITester:
     def __init__(self, base_url="http://localhost:8001"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.test_user_email = f"test_{uuid.uuid4().hex[:8]}@mobills.com"
+        self.test_user_email = f"test_{uuid.uuid4().hex[:8]}@alca.fin"
         self.test_user_password = "TestPass123!"
         self.test_user_name = "Test User"
         self.created_category_id = None
@@ -408,7 +408,7 @@ class MobillsAPITester:
 
     def run_all_tests(self):
         """Run all API tests"""
-        print("🚀 Starting Mobills Pro API Tests...")
+        print("🚀 Starting Alça Finanças API Tests...")
         print(f"📍 Testing against: {self.base_url}")
         print(f"👤 Test user: {self.test_user_email}")
         
@@ -447,7 +447,7 @@ def main():
     
     print(f"🔧 Backend URL: {backend_url}")
     
-    tester = MobillsAPITester(backend_url)
+    tester = AlcaFinancasAPITester(backend_url)
     
     success = tester.run_all_tests()
     

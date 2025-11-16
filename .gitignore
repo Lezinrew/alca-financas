@@ -1,5 +1,47 @@
+# Environment files
 backend/.env
 backend/.env.local
+.env
+.env.local
+
+# Virtual environments
+venv/
+.venv/
+backend/.venv/
+backend/venv/
+env/
+ENV/
+
+# Logs
+logs/
+*.log
+
+# Database
+mongo_data/
+*.db
+
+# Process IDs
+*.pid
+.backend.pid
+.frontend.pid
+.mongo_logs.pid
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Scripts (debug)
 debug_google_login.sh
 fix_google_login.sh
-venv/
+test_*.sh
+
+# Build outputs
+dist/
+build/
+*.pyc
+__pycache__/
+
+# macOS
+.DS_Store
+*/.DS_Store
+**/.DS_Store

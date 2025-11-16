@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import CurrencyInput from '../ui/CurrencyInput';
 
 // Type definitions
 interface Category {
@@ -22,6 +23,8 @@ interface Transaction {
   category_id: string;
   date: string;
   is_recurring?: boolean;
+  status?: 'paid' | 'pending' | 'overdue' | 'cancelled';
+  responsible_person?: string;
   installment_info?: InstallmentInfo;
 }
 
@@ -33,6 +36,8 @@ interface TransactionFormData {
   date: string;
   is_recurring: boolean;
   installments: number;
+  status: string;
+  responsible_person: string;
 }
 
 interface TransactionFormProps {
@@ -52,7 +57,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
     category_id: '',
     date: new Date().toISOString().split('T')[0],
     is_recurring: false,
-    installments: 1
+    installments: 1,
+    status: 'pending',
+    responsible_person: 'Leandro'
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -67,7 +74,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
         category_id: transaction.category_id?.toString() || '',
         date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : '',
         is_recurring: transaction.is_recurring || false,
-        installments: transaction.installment_info?.total || 1
+        installments: transaction.installment_info?.total || 1,
+        status: transaction.status || 'pending',
+        responsible_person: transaction.responsible_person || 'Leandro'
       });
     } else {
       // Reset form for new transaction
@@ -78,7 +87,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
         category_id: '',
         date: new Date().toISOString().split('T')[0],
         is_recurring: false,
-        installments: 1
+        installments: 1,
+        status: 'pending',
+        responsible_person: 'Leandro'
       });
     }
   }, [transaction]);
@@ -125,12 +136,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
         category_id: formData.category_id,
         date: new Date(formData.date).toISOString(),
         is_recurring: formData.is_recurring,
-        installments: parseInt(formData.installments) || 1
+        installments: parseInt(formData.installments.toString()) || 1,
+        status: formData.status,
+        responsible_person: formData.responsible_person
       };
 
       await onSubmit(submitData);
+      // Se chegou aqui, o submit foi bem-sucedido
+      // O componente pai (Transactions) deve fechar o modal
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Erro ao salvar transação');
+      console.error('Erro ao salvar transação:', err);
+      const errorMessage = err?.response?.data?.error || err?.message || 'Erro ao salvar transação';
+      setError(errorMessage);
+      // Não fecha o modal em caso de erro para o usuário ver a mensagem
     } finally {
       setLoading(false);
     }
@@ -148,9 +166,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
   if (!show) return null;
 
   return (
-    <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog">
-      <div className="modal-backdrop fade show" onClick={handleClose}></div>
-      <div className="modal-dialog modal-lg" role="document">
+    <>
+      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }}></div>
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+        <div className="modal-dialog modal-lg" role="document">
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">
@@ -161,6 +180,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
               className="btn-close"
               onClick={handleClose}
               disabled={loading}
+              aria-label="Fechar"
             ></button>
           </div>
 
@@ -212,8 +232,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
 
                 {/* Categoria */}
                 <div className="col-md-6">
-                  <label className="form-label">{t('transactions.category')}</label>
+                  <label htmlFor="transaction-category" className="form-label">{t('transactions.category')}</label>
                   <select
+                    id="transaction-category"
                     name="category_id"
                     className="form-select"
                     value={formData.category_id}
@@ -232,9 +253,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
 
                 {/* Descrição */}
                 <div className="col-12">
-                  <label className="form-label">{t('transactions.description')}</label>
+                  <label htmlFor="transaction-description" className="form-label">{t('transactions.description')}</label>
                   <input
                     type="text"
+                    id="transaction-description"
                     name="description"
                     className="form-control"
                     value={formData.description}
@@ -242,34 +264,35 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
                     required
                     disabled={loading}
                     placeholder="Ex: Compras no supermercado"
+                    autoComplete="transaction-description"
                   />
                 </div>
 
                 {/* Valor */}
                 <div className="col-md-6">
-                  <label className="form-label">{t('transactions.amount')}</label>
+                  <label htmlFor="transaction-amount" className="form-label">{t('transactions.amount')}</label>
                   <div className="input-group">
                     <span className="input-group-text">R$</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
+                      id="transaction-amount"
                       name="amount"
                       className="form-control"
                       value={formData.amount}
                       onChange={handleChange}
-                      step="0.01"
-                      min="0.01"
-                      required
-                      disabled={loading}
                       placeholder="0,00"
+                      disabled={loading}
+                      required
+                      autoComplete="transaction-amount"
                     />
                   </div>
                 </div>
 
                 {/* Data */}
                 <div className="col-md-6">
-                  <label className="form-label">{t('transactions.date')}</label>
+                  <label htmlFor="transaction-date" className="form-label">{t('transactions.date')}</label>
                   <input
                     type="date"
+                    id="transaction-date"
                     name="date"
                     className="form-control"
                     value={formData.date}
@@ -281,9 +304,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
 
                 {/* Parcelamento */}
                 <div className="col-md-6">
-                  <label className="form-label">{t('transactions.installments')}</label>
+                  <label htmlFor="transaction-installments" className="form-label">{t('transactions.installments')}</label>
                   <input
                     type="number"
+                    id="transaction-installments"
                     name="installments"
                     className="form-control"
                     value={formData.installments}
@@ -317,6 +341,41 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
                     Transação se repete mensalmente
                   </div>
                 </div>
+
+                {/* Responsável */}
+                <div className="col-md-6">
+                  <label htmlFor="transaction-responsible" className="form-label">Responsável</label>
+                  <select
+                    id="transaction-responsible"
+                    name="responsible_person"
+                    className="form-select"
+                    value={formData.responsible_person}
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    <option value="Leandro">Leandro</option>
+                    <option value="Glenda">Glenda</option>
+                    <option value="Ambos">Ambos</option>
+                  </select>
+                </div>
+
+                {/* Status (apenas visualização por enquanto) */}
+                <div className="col-md-6">
+                  <label htmlFor="transaction-status" className="form-label">Status</label>
+                  <select
+                    id="transaction-status"
+                    name="status"
+                    className="form-select"
+                    value={formData.status}
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    <option value="pending">Pendente</option>
+                    <option value="paid">Pago</option>
+                    <option value="overdue">Atrasado</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -347,7 +406,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
           </form>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

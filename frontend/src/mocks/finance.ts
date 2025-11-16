@@ -49,7 +49,7 @@ export const generateFinancialData = () => {
   const currentBalance = 25847.32;
   const monthlyIncome = 8500.00;
   const monthlyExpenses = 6234.56;
-  const openTickets = 3;
+  const creditCards = 2;
 
   const kpis: FinanceKPI[] = [
     {
@@ -74,11 +74,11 @@ export const generateFinancialData = () => {
       icon: 'trending-down',
     },
     {
-      title: 'Tickets Abertos',
-      value: openTickets,
-      change: -2,
-      changeType: 'decrease',
-      icon: 'ticket',
+      title: 'Cartões de Crédito',
+      value: creditCards,
+      change: 0,
+      changeType: 'increase',
+      icon: 'credit-card',
     },
   ];
 

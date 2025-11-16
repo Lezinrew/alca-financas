@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { authAPI } from '../../utils/api';
 
 const Settings = () => {
   const { t, i18n } = useTranslation();
   const { user, updateUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState({
     currency: 'BRL',
-    theme: 'light',
+    theme: theme,
     language: 'pt'
   });
   const [loading, setLoading] = useState(false);
@@ -18,6 +20,14 @@ const Settings = () => {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Sincroniza o tema do contexto com o estado local
+  useEffect(() => {
+    setSettings(prev => ({
+      ...prev,
+      theme: theme
+    }));
+  }, [theme]);
 
   const loadSettings = async () => {
     try {
@@ -33,13 +43,18 @@ const Settings = () => {
       ...prev,
       [field]: value
     }));
-    
+
     setError('');
     setSuccess('');
 
-    // Aplica mudança de idioma imediatamente
+    // Apply language change immediately
     if (field === 'language') {
       i18n.changeLanguage(value);
+    }
+
+    // Apply theme change immediately
+    if (field === 'theme') {
+      setTheme(value);
     }
   };
 
@@ -50,12 +65,15 @@ const Settings = () => {
 
     try {
       await authAPI.updateSettings(settings);
-      
-      // Atualiza dados do usuário no contexto
+
+      // Update user data in context
       const updatedUser = { ...user, settings };
       updateUser(updatedUser);
-      
+
       setSuccess(t('settings.saveSuccess'));
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Erro ao salvar configurações');
       console.error('Save settings error:', err);
@@ -65,10 +83,10 @@ const Settings = () => {
   };
 
   const currencies = [
-    { code: 'BRL', name: 'Real Brasileiro (R$)', symbol: 'R$' },
-    { code: 'USD', name: 'Dólar Americano ($)', symbol: '$' },
-    { code: 'EUR', name: 'Euro (€)', symbol: '€' },
-    { code: 'GBP', name: 'Libra Esterlina (£)', symbol: '£' }
+    { code: 'BRL', name: 'Real Brasileiro', symbol: 'R$' },
+    { code: 'USD', name: 'Dólar Americano', symbol: '$' },
+    { code: 'EUR', name: 'Euro', symbol: '€' },
+    { code: 'GBP', name: 'Libra Esterlina', symbol: '£' }
   ];
 
   const languages = [
@@ -78,72 +96,82 @@ const Settings = () => {
   ];
 
   const themes = [
-    { code: 'light', name: t('settings.light'), icon: 'bi-sun' },
-    { code: 'dark', name: t('settings.dark'), icon: 'bi-moon' }
+    { code: 'light', name: t('settings.light'), icon: 'bi-sun-fill' },
+    { code: 'dark', name: t('settings.dark'), icon: 'bi-moon-stars-fill' }
   ];
 
   return (
-    <div className="settings">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="h3 mb-0">{t('settings.title')}</h2>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Gerencie suas preferências da aplicação</p>
+        </div>
       </div>
 
       {error && (
-        <div className="alert alert-danger" role="alert">
-          <i className="bi bi-exclamation-triangle-fill me-2"></i>
-          {error}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+          <i className="bi bi-exclamation-triangle-fill text-red-600"></i>
+          <span className="text-red-800">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="alert alert-success" role="alert">
-          <i className="bi bi-check-circle-fill me-2"></i>
-          {success}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-2">
+          <i className="bi bi-check-circle-fill text-emerald-600"></i>
+          <span className="text-emerald-800">{success}</span>
         </div>
       )}
 
-      <div className="row">
-        <div className="col-lg-8">
-          <div className="card">
-            <div className="card-header">
-              <h5 className="card-title mb-0">
-                <i className="bi bi-gear me-2"></i>
-                Preferências da Aplicação
-              </h5>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Application Preferences */}
+          <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
+              <div className="flex items-center gap-2">
+                <i className="bi bi-gear text-slate-600 dark:text-slate-300"></i>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Preferências da Aplicação</h2>
+              </div>
             </div>
-            <div className="card-body">
-              <div className="row g-4">
-                {/* Moeda */}
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">
-                    <i className="bi bi-currency-exchange me-2"></i>
+            <div className="p-6">
+              <div className="space-y-6">
+                {/* Currency */}
+                <div>
+                  <label htmlFor="settings-currency" className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
+                    <i className="bi bi-currency-exchange text-slate-600 dark:text-slate-400"></i>
                     {t('settings.currency')}
                   </label>
                   <select
-                    className="form-select"
+                    id="settings-currency"
+                    name="currency"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-[#1a1d29] border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={settings.currency}
                     onChange={(e) => handleChange('currency', e.target.value)}
                     disabled={loading}
                   >
                     {currencies.map((currency) => (
                       <option key={currency.code} value={currency.code}>
-                        {currency.name}
+                        {currency.symbol} {currency.name}
                       </option>
                     ))}
                   </select>
-                  <div className="form-text">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                     Moeda padrão para exibição de valores
-                  </div>
+                  </p>
                 </div>
 
-                {/* Idioma */}
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">
-                    <i className="bi bi-translate me-2"></i>
+                {/* Language */}
+                <div>
+                  <label htmlFor="settings-language" className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
+                    <i className="bi bi-translate text-slate-600 dark:text-slate-400"></i>
                     {t('settings.language')}
                   </label>
                   <select
-                    className="form-select"
+                    id="settings-language"
+                    name="language"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-[#1a1d29] border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={settings.language}
                     onChange={(e) => handleChange('language', e.target.value)}
                     disabled={loading}
@@ -154,100 +182,115 @@ const Settings = () => {
                       </option>
                     ))}
                   </select>
-                  <div className="form-text">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                     Idioma da interface da aplicação
-                  </div>
+                  </p>
                 </div>
 
-                {/* Tema */}
-                <div className="col-12">
-                  <label className="form-label fw-semibold">
-                    <i className="bi bi-palette me-2"></i>
+                {/* Theme */}
+                <div>
+                  <label htmlFor="theme-selector" className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
+                    <i className="bi bi-palette text-slate-600 dark:text-slate-400"></i>
                     {t('settings.theme')}
                   </label>
-                  <div className="row">
-                    {themes.map((theme) => (
-                      <div key={theme.code} className="col-md-6 mb-3">
-                        <div 
-                          className={`card border-2 cursor-pointer ${
-                            settings.theme === theme.code ? 'border-primary' : 'border-light'
-                          }`}
-                          onClick={() => handleChange('theme', theme.code)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <div className="card-body text-center">
-                            <i className={`${theme.icon} display-6 mb-2`}></i>
-                            <h6 className="card-title">{theme.name}</h6>
-                            {settings.theme === theme.code && (
-                              <i className="bi bi-check-circle-fill text-primary"></i>
-                            )}
-                          </div>
+                  <div id="theme-selector" className="grid grid-cols-2 gap-3" role="group" aria-label="Selecionar tema">
+                    {themes.map((themeOption) => (
+                      <button
+                        key={themeOption.code}
+                        type="button"
+                        name={`theme-${themeOption.code}`}
+                        aria-label={`Selecionar tema ${themeOption.name}`}
+                        className={`p-6 rounded-xl border-2 transition-all ${
+                          settings.theme === themeOption.code
+                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1a1d29] hover:border-slate-300 dark:hover:border-slate-600'
+                        }`}
+                        onClick={() => handleChange('theme', themeOption.code)}
+                        disabled={loading}
+                      >
+                        <div className="text-center">
+                          <i className={`${themeOption.icon} text-4xl mb-3 ${
+                            settings.theme === themeOption.code ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'
+                          }`}></i>
+                          <h3 className={`font-semibold text-sm ${
+                            settings.theme === themeOption.code ? 'text-blue-900 dark:text-blue-200' : 'text-slate-900 dark:text-slate-100'
+                          }`}>
+                            {themeOption.name}
+                          </h3>
+                          {settings.theme === themeOption.code && (
+                            <i className="bi bi-check-circle-fill text-blue-600 dark:text-blue-400 mt-2 block"></i>
+                          )}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
-                  <div className="form-text">
-                    Aparência da aplicação (em desenvolvimento)
-                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                    Aparência da aplicação
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Informações da Conta */}
-          <div className="card mt-4">
-            <div className="card-header">
-              <h5 className="card-title mb-0">
-                <i className="bi bi-person-circle me-2"></i>
-                Informações da Conta
-              </h5>
+          {/* Account Information */}
+          <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
+              <div className="flex items-center gap-2">
+                <i className="bi bi-person-circle text-slate-600 dark:text-slate-300"></i>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Informações da Conta</h2>
+              </div>
             </div>
-            <div className="card-body">
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label">Nome</label>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="settings-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome</label>
                   <input
                     type="text"
-                    className="form-control"
+                    id="settings-name"
+                    name="name"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1d29] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
                     value={user?.name || ''}
                     disabled
                   />
                 </div>
-                
-                <div className="col-md-6">
-                  <label className="form-label">Email</label>
+
+                <div>
+                  <label htmlFor="settings-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
                   <input
                     type="email"
-                    className="form-control"
+                    id="settings-email"
+                    name="email"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1d29] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
                     value={user?.email || ''}
                     disabled
                   />
                 </div>
               </div>
-              
-              <div className="mt-3">
-                <small className="text-muted">
+
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                  <i className="bi bi-info-circle-fill"></i>
                   Para alterar dados da conta, acesse a seção Perfil
-                </small>
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Botão Salvar */}
-          <div className="d-flex justify-content-end mt-4">
+          {/* Save Button */}
+          <div className="flex justify-end">
             <button
               onClick={handleSave}
-              className="btn btn-primary btn-lg"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
             >
               {loading ? (
                 <>
-                  <span className="loading-spinner me-2"></span>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                   {t('common.loading')}
                 </>
               ) : (
                 <>
-                  <i className="bi bi-check-lg me-2"></i>
+                  <i className="bi bi-check-lg"></i>
                   {t('settings.save')}
                 </>
               )}
@@ -255,58 +298,60 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Sidebar com Informações */}
-        <div className="col-lg-4">
-          <div className="card">
-            <div className="card-header">
-              <h6 className="card-title mb-0">
-                <i className="bi bi-info-circle me-2"></i>
-                Sobre as Configurações
-              </h6>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* About Settings */}
+          <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
+              <div className="flex items-center gap-2">
+                <i className="bi bi-info-circle text-slate-600 dark:text-slate-300"></i>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Sobre as Configurações</h3>
+              </div>
             </div>
-            <div className="card-body">
-              <div className="mb-3">
-                <h6 className="text-primary">
-                  <i className="bi bi-currency-exchange me-2"></i>
+            <div className="p-6 space-y-4">
+              <div>
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
+                  <i className="bi bi-currency-exchange"></i>
                   Moeda
-                </h6>
-                <p className="small text-muted mb-3">
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Define a moeda padrão para exibição de valores em toda a aplicação.
                 </p>
               </div>
 
-              <div className="mb-3">
-                <h6 className="text-primary">
-                  <i className="bi bi-translate me-2"></i>
+              <div>
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
+                  <i className="bi bi-translate"></i>
                   Idioma
-                </h6>
-                <p className="small text-muted mb-3">
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Altera o idioma da interface. A mudança é aplicada imediatamente.
                 </p>
               </div>
 
-              <div className="mb-3">
-                <h6 className="text-primary">
-                  <i className="bi bi-palette me-2"></i>
+              <div>
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
+                  <i className="bi bi-palette"></i>
                   Tema
-                </h6>
-                <p className="small text-muted mb-0">
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Escolha entre tema claro ou escuro. Funcionalidade em desenvolvimento.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="card mt-4">
-            <div className="card-header">
-              <h6 className="card-title mb-0">
-                <i className="bi bi-shield-check me-2"></i>
-                Privacidade
-              </h6>
+          {/* Privacy Card */}
+          <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
+              <div className="flex items-center gap-2">
+                <i className="bi bi-shield-check text-slate-600 dark:text-slate-300"></i>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Privacidade</h3>
+              </div>
             </div>
-            <div className="card-body">
-              <p className="small text-muted">
-                Suas configurações são salvas de forma segura e criptografada. 
+            <div className="p-6">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Suas configurações são salvas de forma segura e criptografada.
                 Apenas você tem acesso aos seus dados financeiros.
               </p>
             </div>

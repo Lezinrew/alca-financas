@@ -1,9 +1,9 @@
-### Prompt para Refatoração do Backend (Mobills Pro)
+### Prompt para Refatoração do Backend (Alça Finanças)
 
 Use este prompt para orientar refatorações futuras e manter a estrutura modular do backend consistente com o estado atual do projeto.
 
 ```
-Refatore o backend da API do projeto Mobills Pro seguindo estas diretrizes e padrões já adotados no código atual.
+Refatore o backend da API do projeto Alça Finanças seguindo estas diretrizes e padrões já adotados no código atual.
 
 Objetivo
 - Manter `backend/app.py` como ponto de entrada: configura CORS, OAuth, conexão MongoDB e registra Blueprints.

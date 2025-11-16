@@ -2,7 +2,7 @@ import { createContext, useState, useContext, useEffect, ReactNode } from 'react
 import { authAPI } from '../utils/api';
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
 }
@@ -45,21 +45,33 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (token && userData) {
         try {
-          // Check if token is expired (for fake tokens)
-          const tokenData = JSON.parse(atob(token));
-          if (tokenData.exp && tokenData.exp < Date.now()) {
-            throw new Error('Token expired');
-          }
-
-          // For real tokens, validate with server
-          if (!token.startsWith('eyJ')) { // Not a base64 encoded fake token
-            const response = await authAPI.getMe();
-            setUser(response.data);
+          // Tokens JWT reais começam com 'eyJ' (base64 de {")
+          // Tokens fake são base64 de JSON com exp
+          if (token.startsWith('eyJ')) {
+            // Token JWT real - validar com servidor
+            try {
+              const response = await authAPI.getMe();
+              setUser(response.data);
+              setIsAuthenticated(true);
+            } catch (error) {
+              // Token inválido ou expirado
+              throw new Error('Token inválido');
+            }
           } else {
-            // Use stored user data for fake tokens
-            setUser(JSON.parse(userData));
+            // Token fake (base64) - verificar expiração localmente
+            try {
+              const tokenData = JSON.parse(atob(token));
+              if (tokenData.exp && tokenData.exp < Date.now()) {
+                throw new Error('Token expired');
+              }
+              // Use stored user data for fake tokens
+              setUser(JSON.parse(userData));
+              setIsAuthenticated(true);
+            } catch (error) {
+              // Token fake inválido ou expirado
+              throw new Error('Token inválido');
+            }
           }
-          setIsAuthenticated(true);
         } catch (error) {
           // Token inválido, remove dados locais
           localStorage.removeItem('auth_token');
@@ -67,6 +79,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           setUser(null);
           setIsAuthenticated(false);
         }
+      } else {
+        // Sem token ou userData
+        setUser(null);
+        setIsAuthenticated(false);
       }
       setLoading(false);
     };
@@ -118,32 +134,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const loginWithAI = async () => {
     try {
-      // Simulated AI login with demo credentials
-      const demoUser = {
-        id: 1,
-        name: 'Demo User',
-        email: 'demo@alca.fin'
-      };
+      // Login com credenciais demo no backend real
+      // Isso garante que o token seja válido e aceito pelo backend
+      const response = await authAPI.login({
+        email: 'demo@alca.fin',
+        password: 'demo123'
+      });
 
-      // Generate fake token with expiration
-      const fakeToken = btoa(JSON.stringify({ 
-        user: demoUser, 
-        exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours 
-      }));
+      const { token, user: userData } = response.data;
 
-      // Save to localStorage
-      localStorage.setItem('auth_token', fakeToken);
-      localStorage.setItem('user_data', JSON.stringify(demoUser));
+      // Salva dados no localStorage
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user_data', JSON.stringify(userData));
 
-      setUser(demoUser);
+      setUser(userData);
       setIsAuthenticated(true);
 
       return { success: true };
     } catch (error) {
-      return {
-        success: false,
-        message: 'Erro no login com IA'
-      };
+      // Se o login falhar, tenta criar o usuário demo
+      try {
+        const registerResponse = await authAPI.register({
+          name: 'Demo User',
+          email: 'demo@alca.fin',
+          password: 'demo123'
+        });
+
+        const { token, user: userData } = registerResponse.data;
+
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('user_data', JSON.stringify(userData));
+
+        setUser(userData);
+        setIsAuthenticated(true);
+
+        return { success: true };
+      } catch (registerError) {
+        return {
+          success: false,
+          message: (registerError as any).response?.data?.error || 'Erro no login com IA'
+        };
+      }
     }
   };
 
