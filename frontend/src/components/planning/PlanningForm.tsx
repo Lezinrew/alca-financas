@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '../../utils/api';
+import { parseCurrencyString } from '../../lib/utils';
+import CurrencyInput from '../ui/CurrencyInput';
 
 interface Budget {
   monthly_income: number;
   savings_percentage: number;
   category_budgets?: Array<{ category_id: string; amount: number }>;
+  credit_card_visualization?: 'purchase_date' | 'invoice_date';
 }
 
 interface PlanningFormProps {
@@ -13,8 +16,7 @@ interface PlanningFormProps {
   onSubmit: (data: any) => Promise<void>;
   categories: any[];
   budget: Budget | null;
-  month: number;
-  year: number;
+  defaultIncome?: number;
 }
 
 const PlanningForm: React.FC<PlanningFormProps> = ({
@@ -23,11 +25,10 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
   onSubmit,
   categories,
   budget,
-  month,
-  year
+  defaultIncome = 0
 }) => {
   const [formData, setFormData] = useState({
-    monthly_income: budget?.monthly_income || 0,
+    monthly_income: (budget?.monthly_income ?? defaultIncome ?? 0).toString(),
     savings_percentage: budget?.savings_percentage || 20,
     category_budgets: budget?.category_budgets || [],
     credit_card_visualization: budget?.credit_card_visualization || 'invoice_date'
@@ -39,13 +40,18 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
   useEffect(() => {
     if (budget) {
       setFormData({
-        monthly_income: budget.monthly_income || 0,
+        monthly_income: budget.monthly_income?.toString() || '0',
         savings_percentage: budget.savings_percentage || 20,
         category_budgets: budget.category_budgets || [],
         credit_card_visualization: budget.credit_card_visualization || 'invoice_date'
       });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        monthly_income: (defaultIncome ?? 0).toString()
+      }));
     }
-  }, [budget]);
+  }, [budget, defaultIncome]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -54,7 +60,15 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
     }));
   };
 
-  const handleCategoryBudgetChange = (categoryId: string, amount: number) => {
+  const handleMonthlyIncomeChange = (value?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      monthly_income: value ?? ''
+    }));
+  };
+
+  const handleCategoryBudgetChange = (categoryId: string, amountValue?: string) => {
+    const amount = parseCurrencyString(amountValue ?? '');
     setFormData(prev => {
       const existing = prev.category_budgets.find(cb => cb.category_id === categoryId);
       const updated = existing
@@ -73,7 +87,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
 
     try {
       if (step === 1) {
-        if (!formData.monthly_income || formData.monthly_income <= 0) {
+      if (monthlyIncomeValue <= 0) {
           throw new Error('A renda mensal deve ser maior que zero');
         }
         setStep(2);
@@ -87,7 +101,10 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
         return;
       }
 
-      await onSubmit(formData);
+      await onSubmit({
+        ...formData,
+        monthly_income: monthlyIncomeValue,
+      });
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar planejamento');
     } finally {
@@ -95,13 +112,9 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
     }
   };
 
-  const monthlyBudget = formData.monthly_income * (1 - formData.savings_percentage / 100);
-  const monthlySavings = (formData.monthly_income * formData.savings_percentage) / 100;
-
-  const months = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
+  const monthlyIncomeValue = parseCurrencyString(formData.monthly_income);
+  const monthlyBudget = monthlyIncomeValue * (1 - formData.savings_percentage / 100);
+  const monthlySavings = (monthlyIncomeValue * formData.savings_percentage) / 100;
 
   if (!show) return null;
 
@@ -170,22 +183,19 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                       <label htmlFor="monthly_income_input" className="block text-sm text-slate-600 dark:text-slate-400 mb-2">
                         Quanto você ganha por mês?
                       </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          id="monthly_income_input"
-                          name="monthly_income"
-                          min="0"
-                          step="0.01"
-                          value={formData.monthly_income}
-                          onChange={(e) => handleChange('monthly_income', parseFloat(e.target.value) || 0)}
-                          className="w-full px-4 py-3 text-2xl font-semibold text-purple-600 dark:text-purple-400 bg-transparent border-b-2 border-purple-600 dark:border-purple-400 focus:outline-none focus:border-purple-700 dark:focus:border-purple-300"
-                          placeholder="0,00"
-                        />
-                        <span className="absolute right-0 top-3 text-2xl font-semibold text-purple-600 dark:text-purple-400">
-                          R$
-                        </span>
-                      </div>
+                      {defaultIncome > 0 && !budget && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                          Receita real identificada neste mês: <span className="font-semibold">{formatCurrency(defaultIncome)}</span>
+                        </p>
+                      )}
+                      <CurrencyInput
+                        id="monthly_income_input"
+                        name="monthly_income"
+                        value={formData.monthly_income}
+                        onValueChange={handleMonthlyIncomeChange}
+                        className="w-full px-4 py-3 text-2xl font-semibold text-purple-600 dark:text-purple-400 bg-transparent border-b-2 border-purple-600 dark:border-purple-400 focus:outline-none focus:border-purple-700 dark:focus:border-purple-300"
+                        placeholder="0,00"
+                      />
                     </div>
                   </div>
 
@@ -265,21 +275,14 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                               <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
                             </div>
                           </div>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={categoryBudget?.amount || 0}
-                              onChange={(e) =>
-                                handleCategoryBudgetChange(category.id, parseFloat(e.target.value) || 0)
-                              }
-                              className="w-32 px-3 py-2 text-lg font-semibold text-purple-600 dark:text-purple-400 bg-transparent border-b-2 border-purple-600 dark:border-purple-400 focus:outline-none focus:border-purple-700 dark:focus:border-purple-300 text-right"
+                          <div className="relative w-36">
+                            <CurrencyInput
+                              name={`category-${category.id}`}
+                              value={categoryBudget ? categoryBudget.amount.toString() : ''}
+                              onValueChange={(value) => handleCategoryBudgetChange(category.id, value)}
+                              className="w-full px-3 py-2 text-lg font-semibold text-purple-600 dark:text-purple-400 bg-transparent border-b-2 border-purple-600 dark:border-purple-400 focus:outline-none focus:border-purple-700 dark:focus:border-purple-300 text-right"
                               placeholder="0,00"
                             />
-                            <span className="absolute right-0 top-2 text-sm text-slate-500 dark:text-slate-400">
-                              R$
-                            </span>
                           </div>
                         </div>
                       );

@@ -4,18 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, formatDate, categoriesAPI } from '../../utils/api';
 import CreditCardExpenseForm from './CreditCardExpenseForm';
 import CreditCardImportModal from './CreditCardImportModal';
-
-interface CreditCard {
-  id: string;
-  name: string;
-  limit: number;
-  used: number;
-  closingDay: number;
-  dueDay: number;
-  color: string;
-  icon: string;
-  is_active: boolean;
-}
+import { CreditCard } from '../../types/credit-card';
 
 interface Expense {
   id: string;
@@ -219,7 +208,7 @@ const CreditCardDetail: React.FC = () => {
   ];
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const availableLimit = card ? card.limit - card.used : 0;
+  const availableLimit = card ? card.limit - (card.used ?? 0) : 0;
 
   if (authLoading || loading) {
     return (
@@ -427,6 +416,33 @@ const CreditCardDetail: React.FC = () => {
               <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <i className="bi bi-currency-dollar text-blue-600 dark:text-blue-400 text-xl"></i>
               </div>
+            </div>
+          </div>
+
+          {/* Limite disponível */}
+          <div className="card-base p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-secondary mb-1">Limite disponível</p>
+                <p className="text-2xl font-bold text-primary">{formatCurrency(availableLimit)}</p>
+                <p className="text-xs text-secondary mt-1">
+                  Limite total de {formatCurrency(card.limit)}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <i className="bi bi-speedometer text-amber-600 dark:text-amber-400 text-xl"></i>
+              </div>
+            </div>
+            <div className="mt-4 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-amber-500 rounded-full transition-all"
+                style={{
+                  width: `${Math.min(
+                    card.limit > 0 ? (availableLimit / card.limit) * 100 : 0,
+                    100
+                  )}%`
+                }}
+              ></div>
             </div>
           </div>
 

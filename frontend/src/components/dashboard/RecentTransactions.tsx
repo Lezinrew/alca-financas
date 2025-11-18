@@ -1,7 +1,26 @@
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatDate } from '../../utils/api';
 
-const RecentTransactions = ({ transactions }) => {
+interface TransactionCategory {
+  name?: string;
+  color?: string;
+  icon?: string;
+}
+
+interface RecentTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  date: string;
+  category?: TransactionCategory;
+}
+
+interface RecentTransactionsProps {
+  transactions: RecentTransaction[];
+}
+
+const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions }) => {
   const { t } = useTranslation();
 
   if (!transactions || transactions.length === 0) {

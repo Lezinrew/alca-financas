@@ -1,4 +1,4 @@
-import { format, subMonths, eachMonthOfInterval, startOfMonth } from 'date-fns';
+import { format, subMonths, eachMonthOfInterval } from 'date-fns';
 
 export interface FinanceKPI {
   title: string;

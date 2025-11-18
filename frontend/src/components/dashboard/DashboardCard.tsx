@@ -1,5 +1,12 @@
+interface DashboardCardProps {
+  title: string;
+  value: string;
+  icon: string;
+  type?: 'income' | 'expense' | 'balance' | string;
+  subtitle?: string;
+}
 
-const DashboardCard = ({ title, value, icon, type, subtitle }) => {
+const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon, type, subtitle }) => {
   const getCardClass = () => {
     switch (type) {
       case 'income':

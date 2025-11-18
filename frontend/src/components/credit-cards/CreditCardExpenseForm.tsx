@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import CurrencyInput from '../ui/CurrencyInput';
+import { parseCurrencyString } from '../../lib/utils';
+import { CreditCard } from '../../types/credit-card';
 
 interface Category {
   id: string;
@@ -8,16 +9,6 @@ interface Category {
   type: string;
   color: string;
   icon: string;
-}
-
-interface CreditCard {
-  id: string;
-  name: string;
-  limit: number;
-  used: number;
-  closingDay: number;
-  dueDay: number;
-  color: string;
 }
 
 interface CreditCardExpenseFormProps {
@@ -28,6 +19,20 @@ interface CreditCardExpenseFormProps {
   categories: Category[];
 }
 
+interface CreditCardExpenseFormData {
+  amount: string;
+  date: string;
+  description: string;
+  category_id: string;
+  card_id: string;
+  tags: string;
+  observation: string;
+  is_fixed: boolean;
+  is_installment: boolean;
+  installments: number;
+  ignore_transaction: boolean;
+}
+
 const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
   show,
   onHide,
@@ -35,8 +40,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
   card,
   categories
 }) => {
-  const { t } = useTranslation();
-  const [formData, setFormData] = useState({
+  const initialFormState: CreditCardExpenseFormData = {
     amount: '',
     date: 'today',
     description: '',
@@ -48,7 +52,9 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
     is_installment: false,
     installments: 2,
     ignore_transaction: false
-  });
+  };
+
+  const [formData, setFormData] = useState<CreditCardExpenseFormData>(initialFormState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showMoreDetails, setShowMoreDetails] = useState(false);
@@ -56,32 +62,40 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
   useEffect(() => {
     if (show) {
       setFormData({
-        amount: '',
-        date: 'today',
-        description: '',
-        category_id: '',
-        card_id: card.id,
-        tags: '',
-        observation: '',
-        is_fixed: false,
-        is_installment: false,
-        installments: 2,
-        ignore_transaction: false
+        ...initialFormState,
+        card_id: card.id
       });
       setError('');
       setShowMoreDetails(false);
     }
   }, [show, card.id]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const target = e.target;
+    const { name, value } = target;
+    const fieldName = name as keyof CreditCardExpenseFormData;
+
+    let nextValue: string | number | boolean = value;
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      nextValue = target.checked;
+    } else if (fieldName === 'installments') {
+      nextValue = Number(value) || 0;
+    }
 
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [fieldName]: nextValue as CreditCardExpenseFormData[typeof fieldName]
     }));
+    setError('');
+  };
 
+  const handleAmountChange = (value?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      amount: value ?? ''
+    }));
     setError('');
   };
 
@@ -92,7 +106,9 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
 
     try {
       // Validações
-      if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      const amountValue = parseCurrencyString(formData.amount);
+
+      if (amountValue <= 0) {
         throw new Error('Deve ter um valor diferente de 0');
       }
 
@@ -102,7 +118,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
 
       const submitData = {
         ...formData,
-        amount: parseFloat(formData.amount),
+        amount: amountValue,
         date: formData.date === 'today' ? new Date().toISOString() :
               formData.date === 'yesterday' ? new Date(Date.now() - 86400000).toISOString() :
               new Date(formData.date).toISOString()
@@ -158,25 +174,17 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                   {/* Valor */}
                   <div className="col-12">
                     <label htmlFor="expense-amount" className="form-label">Valor</label>
-                    <div className="input-group input-group-lg">
-                      <span className="input-group-text bg-transparent border-0 text-muted">R$</span>
-                      <CurrencyInput
-                        id="expense-amount"
-                        name="amount"
-                        className="form-control form-control-lg border-0 border-bottom rounded-0 px-0 text-primary fw-bold fs-3"
-                        value={formData.amount}
-                        onChange={handleChange}
-                        placeholder="0,00"
-                        disabled={loading}
-                        required
-                        autoComplete="transaction-amount"
-                      />
-                      <span className="input-group-text bg-transparent border-0">
-                        <select className="form-select form-select-sm border-0" disabled>
-                          <option>BRL</option>
-                        </select>
-                      </span>
-                    </div>
+                    <CurrencyInput
+                      id="expense-amount"
+                      name="amount"
+                      className="form-control form-control-lg border-0 border-bottom rounded-0 px-0 text-primary fw-bold fs-3"
+                      value={formData.amount}
+                      onValueChange={handleAmountChange}
+                      placeholder="0,00"
+                      disabled={loading}
+                      required
+                      autoComplete="transaction-amount"
+                    />
                   </div>
 
                   {/* Data - Botões de Seleção Rápida */}

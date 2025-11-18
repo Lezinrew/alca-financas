@@ -1,59 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import CurrencyInput from '../ui/CurrencyInput';
-
-// Type definitions
-interface Category {
-  id: string;
-  name: string;
-  type: 'income' | 'expense';
-  color?: string;
-}
-
-interface InstallmentInfo {
-  total: number;
-  current: number;
-}
-
-interface Transaction {
-  id?: string;
-  description: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category_id: string;
-  date: string;
-  is_recurring?: boolean;
-  status?: 'paid' | 'pending' | 'overdue' | 'cancelled';
-  responsible_person?: string;
-  installment_info?: InstallmentInfo;
-}
+import {
+  TransactionCategory,
+  TransactionRecord,
+  TransactionSubmitPayload,
+  TransactionStatus,
+  TransactionType,
+} from '../../types/transaction';
+import { parseCurrencyString } from '../../lib/utils';
 
 interface TransactionFormData {
   description: string;
   amount: string;
-  type: 'income' | 'expense';
+  type: TransactionType;
   category_id: string;
   date: string;
   is_recurring: boolean;
   installments: number;
-  status: string;
+  status: TransactionStatus;
   responsible_person: string;
 }
 
 interface TransactionFormProps {
   show: boolean;
   onHide: () => void;
-  onSubmit: (transaction: Omit<Transaction, 'id'> & { installments: number }) => Promise<void>;
-  categories: Category[];
-  transaction?: Transaction | null;
+  onSubmit: (transaction: TransactionSubmitPayload) => Promise<void>;
+  categories: TransactionCategory[];
+  transaction?: TransactionRecord | null;
+  defaultType?: TransactionType;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmit, categories, transaction }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({
+  show,
+  onHide,
+  onSubmit,
+  categories,
+  transaction,
+  defaultType = 'expense',
+}) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<TransactionFormData>({
     description: '',
     amount: '',
-    type: 'expense',
+    type: defaultType,
     category_id: '',
     date: new Date().toISOString().split('T')[0],
     is_recurring: false,
@@ -70,38 +60,53 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
       setFormData({
         description: transaction.description || '',
         amount: transaction.amount?.toString() || '',
-        type: transaction.type || 'expense',
-        category_id: transaction.category_id?.toString() || '',
+        type: transaction.type || defaultType,
+        category_id: transaction.category_id || '',
         date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : '',
         is_recurring: transaction.is_recurring || false,
         installments: transaction.installment_info?.total || 1,
         status: transaction.status || 'pending',
-        responsible_person: transaction.responsible_person || 'Leandro'
+        responsible_person: transaction.responsible_person || 'Leandro',
       });
     } else {
-      // Reset form for new transaction
       setFormData({
         description: '',
         amount: '',
-        type: 'expense',
+        type: defaultType,
         category_id: '',
         date: new Date().toISOString().split('T')[0],
         is_recurring: false,
         installments: 1,
         status: 'pending',
-        responsible_person: 'Leandro'
+        responsible_person: 'Leandro',
       });
     }
-  }, [transaction]);
+  }, [transaction, defaultType]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type, checked } = e.target;
-    
+    const target = e.target;
+    const { name, value } = target;
+    let nextValue: string | boolean | number = value;
+
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      nextValue = target.checked;
+    } else if (name === 'installments') {
+      nextValue = Number(value) || 1;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: nextValue as TransactionFormData[keyof TransactionFormData],
     }));
-    
+
+    setError('');
+  };
+
+  const handleAmountChange = (value?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      amount: value ?? '',
+    }));
     setError('');
   };
 
@@ -116,7 +121,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
         throw new Error('Descrição é obrigatória');
       }
       
-      if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      const amountValue = parseCurrencyString(formData.amount);
+
+      if (amountValue <= 0) {
         throw new Error('Valor deve ser positivo');
       }
       
@@ -129,9 +136,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
       }
 
       // Prepara dados para envio
-      const submitData = {
+      const submitData: TransactionSubmitPayload = {
         description: formData.description.trim(),
-        amount: parseFloat(formData.amount),
+        amount: amountValue,
         type: formData.type,
         category_id: formData.category_id,
         date: new Date(formData.date).toISOString(),
@@ -168,7 +175,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
   return (
     <>
       <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }}></div>
-      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
         <div className="modal-dialog modal-lg" role="document">
         <div className="modal-content">
           <div className="modal-header">
@@ -271,20 +278,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ show, onHide, onSubmi
                 {/* Valor */}
                 <div className="col-md-6">
                   <label htmlFor="transaction-amount" className="form-label">{t('transactions.amount')}</label>
-                  <div className="input-group">
-                    <span className="input-group-text">R$</span>
-                    <CurrencyInput
-                      id="transaction-amount"
-                      name="amount"
-                      className="form-control"
-                      value={formData.amount}
-                      onChange={handleChange}
-                      placeholder="0,00"
-                      disabled={loading}
-                      required
-                      autoComplete="transaction-amount"
-                    />
-                  </div>
+                  <CurrencyInput
+                    id="transaction-amount"
+                    name="amount"
+                    className="form-control"
+                    value={formData.amount}
+                    onValueChange={handleAmountChange}
+                    placeholder="0,00"
+                    disabled={loading}
+                    required
+                    autoComplete="transaction-amount"
+                  />
                 </div>
 
                 {/* Data */}

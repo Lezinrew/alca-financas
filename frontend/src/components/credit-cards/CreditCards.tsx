@@ -1,27 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, categoriesAPI } from '../../utils/api';
 import CreditCardExpenseForm from './CreditCardExpenseForm';
 import CreditCardForm from './CreditCardForm';
+import { CreditCard, CreditCardPayload } from '../../types/credit-card';
 
-interface CreditCard {
+interface Category {
   id: string;
   name: string;
-  limit: number;
-  used: number;
-  closingDay: number;
-  dueDay: number;
+  type: 'income' | 'expense';
   color: string;
+  icon: string;
 }
 
 const CreditCards: React.FC = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [cards, setCards] = useState<CreditCard[]>([]);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -67,7 +64,9 @@ const CreditCards: React.FC = () => {
             dueDay: acc.due_day || 15, // TODO: Adicionar campo no backend
             color: acc.color || '#6366f1',
             icon: acc.icon || 'credit-card',
-            is_active: acc.is_active
+            is_active: acc.is_active,
+            account_id: acc.account_id,
+            card_type: acc.card_type
           }));
         setCards(creditCards);
       }
@@ -99,7 +98,7 @@ const CreditCards: React.FC = () => {
     }
   };
 
-  const handleCardFormSubmit = async (cardData: any) => {
+  const handleCardFormSubmit = async (cardData: CreditCardPayload) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
       const url = editingCard
@@ -146,11 +145,14 @@ const CreditCards: React.FC = () => {
   };
 
   const calculateAvailable = (card: CreditCard) => {
-    return card.limit - card.used;
+    const used = card.used ?? 0;
+    return card.limit - used;
   };
 
   const calculateUsedPercentage = (card: CreditCard) => {
-    return (card.used / card.limit) * 100;
+    const used = card.used ?? 0;
+    if (card.limit === 0) return 0;
+    return (used / card.limit) * 100;
   };
 
   const getNextClosingDate = (closingDay: number) => {
@@ -337,7 +339,7 @@ const CreditCards: React.FC = () => {
                   <div className="flex items-center justify-between text-sm">
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Usado: </span>
-                      <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(card.used)}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(card.used ?? 0)}</span>
                     </div>
                     <button className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
                       Ver detalhes

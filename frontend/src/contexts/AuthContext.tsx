@@ -1,10 +1,16 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { authAPI } from '../utils/api';
 
+interface AuthProviderInfo {
+  provider: string;
+  email_verified?: boolean;
+}
+
 interface User {
   id: string;
   name: string;
   email: string;
+  auth_providers?: AuthProviderInfo[];
 }
 
 interface AuthContextType {

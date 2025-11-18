@@ -153,3 +153,130 @@ def microsoft_login():
 @bp.route('/auth/apple/login', methods=['GET'])
 def apple_login():
     return jsonify({'error': 'Login com Apple não implementado ainda', 'message': 'Configure as credenciais do Apple OAuth no arquivo .env'}), 501
+
+
+@bp.route('/auth/backup/export', methods=['GET'])
+@require_auth
+def export_backup():
+    """Exporta todos os dados do usuário em formato JSON"""
+    try:
+        user_id = request.user_id
+        categories_collection = current_app.config['CATEGORIES']
+        transactions_collection = current_app.config['TRANSACTIONS']
+        accounts_collection = current_app.config['ACCOUNTS']
+        
+        # Busca todos os dados do usuário
+        categories = list(categories_collection.find({'user_id': user_id}))
+        transactions = list(transactions_collection.find({'user_id': user_id}))
+        accounts = list(accounts_collection.find({'user_id': user_id}))
+        
+        # Remove _id do MongoDB e converte para string
+        backup_data = {
+            'version': '1.0',
+            'exported_at': datetime.utcnow().isoformat(),
+            'user_id': user_id,
+            'categories': [dict(cat, _id=str(cat['_id'])) for cat in categories],
+            'transactions': [dict(tx, _id=str(tx['_id'])) for tx in transactions],
+            'accounts': [dict(acc, _id=str(acc['_id'])) for acc in accounts]
+        }
+        
+        return jsonify(backup_data)
+    except Exception as e:
+        return jsonify({'error': f'Erro ao exportar backup: {str(e)}'}), 500
+
+
+@bp.route('/auth/backup/import', methods=['POST'])
+@require_auth
+def import_backup():
+    """Importa backup de dados do usuário"""
+    try:
+        user_id = request.user_id
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Dados do backup são obrigatórios'}), 400
+        
+        categories_collection = current_app.config['CATEGORIES']
+        transactions_collection = current_app.config['TRANSACTIONS']
+        accounts_collection = current_app.config['ACCOUNTS']
+        
+        imported_counts = {
+            'categories': 0,
+            'transactions': 0,
+            'accounts': 0
+        }
+        
+        # Importa categorias
+        if 'categories' in data and isinstance(data['categories'], list):
+            for cat in data['categories']:
+                cat['user_id'] = user_id
+                cat.pop('_id', None)  # Remove _id para criar novo
+                # Verifica se já existe pelo nome e tipo
+                existing = categories_collection.find_one({
+                    'user_id': user_id,
+                    'name': cat.get('name'),
+                    'type': cat.get('type')
+                })
+                if not existing:
+                    categories_collection.insert_one(cat)
+                    imported_counts['categories'] += 1
+        
+        # Importa contas
+        if 'accounts' in data and isinstance(data['accounts'], list):
+            for acc in data['accounts']:
+                acc['user_id'] = user_id
+                acc.pop('_id', None)
+                # Verifica se já existe pelo nome
+                existing = accounts_collection.find_one({
+                    'user_id': user_id,
+                    'name': acc.get('name')
+                })
+                if not existing:
+                    accounts_collection.insert_one(acc)
+                    imported_counts['accounts'] += 1
+        
+        # Importa transações
+        if 'transactions' in data and isinstance(data['transactions'], list):
+            for tx in data['transactions']:
+                tx['user_id'] = user_id
+                tx.pop('_id', None)
+                # Atualiza category_id e account_id se necessário
+                if 'category_id' in tx:
+                    # Tenta encontrar categoria pelo nome se ID não existir
+                    pass
+                transactions_collection.insert_one(tx)
+                imported_counts['transactions'] += 1
+        
+        return jsonify({
+            'message': 'Backup importado com sucesso',
+            'imported': imported_counts
+        })
+    except Exception as e:
+        return jsonify({'error': f'Erro ao importar backup: {str(e)}'}), 500
+
+
+@bp.route('/auth/data/clear', methods=['POST'])
+@require_auth
+def clear_all_data():
+    """Limpa todos os dados do usuário (exceto a conta)"""
+    try:
+        user_id = request.user_id
+        categories_collection = current_app.config['CATEGORIES']
+        transactions_collection = current_app.config['TRANSACTIONS']
+        accounts_collection = current_app.config['ACCOUNTS']
+        
+        # Deleta todos os dados do usuário
+        categories_deleted = categories_collection.delete_many({'user_id': user_id}).deleted_count
+        transactions_deleted = transactions_collection.delete_many({'user_id': user_id}).deleted_count
+        accounts_deleted = accounts_collection.delete_many({'user_id': user_id}).deleted_count
+        
+        return jsonify({
+            'message': 'Todos os dados foram limpos com sucesso',
+            'deleted': {
+                'categories': categories_deleted,
+                'transactions': transactions_deleted,
+                'accounts': accounts_deleted
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': f'Erro ao limpar dados: {str(e)}'}), 500

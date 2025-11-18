@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { KPICard } from './KPICard';
@@ -10,8 +9,6 @@ import {
   CreditCard,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   PieChart,
@@ -24,7 +21,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCurrency, formatPercent, dashboardAPI } from '../../utils/api';
+import { formatCurrency, dashboardAPI } from '../../utils/api';
 
 // Custom tooltip for line chart
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -92,7 +89,6 @@ interface CategoryExpense {
 }
 
 const Dashboard: React.FC = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [showNewMenu, setShowNewMenu] = useState(false);

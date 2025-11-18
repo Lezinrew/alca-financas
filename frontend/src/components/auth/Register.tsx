@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,9 +16,9 @@ const Register = () => {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
@@ -26,7 +26,7 @@ const Register = () => {
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -59,8 +59,8 @@ const Register = () => {
     setLoading(false);
   };
 
-  const handleSocialLogin = (provider) => {
-    let loginUrl;
+  const handleSocialLogin = (provider: 'google' | 'microsoft' | 'apple') => {
+    let loginUrl: string;
     switch (provider) {
       case 'google':
         loginUrl = oauthAPI.googleLogin();
@@ -74,7 +74,7 @@ const Register = () => {
       default:
         return;
     }
-    
+
     window.location.href = loginUrl;
   };
 
@@ -145,7 +145,7 @@ const Register = () => {
               required
               disabled={loading}
               placeholder="••••••••"
-              minLength="6"
+              minLength={6}
             />
           </div>
 
@@ -164,7 +164,7 @@ const Register = () => {
               required
               disabled={loading}
               placeholder="••••••••"
-              minLength="6"
+              minLength={6}
             />
           </div>
 

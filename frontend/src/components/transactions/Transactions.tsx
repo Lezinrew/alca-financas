@@ -1,41 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { transactionsAPI, categoriesAPI, formatCurrency, formatDate } from '../../utils/api';
+import { transactionsAPI, categoriesAPI } from '../../utils/api';
 import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
+import {
+  TransactionCategory,
+  TransactionRecord,
+  TransactionSubmitPayload,
+  TransactionType,
+} from '../../types/transaction';
 
 const Transactions = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const [transactions, setTransactions] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState(null);
-  const [initialTransactionType, setInitialTransactionType] = useState<'expense' | 'income' | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
+  const [initialTransactionType, setInitialTransactionType] = useState<TransactionType | null>(null);
   
   // Inicializa filtros com base no state da navegação (se houver)
-  const getInitialFilters = () => {
-    const state = location.state as any;
-    const initialType = (state?.filterType && (state.filterType === 'income' || state.filterType === 'expense')) 
-      ? state.filterType 
-      : '';
-    
+  type FilterType = '' | TransactionType;
+
+  interface TransactionFilters {
+    month: number;
+    year: number;
+    category_id: string;
+    type: FilterType;
+  }
+
+  const getInitialFilters = (): TransactionFilters => {
+    const state = location.state as { filterType?: FilterType } | null;
+    const initialType: FilterType =
+      state?.filterType === 'income' || state?.filterType === 'expense' ? state.filterType : '';
+
     return {
       month: new Date().getMonth() + 1,
       year: new Date().getFullYear(),
       category_id: '',
-      type: initialType
+      type: initialType,
     };
   };
 
   // Filtros
-  const [filters, setFilters] = useState(getInitialFilters);
+  const [filters, setFilters] = useState<TransactionFilters>(getInitialFilters);
 
   const loadData = async () => {
     try {
@@ -47,9 +61,13 @@ const Transactions = () => {
         categoriesAPI.getAll()
       ]);
       
-      setTransactions(transactionsRes.data);
-      // Backend devolve categorias com 'id' string; garantir string
-      setCategories(categoriesRes.data.map((c: any) => ({ ...c, id: String(c.id) })));
+      setTransactions(transactionsRes.data as TransactionRecord[]);
+      setCategories(
+        categoriesRes.data.map((c: TransactionCategory) => ({
+          ...c,
+          id: String(c.id),
+        }))
+      );
     } catch (err) {
       setError('Erro ao carregar transações');
       console.error('Load transactions error:', err);
@@ -101,7 +119,7 @@ const Transactions = () => {
     setShowForm(true);
   };
 
-  const handleEditTransaction = (transaction) => {
+  const handleEditTransaction = (transaction: TransactionRecord) => {
     console.log('Transactions: Editando transação:', transaction);
     setEditingTransaction(transaction);
     setShowForm(true);
@@ -136,7 +154,7 @@ const Transactions = () => {
     }
   };
 
-  const handleFormSubmit = async (formData) => {
+  const handleFormSubmit = async (formData: TransactionSubmitPayload) => {
     try {
       setError(''); // Limpa erros anteriores
       if (editingTransaction) {
@@ -156,10 +174,13 @@ const Transactions = () => {
     }
   };
 
-  const handleFilterChange = (field, value) => {
+  const handleFilterChange = <K extends keyof TransactionFilters>(
+    field: K,
+    value: TransactionFilters[K]
+  ) => {
     setFilters(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -227,7 +248,7 @@ const Transactions = () => {
                 name="month"
                 className="input-base dark:bg-[#1a1d29] dark:text-white dark:border-slate-700"
                 value={filters.month}
-                onChange={(e) => handleFilterChange('month', e.target.value)}
+                onChange={(e) => handleFilterChange('month', Number(e.target.value))}
               >
                 {months.map((month, index) => (
                   <option key={index} value={index + 1}>
@@ -244,7 +265,7 @@ const Transactions = () => {
                 name="year"
                 className="select-base"
                 value={filters.year}
-                onChange={(e) => handleFilterChange('year', e.target.value)}
+                onChange={(e) => handleFilterChange('year', Number(e.target.value))}
               >
                 {years.map(year => (
                   <option key={year} value={year}>
@@ -279,7 +300,7 @@ const Transactions = () => {
                 name="type"
                 className="select-base"
                 value={filters.type}
-                onChange={(e) => handleFilterChange('type', e.target.value)}
+                onChange={(e) => handleFilterChange('type', e.target.value as FilterType)}
               >
                 <option value="">Todos os tipos</option>
                 <option value="income">{t('transactions.income')}</option>
@@ -308,13 +329,8 @@ const Transactions = () => {
           }}
           onSubmit={handleFormSubmit}
           categories={categories}
-          transaction={editingTransaction || (initialTransactionType ? {
-            type: initialTransactionType,
-            description: '',
-            amount: 0,
-            category_id: '',
-            date: new Date().toISOString().split('T')[0]
-          } as any : null)}
+          transaction={editingTransaction}
+          defaultType={initialTransactionType ?? 'expense'}
         />
       )}
     </div>

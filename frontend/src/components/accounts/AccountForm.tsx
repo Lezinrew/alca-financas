@@ -1,20 +1,11 @@
 import React, { useState, useEffect } from 'react';
-
-// Type definitions
-interface Account {
-  id?: number;
-  name: string;
-  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
-  institution?: string;
-  initial_balance: number;
-  color: string;
-  icon: string;
-  is_active: boolean;
-}
+import { Account, AccountType, AccountPayload } from '../../types/account';
+import CurrencyInput from '../ui/CurrencyInput';
+import { parseCurrencyString } from '../../lib/utils';
 
 interface AccountFormData {
   name: string;
-  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+  type: AccountType;
   institution: string;
   initial_balance: string;
   color: string;
@@ -25,12 +16,12 @@ interface AccountFormData {
 interface AccountFormProps {
   show: boolean;
   onHide: () => void;
-  onSubmit: (account: Omit<Account, 'id'>) => Promise<void>;
+  onSubmit: (account: AccountPayload) => Promise<void>;
   account?: Account | null;
 }
 
-interface AccountType {
-  value: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
+interface AccountTypeOption {
+  value: AccountType;
   label: string;
   icon: string;
 }
@@ -48,7 +39,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  const accountTypes: AccountType[] = [
+  const accountTypes: AccountTypeOption[] = [
     { value: 'wallet', label: 'Carteira', icon: 'wallet2' },
     { value: 'checking', label: 'Conta Corrente', icon: 'bank' },
     { value: 'savings', label: 'Poupança', icon: 'piggy-bank' },
@@ -94,16 +85,14 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
     }
   }, [account, show]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string | boolean; type?: string; checked?: boolean } }) => {
-    const { name, value, type, checked } = e.target;
-    
+  const updateField = (name: keyof AccountFormData, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: typeof prev[name] === 'boolean' ? Boolean(value) : (value as string)
     }));
-    
-    // Atualiza ícone automaticamente quando tipo muda
-    if (name === 'type') {
+    setError('');
+
+    if (name === 'type' && typeof value === 'string') {
       const typeConfig = accountTypes.find(t => t.value === value);
       if (typeConfig) {
         setFormData(prev => ({
@@ -112,8 +101,18 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
         }));
       }
     }
-    
-    setError('');
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const target = e.target;
+    const fieldName = target.name as keyof AccountFormData;
+    const isCheckbox = target instanceof HTMLInputElement && target.type === 'checkbox';
+    const fieldValue = isCheckbox ? target.checked : target.value;
+    updateField(fieldName, fieldValue);
+  };
+
+  const handleManualChange = (name: keyof AccountFormData, value: string | boolean) => {
+    updateField(name, value);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -127,16 +126,14 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
         throw new Error('Nome da conta é obrigatório');
       }
 
-      if (formData.initial_balance && isNaN(parseFloat(formData.initial_balance))) {
-        throw new Error('Saldo inicial deve ser um número válido');
-      }
-
       // Prepara dados para envio
-      const submitData: Omit<Account, 'id'> = {
+      const initialBalanceValue = parseCurrencyString(formData.initial_balance);
+
+      const submitData: AccountPayload = {
         name: formData.name.trim(),
         type: formData.type,
         institution: formData.institution.trim(),
-        initial_balance: formData.initial_balance ? parseFloat(formData.initial_balance) : 0,
+        initial_balance: initialBalanceValue,
         color: formData.color,
         icon: formData.icon,
         is_active: formData.is_active
@@ -161,7 +158,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
   return (
     <>
       <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }} onClick={handleClose}></div>
-      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
         <div className="modal-dialog modal-lg" role="document" onClick={(e) => e.stopPropagation()}>
           <div className="modal-content">
             <div className="modal-header">
@@ -247,22 +244,17 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                 {/* Saldo Inicial */}
                 <div className="col-md-6">
                   <label htmlFor="account-initial-balance" className="form-label">Saldo Inicial</label>
-                  <div className="input-group">
-                    <span className="input-group-text">R$</span>
-                    <input
-                      type="number"
-                      id="account-initial-balance"
-                      name="initial_balance"
-                      className="form-control"
-                      value={formData.initial_balance}
-                      onChange={handleChange}
-                      step="0.01"
-                      disabled={loading}
-                      placeholder="0,00"
-                      autoComplete="off"
-                      aria-label="Saldo inicial da conta"
-                    />
-                  </div>
+                  <CurrencyInput
+                    id="account-initial-balance"
+                    name="initial_balance"
+                    className="form-control"
+                    value={formData.initial_balance}
+                    onValueChange={(value) => handleManualChange('initial_balance', value ?? '')}
+                    disabled={loading}
+                    placeholder="0,00"
+                    autoComplete="off"
+                    aria-label="Saldo inicial da conta"
+                  />
                 </div>
 
                 {/* Instituição */}
@@ -299,7 +291,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                           backgroundColor: color,
                           borderRadius: '50%'
                         }}
-                        onClick={() => handleChange({ target: { name: 'color', value: color } })}
+                        onClick={() => handleManualChange('color', color)}
                         disabled={loading}
                       />
                     ))}
@@ -329,7 +321,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                         aria-label={`Selecionar ícone ${icon}`}
                         className={`btn btn-outline-secondary btn-sm ${formData.icon === icon ? 'active' : ''}`}
                         style={{ width: '40px', height: '40px' }}
-                        onClick={() => handleChange({ target: { name: 'icon', value: icon } })}
+                        onClick={() => handleManualChange('icon', icon)}
                         disabled={loading}
                       >
                         <i className={`bi bi-${icon}`}></i>

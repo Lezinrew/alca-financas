@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatDate } from '../../utils/api';
+import { TransactionRecord } from '../../types/transaction';
 
-const TransactionList = ({ transactions, onEdit, onDelete }) => {
+interface TransactionListProps {
+  transactions: TransactionRecord[];
+  onEdit: (transaction: TransactionRecord) => void;
+  onDelete: (transactionId: string) => void;
+}
+
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEdit, onDelete }) => {
   const { t } = useTranslation();
-  const [openMenuId, setOpenMenuId] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Fecha o menu ao clicar fora
   useEffect(() => {
@@ -63,17 +70,21 @@ const TransactionList = ({ transactions, onEdit, onDelete }) => {
             </tr>
           </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
-            {transactions.map((transaction) => (
+            {transactions.map((transaction) => {
+              const categoryColor = transaction.category?.color || '#6b7280';
+              const categoryIcon = transaction.category?.icon || 'circle';
+
+              return (
               <tr key={transaction.id} className="table-row">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div
                       className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{
-                        backgroundColor: transaction.category?.color || '#6b7280'
+                        backgroundColor: categoryColor
                       }}
                     >
-                      <i className={`bi bi-${transaction.category?.icon || 'circle'} text-white`}></i>
+                      <i className={`bi bi-${categoryIcon} text-white`}></i>
                     </div>
                     <div>
                       <div className="font-medium text-slate-900 dark:text-white">{transaction.description}</div>
@@ -87,14 +98,14 @@ const TransactionList = ({ transactions, onEdit, onDelete }) => {
                 </td>
 
                 <td className="px-6 py-4">
-                  <span
+                    <span
                     className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium"
                     style={{
-                      backgroundColor: `${transaction.category?.color}15`,
-                      color: transaction.category?.color
+                      backgroundColor: `${categoryColor}15`,
+                      color: categoryColor,
                     }}
                   >
-                    {transaction.category?.name}
+                    {transaction.category?.name || t('transactions.uncategorized')}
                   </span>
                 </td>
 
@@ -184,7 +195,7 @@ const TransactionList = ({ transactions, onEdit, onDelete }) => {
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
