@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 import uuid
 import pandas as pd
+from datetime import datetime
 from utils.auth_utils import require_auth
 from services.account_service import list_accounts, create_account, update_account, delete_account
 
@@ -185,7 +186,7 @@ def import_credit_card_statement(account_id: str):
                     'installment_info': None,
                     'imported': True,
                     'import_source': file_format,
-                    'created_at': pd.Timestamp.now().to_pydatetime()
+                    'created_at': datetime.utcnow()
                 }
                 imported_transactions.append(transaction_data)
             except Exception as e:
