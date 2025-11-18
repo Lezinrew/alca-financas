@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
+import { useState, ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+
+interface ProfileData {
+  name: string;
+  email: string;
+}
+
+interface PasswordData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 
 const Profile = () => {
   const { t } = useTranslation();
@@ -9,18 +20,18 @@ const Profile = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState<ProfileData>({
     name: user?.name || '',
     email: user?.email || ''
   });
 
-  const [passwordData, setPasswordData] = useState({
+  const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
-  const handleProfileChange = (e) => {
+  const handleProfileChange = (e: ChangeEvent<HTMLInputElement>) => {
     setProfileData({
       ...profileData,
       [e.target.name]: e.target.value
@@ -29,7 +40,7 @@ const Profile = () => {
     setSuccess('');
   };
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
     setPasswordData({
       ...passwordData,
       [e.target.name]: e.target.value
@@ -38,7 +49,7 @@ const Profile = () => {
     setSuccess('');
   };
 
-  const handleProfileSubmit = async (e) => {
+  const handleProfileSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -52,7 +63,7 @@ const Profile = () => {
     }, 1000);
   };
 
-  const handlePasswordSubmit = async (e) => {
+  const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -215,7 +226,7 @@ const Profile = () => {
                         onChange={handlePasswordChange}
                         required
                         disabled={loading}
-                        minLength="6"
+                        minLength={6}
                         placeholder="Digite a nova senha"
                       />
                     </div>
@@ -232,7 +243,7 @@ const Profile = () => {
                         onChange={handlePasswordChange}
                         required
                         disabled={loading}
-                        minLength="6"
+                        minLength={6}
                         placeholder="Confirme a nova senha"
                       />
                     </div>

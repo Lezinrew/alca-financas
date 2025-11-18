@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
-
-interface CreditCard {
-  id?: string;
-  name: string;
-  limit: number;
-  closingDay: number;
-  dueDay: number;
-  color: string;
-  icon: string;
-  is_active: boolean;
-  account_id?: string;
-  card_type?: string;
-}
+import CurrencyInput from '../ui/CurrencyInput';
+import { parseCurrencyString } from '../../lib/utils';
+import { CreditCard, CreditCardPayload } from '../../types/credit-card';
 
 interface CreditCardFormData {
   name: string;
@@ -28,7 +18,7 @@ interface CreditCardFormData {
 interface CreditCardFormProps {
   show: boolean;
   onHide: () => void;
-  onSubmit: (card: Omit<CreditCard, 'id'>) => Promise<void>;
+  onSubmit: (card: CreditCardPayload) => Promise<void>;
   card?: CreditCard | null;
 }
 
@@ -120,22 +110,31 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
     }
   }, [card, show, accounts]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string | boolean; type?: string; checked?: boolean } }) => {
-    const { name, value, type, checked } = e.target;
-    
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const target = e.target;
+    const fieldName = target.name as keyof CreditCardFormData;
+
+    let nextValue: string | boolean = target.value;
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      nextValue = target.checked;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [fieldName]: (typeof nextValue === 'boolean' ? nextValue : String(nextValue)) as CreditCardFormData[typeof fieldName]
     }));
+  };
 
-    // Validação em tempo real do limite
-    if (name === 'limit') {
-      const limitValue = parseFloat(value as string);
-      if (value && (isNaN(limitValue) || limitValue <= 0)) {
-        setLimitError('Deve ter um valor diferente de 0');
-      } else {
-        setLimitError('');
-      }
+  const handleLimitChange = (value?: string) => {
+    const nextValue = value ?? '';
+    setFormData(prev => ({ ...prev, limit: nextValue }));
+    const numericValue = parseCurrencyString(nextValue);
+    if (nextValue && numericValue <= 0) {
+      setLimitError('Deve ter um valor diferente de 0');
+    } else {
+      setLimitError('');
     }
   };
 
@@ -152,7 +151,7 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
         throw new Error('Nome do cartão é obrigatório');
       }
 
-      if (!formData.limit || isNaN(parseFloat(formData.limit)) || parseFloat(formData.limit) <= 0) {
+      if (!formData.limit || parseCurrencyString(formData.limit) <= 0) {
         throw new Error('Limite deve ser um número válido maior que zero');
       }
 
@@ -168,9 +167,9 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
       }
 
       // Prepara dados para envio
-      const submitData: Omit<CreditCard, 'id'> = {
+      const submitData: CreditCardPayload = {
         name: formData.name.trim(),
-        limit: parseFloat(formData.limit),
+        limit: parseCurrencyString(formData.limit),
         closingDay: closingDay,
         dueDay: dueDay,
         color: formData.color,
@@ -259,15 +258,12 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
                     Limite
                   </label>
                   <div className="relative">
-                    <input
-                      type="number"
+                    <CurrencyInput
                       id="card-limit"
                       name="limit"
                       className={`input-base ${limitError ? 'border-orange-500 dark:border-orange-500 focus:border-orange-500 focus:ring-orange-500' : ''}`}
                       value={formData.limit}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
+                      onValueChange={handleLimitChange}
                       required
                       disabled={loading}
                       placeholder="0,00"

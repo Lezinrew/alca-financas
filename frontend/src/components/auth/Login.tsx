@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -8,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Bot, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const Login: React.FC = () => {
-  const { t } = useTranslation();
   const { login, loginWithAI } = useAuth();
   const navigate = useNavigate();
 

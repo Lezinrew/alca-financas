@@ -1,25 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency } from '../../utils/api';
-import ReportChart from './ReportChart';
+import { formatCurrency, reportsAPI, ReportOverviewResponse } from '../../utils/api';
+import ReportChart, { ChartDisplayType } from './ReportChart';
 import ReportFilters from './ReportFilters';
 
+type ReportTypeOption =
+  | 'expenses_by_category'
+  | 'expenses_by_account'
+  | 'income_by_category'
+  | 'income_by_account'
+  | 'balance_by_account';
+
+interface ReportFiltersState {
+  month: number;
+  year: number;
+  report_type: ReportTypeOption;
+  chart_type: ChartDisplayType;
+}
+
 const Reports = () => {
-  const { t } = useTranslation();
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const [reportData, setReportData] = useState(null);
+  const [reportData, setReportData] = useState<ReportOverviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ReportFiltersState>({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     report_type: 'expenses_by_category',
     chart_type: 'pie'
   });
 
-  const reportTypes = [
+  const reportTypes: Array<{ value: ReportTypeOption; label: string; icon: string }> = [
     { value: 'expenses_by_category', label: 'Despesas por categorias', icon: 'bi-arrow-down-circle' },
     { value: 'expenses_by_account', label: 'Despesas por contas', icon: 'bi-wallet2' },
     { value: 'income_by_category', label: 'Receitas por categorias', icon: 'bi-arrow-up-circle' },
@@ -27,7 +39,7 @@ const Reports = () => {
     { value: 'balance_by_account', label: 'Saldos por conta', icon: 'bi-graph-up' }
   ];
 
-  const chartTypes = [
+  const chartTypes: Array<{ value: ChartDisplayType; label: string; icon: string }> = [
     { value: 'pie', label: 'Gráfico de Pizza', icon: 'bi-pie-chart-fill' },
     { value: 'doughnut', label: 'Gráfico Rosca', icon: 'bi-circle-fill' },
     { value: 'bar', label: 'Gráfico de Barras', icon: 'bi-bar-chart-fill' },
@@ -46,25 +58,12 @@ const Reports = () => {
     setError('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const params = new URLSearchParams({
-        month: filters.month,
-        year: filters.year,
+      const response = await reportsAPI.getOverview({
+        month: filters.month.toString(),
+        year: filters.year.toString(),
         type: filters.report_type
       });
-
-      const response = await fetch(`${API_URL}/api/reports/overview?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar relatório');
-      }
-
-      const data = await response.json();
-      setReportData(data);
+      setReportData(response.data);
     } catch (err) {
       setError('Erro ao carregar dados do relatório');
       console.error('Report error:', err);
@@ -73,11 +72,15 @@ const Reports = () => {
     }
   };
 
-  const handleFilterChange = (field, value) => {
+  const handleFilterChange = <K extends keyof ReportFiltersState>(field: K, value: ReportFiltersState[K]) => {
     setFilters(prev => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const handlePeriodChange = (field: 'month' | 'year', value: number) => {
+    handleFilterChange(field, value);
   };
 
   const getCurrentReportLabel = () => {
@@ -145,8 +148,8 @@ const Reports = () => {
             {/* Period Selector */}
             <div className="mb-6">
               <ReportFilters
-                filters={filters}
-                onFilterChange={handleFilterChange}
+                filters={{ month: filters.month, year: filters.year }}
+                onFilterChange={handlePeriodChange}
               />
             </div>
 
@@ -157,7 +160,6 @@ const Reports = () => {
                   <ReportChart
                     data={reportData.data}
                     chartType={filters.chart_type}
-                    reportType={filters.report_type}
                   />
                 </div>
 
@@ -185,7 +187,7 @@ const Reports = () => {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="font-semibold text-sm text-slate-900">
-                            {formatCurrency(item.total)}
+                            {formatCurrency(item.total ?? item.current_balance ?? 0)}
                           </div>
                         </div>
                       </div>
@@ -258,7 +260,9 @@ const Reports = () => {
                   <div className="text-center">
                     <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Período</div>
                     <div className="font-semibold text-slate-900 dark:text-white">
-                      {reportData.period.month}/{reportData.period.year}
+                      {reportData.period
+                        ? `${reportData.period.month}/${reportData.period.year}`
+                        : `${filters.month}/${filters.year}`}
                     </div>
                   </div>
 

@@ -8,8 +8,6 @@ import {
   Settings,
   User,
   LogOut,
-  Menu,
-  ChevronLeft,
   Tag,
   Calendar,
   CreditCard

@@ -58,6 +58,9 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
   updateSettings: (settings: any) => api.put('/auth/settings', settings),
   getSettings: () => api.get('/auth/settings'),
+  exportBackup: () => api.get('/auth/backup/export'),
+  importBackup: (backupData: any) => api.post('/auth/backup/import', backupData),
+  clearAllData: () => api.post('/auth/data/clear'),
 };
 
 // Funções de categorias
@@ -66,6 +69,15 @@ export const categoriesAPI = {
   create: (categoryData: any) => api.post('/categories', categoryData),
   update: (id: string, categoryData: any) => api.put(`/categories/${id}`, categoryData),
   delete: (id: string) => api.delete(`/categories/${id}`),
+  import: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/categories/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 // Transaction types
@@ -85,6 +97,32 @@ export interface Transaction {
     total: number;
     parent_id: string;
   };
+}
+
+export interface ReportItem {
+  category_name?: string;
+  category_color?: string;
+  account_name?: string;
+  account_color?: string;
+  total?: number;
+  percentage?: number;
+  count?: number;
+  current_balance?: number;
+}
+
+export interface ReportOverviewResponse {
+  data: ReportItem[];
+  total_amount?: number;
+  period?: {
+    month: number;
+    year: number;
+  };
+}
+
+interface ReportOverviewParams {
+  month: string;
+  year: string;
+  type: string;
 }
 
 // Funções de transações
@@ -110,6 +148,14 @@ export const transactionsAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
+  },
+};
+
+// Funções de relatórios
+export const reportsAPI = {
+  getOverview: (params: ReportOverviewParams) => {
+    const searchParams = new URLSearchParams(Object.entries(params));
+    return api.get<ReportOverviewResponse>(`/reports/overview?${searchParams.toString()}`);
   },
 };
 

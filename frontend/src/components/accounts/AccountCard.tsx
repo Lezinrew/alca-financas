@@ -1,23 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../utils/api';
-
-interface Account {
-  id: number;
-  name: string;
-  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
-  current_balance: number;
-  initial_balance: number;
-  institution?: string;
-  color: string;
-  icon?: string;
-  is_active: boolean;
-}
+import { Account } from '../../types/account';
 
 interface AccountCardProps {
   account: Account;
   onEdit: (account: Account) => void;
-  onDelete: (accountId: number) => void;
+  onDelete: (accountId: string) => void;
 }
 
 const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) => {
@@ -89,12 +78,11 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
     }
   };
 
-  const variance = (account.current_balance || 0) - (account.initial_balance || 0);
-  const isPositiveVariance = variance >= 0;
-  // Saldo previsto = saldo atual (pode ser melhorado com transações futuras)
-  const projectedBalance = account.current_balance || 0;
+  const currentBalance = account.current_balance ?? 0;
+  const projectedBalance = currentBalance;
 
   const handleAddExpense = () => {
+    if (!account.id) return;
     navigate('/transactions', {
       state: {
         openForm: true,
@@ -111,7 +99,7 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
         <div className="flex items-center gap-3 flex-1">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-            style={{ backgroundColor: account.color }}
+            style={{ backgroundColor: account.color || '#6366f1' }}
           >
             <i className={`bi ${account.icon || getAccountTypeIcon(account.type)} text-lg`}></i>
           </div>
@@ -182,7 +170,9 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
                   setOpenMenu(false);
                   // Usa setTimeout para garantir que o menu seja fechado antes de chamar onDelete
                   setTimeout(() => {
-                    onDelete(account.id);
+                    if (account.id) {
+                      onDelete(account.id);
+                    }
                   }, 0);
                 }}
                 className="dropdown-item w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
@@ -201,11 +191,11 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
         <div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Saldo atual</p>
           <p className={`text-xl font-bold ${
-            account.current_balance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-            account.current_balance < 0 ? 'text-red-600 dark:text-red-400' :
+            currentBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+            currentBalance < 0 ? 'text-red-600 dark:text-red-400' :
             'text-slate-600 dark:text-slate-400'
           }`}>
-            {formatCurrency(account.current_balance || 0)}
+            {formatCurrency(currentBalance)}
           </p>
         </div>
 

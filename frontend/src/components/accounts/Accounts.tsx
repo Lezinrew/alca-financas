@@ -1,24 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../utils/api';
+import { Account, AccountPayload } from '../../types/account';
 import AccountForm from './AccountForm';
 import AccountCard from './AccountCard';
 
-interface Account {
-  id: number;
-  name: string;
-  type: 'wallet' | 'checking' | 'savings' | 'credit_card' | 'investment';
-  current_balance: number;
-  initial_balance: number;
-  institution?: string;
-  color: string;
-  icon?: string;
-  is_active: boolean;
-}
-
 const Accounts: React.FC = () => {
-  const { t } = useTranslation();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -69,7 +56,7 @@ const Accounts: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDeleteAccount = async (accountId: number) => {
+  const handleDeleteAccount = async (accountId: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
 
     try {
@@ -93,7 +80,7 @@ const Accounts: React.FC = () => {
     }
   };
 
-  const handleFormSubmit = async (formData: any) => {
+  const handleFormSubmit = async (formData: AccountPayload) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
       const url = editingAccount

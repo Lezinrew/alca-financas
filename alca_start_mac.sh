@@ -135,15 +135,15 @@ fi
 # Aguardar MongoDB responder na porta 27017
 if [ "$MONGO_STARTED_BY_SCRIPT" != "externo" ]; then
   echo -n "  ⏳ Aguardando MongoDB em localhost:27017"
-  for i in {1..60}; do
-    if nc -z localhost 27017 >/dev/null 2>&1; then
+for i in {1..60}; do
+  if nc -z localhost 27017 >/dev/null 2>&1; then
       echo -e " ${GREEN}- ok${NC}"
-      break
-    fi
-    echo -n "."
-    sleep 1
-  done
-  echo
+    break
+  fi
+  echo -n "."
+  sleep 1
+done
+echo
 fi
 
 # Verificação final do MongoDB

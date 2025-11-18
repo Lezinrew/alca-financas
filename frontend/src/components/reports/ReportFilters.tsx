@@ -1,4 +1,14 @@
-const ReportFilters = ({ filters, onFilterChange }) => {
+import React from 'react';
+
+interface ReportFiltersProps {
+  filters: {
+    month: number;
+    year: number;
+  };
+  onFilterChange: (field: 'month' | 'year', value: number) => void;
+}
+
+const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }) => {
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'

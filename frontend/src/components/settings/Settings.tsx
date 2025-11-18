@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { authAPI } from '../../utils/api';
+import { authAPI, categoriesAPI } from '../../utils/api';
 
 const Settings = () => {
   const { t, i18n } = useTranslation();
@@ -16,6 +16,12 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
+  const [categoryImportLoading, setCategoryImportLoading] = useState(false);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const categoryFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSettings();
@@ -38,7 +44,7 @@ const Settings = () => {
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: any) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
@@ -58,6 +64,149 @@ const Settings = () => {
     }
   };
 
+  const handleExportBackup = async () => {
+    try {
+      setBackupLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const response = await authAPI.exportBackup();
+      const backupData = response.data;
+      
+      // Cria um blob e faz download
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `alca-financas-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setSuccess('Backup exportado com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao exportar backup');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const fileContent = await file.text();
+      const backupData = JSON.parse(fileContent);
+      
+      if (!window.confirm('Esta ação irá importar os dados do backup. Categorias, contas e transações duplicadas serão ignoradas. Deseja continuar?')) {
+        e.target.value = '';
+        return;
+      }
+      
+      const response = await authAPI.importBackup(backupData);
+      const imported = response.data.imported;
+      
+      setSuccess(
+        `Backup importado com sucesso! ` +
+        `${imported.categories} categorias, ${imported.accounts} contas e ${imported.transactions} transações importadas.`
+      );
+      setTimeout(() => setSuccess(''), 5000);
+      
+      // Recarrega a página após 2 segundos para atualizar os dados
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao importar backup');
+    } finally {
+      setImportLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleImportCategories = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setCategoryImportLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const response = await categoriesAPI.import(file);
+      const result = response.data;
+      
+      let message = result.message;
+      if (result.errors && result.errors.length > 0) {
+        message += ` Alguns erros ocorreram: ${result.errors.slice(0, 3).join(', ')}`;
+        if (result.errors.length > 3) {
+          message += ` e mais ${result.errors.length - 3} erros.`;
+        }
+      }
+      
+      setSuccess(message);
+      setTimeout(() => setSuccess(''), 5000);
+      
+      // Recarrega a página após 2 segundos
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao importar categorias');
+    } finally {
+      setCategoryImportLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleClearAllData = async () => {
+    if (!window.confirm(
+      'ATENÇÃO: Esta ação irá deletar PERMANENTEMENTE todas as suas categorias, transações e contas. ' +
+      'Esta ação NÃO PODE ser desfeita. Tem certeza que deseja continuar?'
+    )) {
+      return;
+    }
+
+    // Confirmação dupla
+    if (!window.confirm(
+      'Última confirmação: Você tem CERTEZA ABSOLUTA que deseja deletar todos os seus dados? ' +
+      'Esta é a última chance de cancelar.'
+    )) {
+      return;
+    }
+
+    try {
+      setClearLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const response = await authAPI.clearAllData();
+      const deleted = response.data.deleted;
+      
+      setSuccess(
+        `Todos os dados foram limpos com sucesso! ` +
+        `${deleted.categories} categorias, ${deleted.accounts} contas e ${deleted.transactions} transações deletadas.`
+      );
+      setTimeout(() => setSuccess(''), 5000);
+      
+      // Recarrega a página após 2 segundos
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao limpar dados');
+    } finally {
+      setClearLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     setError('');
@@ -67,8 +216,10 @@ const Settings = () => {
       await authAPI.updateSettings(settings);
 
       // Update user data in context
-      const updatedUser = { ...user, settings };
-      updateUser(updatedUser);
+      if (user) {
+        const updatedUser = { ...user, settings };
+        updateUser(updatedUser);
+      }
 
       setSuccess(t('settings.saveSuccess'));
 
@@ -355,6 +506,137 @@ const Settings = () => {
                 Apenas você tem acesso aos seus dados financeiros.
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Management Section */}
+      <div className="card-base overflow-hidden">
+        <div className="card-header px-6 py-4 border-b border-slate-200 dark:border-slate-700/50">
+          <div className="flex items-center gap-2">
+            <i className="bi bi-database text-slate-600 dark:text-slate-300"></i>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Gerenciamento de Dados</h2>
+          </div>
+        </div>
+        <div className="p-6 space-y-6">
+          {/* Backup Section */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Backup e Restauração</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
+                Exporte todos os seus dados (categorias, transações e contas) para um arquivo JSON ou importe um backup anterior.
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleExportBackup}
+                disabled={backupLoading}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {backupLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Exportando...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-download"></i>
+                    Exportar Backup
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => backupFileInputRef.current?.click()}
+                disabled={importLoading}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {importLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-upload"></i>
+                    Importar Backup
+                  </>
+                )}
+              </button>
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImportBackup}
+              />
+            </div>
+          </div>
+
+          {/* Category Import Section */}
+          <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Importar Categorias</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
+                Importe categorias de um arquivo JSON ou CSV. O arquivo deve conter as colunas: name, type, color, icon, description.
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => categoryFileInputRef.current?.click()}
+                disabled={categoryImportLoading}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {categoryImportLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-file-earmark-plus"></i>
+                    Importar Categorias
+                  </>
+                )}
+              </button>
+              <input
+                ref={categoryFileInputRef}
+                type="file"
+                accept=".json,.csv"
+                className="hidden"
+                onChange={handleImportCategories}
+              />
+            </div>
+          </div>
+
+          {/* Clear Data Section */}
+          <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+            <div>
+              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Zona de Perigo</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
+                <strong className="text-red-600 dark:text-red-400">Atenção:</strong> Esta ação irá deletar permanentemente todas as suas categorias, transações e contas. Esta ação não pode ser desfeita. Certifique-se de ter um backup antes de continuar.
+              </p>
+            </div>
+            
+            <button
+              onClick={handleClearAllData}
+              disabled={clearLoading}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {clearLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Limpando...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-trash"></i>
+                  Limpar Todos os Dados
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>

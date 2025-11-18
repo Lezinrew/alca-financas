@@ -1,8 +1,18 @@
-import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../../utils/api';
 
-const CategoryChart = ({ data, type }) => {
-  const { t } = useTranslation();
+interface CategoryChartItem {
+  category_id: string;
+  category_name: string;
+  category_color: string;
+  total: number;
+  count: number;
+}
+
+interface CategoryChartProps {
+  data: CategoryChartItem[];
+}
+
+const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
 
   if (!data || data.length === 0) {
     return (
@@ -20,7 +30,7 @@ const CategoryChart = ({ data, type }) => {
     <div className="category-chart">
       {/* Gráfico de barras simples */}
       <div className="mb-4">
-        {data.slice(0, 5).map((category, index) => {
+        {data.slice(0, 5).map((category) => {
           const percentage = total > 0 ? (category.total / total) * 100 : 0;
           
           return (
@@ -51,8 +61,8 @@ const CategoryChart = ({ data, type }) => {
                     backgroundColor: category.category_color
                   }}
                   aria-valuenow={percentage}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
                 ></div>
               </div>
             </div>

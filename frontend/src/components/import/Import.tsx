@@ -1,40 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { transactionsAPI, categoriesAPI } from '../../utils/api';
+import { transactionsAPI } from '../../utils/api';
+
+interface AccountOption {
+  id: string;
+  name: string;
+  institution?: string;
+  type: string;
+  is_active?: boolean;
+  color?: string;
+}
+
+interface ImportResult {
+  imported_count: number;
+  error_count: number;
+  errors?: string[];
+  categories_created?: number;
+  categories_created_list?: string[];
+  account_created?: boolean;
+  account_name?: string;
+  [key: string]: unknown;
+}
+
+type ActiveTab = 'debit' | 'credit_card';
 
 const Import = () => {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const [categories, setCategories] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [creditCards, setCreditCards] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [selectedCreditCardId, setSelectedCreditCardId] = useState('');
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [creditCards, setCreditCards] = useState<AccountOption[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [importResult, setImportResult] = useState(null);
-  const [activeTab, setActiveTab] = useState<'debit' | 'credit_card'>('debit');
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('debit');
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      loadCategories();
       loadAccounts();
     }
   }, [isAuthenticated, authLoading]);
-
-  const loadCategories = async () => {
-    try {
-      const response = await categoriesAPI.getAll();
-      setCategories(response.data);
-    } catch (err) {
-      console.error('Load categories error:', err);
-    }
-  };
 
   const loadAccounts = async () => {
     try {
@@ -49,8 +56,8 @@ const Import = () => {
         const activeAccounts = data.filter((acc: any) => acc.is_active);
         
         // Separa contas normais e cartões de crédito
-        const normalAccounts = activeAccounts.filter((acc: any) => acc.type !== 'credit_card');
-        const cards = activeAccounts.filter((acc: any) => acc.type === 'credit_card');
+        const normalAccounts = activeAccounts.filter((acc: AccountOption) => acc.type !== 'credit_card');
+        const cards = activeAccounts.filter((acc: AccountOption) => acc.type === 'credit_card');
         
         setAccounts(normalAccounts);
         setCreditCards(cards);
@@ -121,7 +128,7 @@ const Import = () => {
     setSuccess('');
 
     try {
-      let response;
+      let response: { data: ImportResult };
       
       if (activeTab === 'credit_card' && selectedCreditCardId) {
         // Importação de cartão de crédito
@@ -129,7 +136,7 @@ const Import = () => {
         const formData = new FormData();
         formData.append('file', selectedFile);
 
-        response = await fetch(`${API_URL}/api/accounts/${selectedCreditCardId}/import`, {
+        const fetchResponse = await fetch(`${API_URL}/api/accounts/${selectedCreditCardId}/import`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
@@ -137,16 +144,17 @@ const Import = () => {
           body: formData
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
+        if (!fetchResponse.ok) {
+          const errorData = await fetchResponse.json();
           throw new Error(errorData.error || 'Erro ao importar fatura');
         }
 
-        const result = await response.json();
+        const result = (await fetchResponse.json()) as ImportResult;
         response = { data: result };
       } else {
         // Importação geral (débito)
-        response = await transactionsAPI.import(selectedFile, selectedAccountId || undefined);
+        const apiResponse = await transactionsAPI.import(selectedFile, selectedAccountId || undefined);
+        response = { data: apiResponse.data as ImportResult };
       }
       
       setImportResult(response.data);

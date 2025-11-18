@@ -12,6 +12,7 @@ import {
   LineElement,
   Title,
 } from 'chart.js';
+import { ReportItem } from '../../utils/api';
 
 ChartJS.register(
   ArcElement,
@@ -25,7 +26,14 @@ ChartJS.register(
   Title
 );
 
-const ReportChart = ({ data, chartType, reportType }) => {
+export type ChartDisplayType = 'pie' | 'doughnut' | 'bar' | 'line';
+
+interface ReportChartProps {
+  data: ReportItem[];
+  chartType: ChartDisplayType;
+}
+
+const ReportChart: React.FC<ReportChartProps> = ({ data, chartType }) => {
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
 
@@ -57,7 +65,7 @@ const ReportChart = ({ data, chartType, reportType }) => {
     };
   }, [data]);
 
-  const chartOptions = {
+  const chartOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -81,9 +89,10 @@ const ReportChart = ({ data, chartType, reportType }) => {
         cornerRadius: 8,
         displayColors: true,
         callbacks: {
-          label: function(context) {
-            const value = context.parsed || context.parsed.y;
-            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+          label: function(context: any) {
+            const parsedValue = typeof context.parsed === 'number' ? context.parsed : context.parsed?.y;
+            const value = parsedValue || 0;
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
             const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
 
             return `${context.label}: R$ ${value.toFixed(2).replace('.', ',')} (${percentage}%)`;
@@ -103,8 +112,12 @@ const ReportChart = ({ data, chartType, reportType }) => {
             family: "'Inter', sans-serif",
           },
           color: '#64748b',
-          callback: function(value) {
-            return 'R$ ' + value.toFixed(0).replace(/\d(?=(\d{3})+$)/g, '$&.');
+          callback: function(value: string | number) {
+            const numeric = typeof value === 'number' ? value : parseFloat(value);
+            if (Number.isNaN(numeric)) {
+              return value;
+            }
+            return 'R$ ' + numeric.toFixed(0).replace(/\d(?=(\d{3})+$)/g, '$&.');
           }
         }
       },
@@ -135,23 +148,23 @@ const ReportChart = ({ data, chartType, reportType }) => {
   }
 
   const renderChart = () => {
-    const chartProps = {
-      data: chartData,
+    const commonProps = {
+      data: chartData as any,
       options: chartOptions,
       height: 300
     };
 
     switch (chartType) {
       case 'pie':
-        return <Pie {...chartProps} />;
+        return <Pie {...commonProps} />;
       case 'doughnut':
-        return <Doughnut {...chartProps} />;
+        return <Doughnut {...commonProps} />;
       case 'bar':
-        return <Bar {...chartProps} />;
+        return <Bar {...commonProps} />;
       case 'line':
-        return <Line {...chartProps} />;
+        return <Line {...commonProps} />;
       default:
-        return <Pie {...chartProps} />;
+        return <Pie {...commonProps} />;
     }
   };
 

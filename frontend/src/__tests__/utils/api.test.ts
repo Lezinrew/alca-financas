@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import axios from 'axios'
-import { api } from '@/utils/api'
+import api from '@/utils/api'
 
 vi.mock('axios')
 
@@ -16,11 +16,12 @@ describe('API Utils', () => {
 
   it('should add authorization header when token exists', () => {
     const token = 'test-token-123'
-    localStorage.setItem('token', token)
+    localStorage.setItem('auth_token', token)
 
     // Simulate interceptor
     const config = { headers: {} }
-    const interceptor = api.interceptors.request.handlers[0]
+    const requestHandlers = (api.interceptors.request as any).handlers || []
+    const interceptor = requestHandlers[0]
 
     if (interceptor && interceptor.fulfilled) {
       const result = interceptor.fulfilled(config)
@@ -47,7 +48,7 @@ describe('API Utils', () => {
 
   it('should handle token expiration', () => {
     const expiredToken = 'expired-token'
-    localStorage.setItem('token', expiredToken)
+    localStorage.setItem('auth_token', expiredToken)
 
     const errorResponse = {
       response: {
@@ -57,13 +58,14 @@ describe('API Utils', () => {
     }
 
     // Simulate response interceptor handling 401
-    const interceptor = api.interceptors.response.handlers[0]
+    const responseHandlers = (api.interceptors.response as any).handlers || []
+    const interceptor = responseHandlers[0]
 
     if (interceptor && interceptor.rejected) {
       try {
         interceptor.rejected(errorResponse)
       } catch (error) {
-        expect(localStorage.getItem('token')).toBeNull()
+        expect(localStorage.getItem('auth_token')).toBeNull()
       }
     }
   })

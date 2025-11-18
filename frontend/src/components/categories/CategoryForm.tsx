@@ -1,9 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const CategoryForm = ({ show, onHide, onSubmit, category }) => {
+type CategoryType = 'income' | 'expense';
+
+interface Category {
+  id?: string;
+  name?: string;
+  type?: CategoryType;
+  color?: string;
+  icon?: string;
+}
+
+interface CategoryFormProps {
+  show: boolean;
+  onHide: () => void;
+  onSubmit: (data: Required<Omit<Category, 'id'>>) => Promise<void> | void;
+  category?: Category | null;
+}
+
+type FormData = {
+  name: string;
+  type: CategoryType;
+  color: string;
+  icon: string;
+};
+
+type InputChangeEvent =
+  | React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  | { target: { name: keyof FormData; value: string } };
+
+const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, category }) => {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     type: 'expense',
     color: '#6366f1',
@@ -13,7 +41,7 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
   const [error, setError] = useState('');
 
   // Lista de ícones disponíveis
-  const availableIcons = [
+  const availableIcons: string[] = [
     'circle', 'basket', 'car-front', 'house', 'heart-pulse', 'currency-dollar',
     'briefcase', 'phone', 'wifi', 'lightning', 'fuel-pump', 'bag',
     'cart', 'cup-straw', 'trophy', 'gift', 'airplane', 'bicycle',
@@ -22,7 +50,7 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
   ];
 
   // Cores predefinidas
-  const availableColors = [
+  const availableColors: string[] = [
     '#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
     '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280',
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
@@ -51,7 +79,7 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
     }
   }, [category, show]);
 
-  const handleChange = (e) => {
+  const handleChange = (e: InputChangeEvent) => {
     const { name, value } = e.target;
     
     setFormData(prev => ({
@@ -62,7 +90,7 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -83,7 +111,9 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
 
       await onSubmit(submitData);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Erro ao salvar categoria');
+      const apiError = (err as any)?.response?.data?.error;
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao salvar categoria';
+      setError(apiError || errorMessage);
     } finally {
       setLoading(false);
     }
@@ -100,7 +130,7 @@ const CategoryForm = ({ show, onHide, onSubmit, category }) => {
   return (
     <>
       <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }} onClick={handleClose}></div>
-      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
         <div className="modal-dialog modal-lg" role="document" onClick={(e) => e.stopPropagation()}>
           <div className="modal-content">
             <div className="modal-header">

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { categoriesAPI, transactionsAPI, formatCurrency } from '../../utils/api';
 import PlanningForm from './PlanningForm';
@@ -20,17 +19,28 @@ interface CategoryBudget {
   amount: number;
 }
 
+interface ActualSummary {
+  totalIncome: number;
+  totalExpenses: number;
+  balance: number;
+  savingsRate: number;
+}
+
 const Planning: React.FC = () => {
-  const { t } = useTranslation();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [planningType, setPlanningType] = useState<'monthly' | 'custom'>('monthly');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [budget, setBudget] = useState<Budget | null>(null);
   const [categories, setCategories] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [actualSummary, setActualSummary] = useState<ActualSummary>({
+    totalIncome: 0,
+    totalExpenses: 0,
+    balance: 0,
+    savingsRate: 0
+  });
 
   const currentMonth = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
@@ -51,12 +61,29 @@ const Planning: React.FC = () => {
         categoriesAPI.getAll(),
         transactionsAPI.getAll({
           month: currentMonth,
-          year: currentYear,
-          type: 'expense'
+          year: currentYear
         })
       ]);
       setCategories(categoriesRes.data);
       setTransactions(transactionsRes.data);
+
+      const totalIncome = transactionsRes.data
+        .filter((tx: any) => tx.type === 'income')
+        .reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+
+      const totalExpenses = transactionsRes.data
+        .filter((tx: any) => tx.type === 'expense')
+        .reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+
+      const balance = totalIncome - totalExpenses;
+      const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+
+      setActualSummary({
+        totalIncome,
+        totalExpenses,
+        balance,
+        savingsRate
+      });
 
       // TODO: Carregar orçamento do backend quando a API estiver pronta
       // Por enquanto, verifica se há orçamento salvo localmente
@@ -449,7 +476,7 @@ const Planning: React.FC = () => {
 
         {/* Coluna Direita - Resumo */}
         <div className="space-y-3">
-          <PlanningSummary budget={budget} />
+          <PlanningSummary budget={budget} actuals={actualSummary} />
         </div>
       </div>
 
@@ -461,8 +488,7 @@ const Planning: React.FC = () => {
           onSubmit={handleFormSubmit}
           categories={categories}
           budget={budget}
-          month={currentMonth}
-          year={currentYear}
+          defaultIncome={actualSummary.totalIncome}
         />
       )}
     </div>
