@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 import pandas as pd
 from io import StringIO
 import uuid
+from datetime import datetime
 
 from utils.auth_utils import require_auth
 from services.transaction_service import build_filter, list_transactions, create_installments, apply_account_balance_updates
@@ -252,7 +253,7 @@ def import_transactions():
                     'installment_info': None,
                     'imported': True,
                     'import_source': file_format,
-                    'created_at': pd.Timestamp.now().to_pydatetime()
+                    'created_at': datetime.utcnow()
                 }
                 
                 # Associa a conta se fornecida
