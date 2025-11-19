@@ -93,7 +93,12 @@ def user_settings():
 def google_login():
     oauth: OAuth = current_app.config['OAUTH']
     google = oauth.create_client('google')
-    redirect_uri = request.url_root + 'api/auth/google/callback'
+    
+    # Usa a URL base da API (api.alcahub.com.br) para o callback
+    # Isso garante que o redirect_uri corresponda ao configurado no Google
+    api_base_url = os.getenv('API_BASE_URL', 'https://api.alcahub.com.br')
+    redirect_uri = f"{api_base_url}/api/auth/google/callback"
+    
     import secrets
     nonce = secrets.token_urlsafe(16)
     session["__google_oidc_nonce__"] = nonce
