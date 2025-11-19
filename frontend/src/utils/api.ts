@@ -195,9 +195,9 @@ export const dashboardAPI = {
 
 // Funções de OAuth
 export const oauthAPI = {
-  googleLogin: () => `${API_BASE_URL}/api/auth/google/login`,
-  microsoftLogin: () => `${API_BASE_URL}/api/auth/microsoft/login`,
-  appleLogin: () => `${API_BASE_URL}/api/auth/apple/login`,
+  googleLogin: () => `${API_BASE_URL}/auth/google/login`,
+  microsoftLogin: () => `${API_BASE_URL}/auth/microsoft/login`,
+  appleLogin: () => `${API_BASE_URL}/auth/apple/login`,
 };
 
 // Utilitários
