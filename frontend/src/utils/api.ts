@@ -1,12 +1,29 @@
 import axios from 'axios';
 
-// Configuração base da API
-// Suporta ambas as variáveis: VITE_API_URL (Vite) e REACT_APP_BACKEND_URL (fallback)
-const API_BASE_URL = import.meta.env.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+// Utilitário para remover barras duplicadas ao final
+const trimTrailingSlashes = (value?: string) => value?.replace(/\/+$/, '') ?? '';
+
+// Normaliza a URL base garantindo que não termina com /api
+const resolveApiHost = (value?: string) => {
+  const trimmed = trimTrailingSlashes(value);
+  if (!trimmed) {
+    return 'http://localhost:8001';
+  }
+
+  if (trimmed.toLowerCase().endsWith('/api')) {
+    return trimmed.slice(0, -4);
+  }
+
+  return trimmed;
+};
+
+// Configuração base da API (aceita VITE_API_URL ou REACT_APP_BACKEND_URL)
+const API_HOST_URL = resolveApiHost(import.meta.env.VITE_API_URL || process.env.REACT_APP_BACKEND_URL);
+const API_BASE_URL = `${API_HOST_URL}/api`;
 
 // Instância do Axios com configurações padrão
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
