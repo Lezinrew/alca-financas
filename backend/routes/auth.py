@@ -103,13 +103,61 @@ def google_login():
 @bp.route('/auth/google/callback', methods=['GET'])
 def google_callback():
     GOOGLE_CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
-    if str(GOOGLE_CLIENT_ID).startswith('placeholder'):
-        return jsonify({'error': 'Configuração OAuth do Google não definida', 'message': 'Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env'}), 400
+    frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.com.br')
+    
+    if str(GOOGLE_CLIENT_ID).startswith('placeholder') or not GOOGLE_CLIENT_ID:
+        error_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Erro de Configuração</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
+        Erro: Configuração OAuth do Google não definida. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env
+    </p>
+    <script>
+        setTimeout(function() {{
+            window.location.href = {json.dumps(frontend_url + '/login?error=oauth_not_configured')};
+        }}, 3000);
+    </script>
+</body>
+</html>"""
+        return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
+    
     try:
         oauth: OAuth = current_app.config['OAUTH']
         google = oauth.create_client('google')
+        
+        # Verifica se há erro na requisição
+        error = request.args.get('error')
+        if error:
+            error_description = request.args.get('error_description', error)
+            error_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Erro de Autenticação</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
+        Erro na autenticação: {error_description}
+    </p>
+    <script>
+        setTimeout(function() {{
+            window.location.href = {json.dumps(frontend_url + '/login?error=' + error)};
+        }}, 3000);
+    </script>
+</body>
+</html>"""
+            return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
+        
         token = google.authorize_access_token()
-        resp = google.parse_id_token(token, nonce=session.get("__google_oidc_nonce__"))
+        if not token:
+            raise Exception('Token de acesso não recebido do Google')
+            
+        nonce = session.get("__google_oidc_nonce__")
+        resp = google.parse_id_token(token, nonce=nonce)
         session.pop("__google_oidc_nonce__", None)
         google_user = {
             'sub': resp['sub'],
@@ -181,7 +229,30 @@ def google_callback():
 </html>"""
         return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
     except Exception as e:
-        return jsonify({'error': f'Erro no login com Google: {str(e)}'}), 500
+        import traceback
+        error_msg = str(e)
+        error_trace = traceback.format_exc()
+        print(f"Erro no callback OAuth: {error_msg}")
+        print(error_trace)
+        
+        error_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Erro de Autenticação</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
+        Erro no login com Google: {error_msg}
+    </p>
+    <script>
+        setTimeout(function() {{
+            window.location.href = {json.dumps(frontend_url + '/login?error=oauth_failed')};
+        }}, 3000);
+    </script>
+</body>
+</html>"""
+        return error_html, 500, {'Content-Type': 'text/html; charset=utf-8'}
 
 
 @bp.route('/auth/microsoft/login', methods=['GET'])
