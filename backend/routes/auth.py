@@ -4,6 +4,9 @@ from flask import Blueprint, request, jsonify, current_app, session
 from authlib.integrations.flask_client import OAuth
 from datetime import datetime
 import uuid
+import os
+import base64
+import json
 
 from utils.auth_utils import hash_password, check_password, generate_jwt, require_auth
 from services.user_service import create_user, create_default_categories, get_user_public
@@ -140,7 +143,43 @@ def google_callback():
             user = user_data
             create_default_categories(categories_collection, user['_id'])
         jwt_token = generate_jwt(user['_id'])
-        return jsonify({'success': True, 'token': jwt_token, 'user': get_user_public(user)})
+        user_data = get_user_public(user)
+        
+        # Redireciona para o frontend com o token e dados do usuário
+        # Usa uma página HTML intermediária que processa o token e redireciona
+        frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.com.br')
+        
+        # Codifica os dados para passar via URL ou usar base64
+        user_json = json.dumps(user_data)
+        user_encoded = base64.urlsafe_b64encode(user_json.encode()).decode()
+        
+        # Retorna HTML que processa o token e redireciona
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Autenticando...</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <script>
+        // Salva token e dados do usuário no localStorage
+        try {{
+            localStorage.setItem('auth_token', {json.dumps(jwt_token)});
+            localStorage.setItem('user_data', {json.dumps(user_json)});
+            
+            // Redireciona para o dashboard
+            window.location.href = {json.dumps(frontend_url + '/dashboard')};
+        }} catch (e) {{
+            console.error('Erro ao salvar dados:', e);
+            window.location.href = {json.dumps(frontend_url + '/login?error=storage_error')};
+        }}
+    </script>
+    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
+        Autenticando... Aguarde.
+    </p>
+</body>
+</html>"""
+        return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
     except Exception as e:
         return jsonify({'error': f'Erro no login com Google: {str(e)}'}), 500
 
