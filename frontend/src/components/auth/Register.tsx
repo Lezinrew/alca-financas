@@ -92,7 +92,12 @@ const Register = () => {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 transition-colors">Alca Finanças</h1>
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-2xl shadow-lg">
+              <Wallet className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 transition-colors">Alça Finanças</h1>
           <p className="text-slate-600 dark:text-slate-300 transition-colors">Controle financeiro inteligente</p>
         </div>
 
