@@ -4,10 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Bot, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const Login: React.FC = () => {
-  const { login, loginWithAI } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -16,7 +16,6 @@ const Login: React.FC = () => {
     rememberMe: false,
   });
   const [loading, setLoading] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -59,24 +58,6 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleAILogin = async () => {
-    setAiLoading(true);
-    setError('');
-
-    try {
-      const result = await loginWithAI();
-      if (result.success) {
-        navigate('/dashboard');
-      } else {
-        setError(result.message || 'Erro no login com IA');
-      }
-    } catch (err) {
-      setError('Erro no login com IA. Tente novamente.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
   const handleKeyPress = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter' && !loading) {
       handleSubmit(e as any);
@@ -96,37 +77,10 @@ const Login: React.FC = () => {
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-2xl font-semibold text-center">Fazer Login</CardTitle>
             <CardDescription className="text-center">
-              Entre com suas credenciais ou use o login inteligente
+              Entre com suas credenciais para acessar sua conta
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* AI Login Button */}
-            <Button
-              type="button"
-              variant="primary"
-              size="lg"
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-              onClick={handleAILogin}
-              disabled={aiLoading || loading}
-            >
-              {aiLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Bot className="mr-2 h-4 w-4" />
-              )}
-              {aiLoading ? 'Conectando...' : 'Login com IA'}
-            </Button>
-
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-slate-200 dark:border-slate-700/50" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white dark:bg-[#1a1d29] px-2 text-slate-500 dark:text-slate-400">ou continue com</span>
-              </div>
-            </div>
-
             {/* Login Form */}
             <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className="space-y-4">
               <div className="space-y-2">
@@ -210,7 +164,7 @@ const Login: React.FC = () => {
                 variant="primary"
                 size="lg"
                 className="w-full"
-                disabled={loading || aiLoading}
+                disabled={loading}
               >
                 {loading ? (
                   <>
@@ -237,16 +191,6 @@ const Login: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo credentials hint */}
-        <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md transition-colors">
-          <div className="text-center">
-            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">💡 Dica: Use o "Login com IA" para acesso demo</p>
-            <p className="text-xs text-blue-600 dark:text-blue-400">
-              Ou teste com: <strong>demo@alca.fin</strong> / <strong>demo123</strong>
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );
