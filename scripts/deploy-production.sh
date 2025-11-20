@@ -63,6 +63,15 @@ fi
 
 echo -e "${GREEN}✅ Verificações de git passaram${NC}\n"
 
+# Run tests first (antes de configurar rollback remoto)
+echo -e "${BLUE}🧪 Executando testes antes do deploy...${NC}"
+./scripts/run-tests.sh all local
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Testes falhou. Deploy cancelado.${NC}"
+    exit 1
+fi
+
 # Função de rollback
 rollback() {
     echo ""
@@ -74,20 +83,10 @@ rollback() {
     exit 1
 }
 
-# Configurar trap para rollback em caso de erro
-trap rollback ERR
-
-
-# Run tests first
-echo -e "${BLUE}🧪 Executando testes antes do deploy...${NC}"
-./scripts/run-tests.sh all local
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ Testes falhou. Deploy cancelado.${NC}"
-    exit 1
-fi
-
 echo -e "${GREEN}✅ Todos os testes passaram${NC}\n"
+
+# Configurar trap para rollback em caso de erro APÓS os testes locais
+trap rollback ERR
 
 # Build Backend Docker Image
 echo -e "${BLUE}🔧 Building Backend Docker image...${NC}"
