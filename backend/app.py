@@ -15,6 +15,7 @@ from routes.transactions import bp as transactions_bp
 from routes.accounts import bp as accounts_bp
 from routes.dashboard import bp as dashboard_bp
 from routes.reports import bp as reports_bp
+from routes.admin import bp as admin_bp
 
 load_dotenv()
 
@@ -75,6 +76,7 @@ app.register_blueprint(transactions_bp)
 app.register_blueprint(accounts_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(reports_bp)
+app.register_blueprint(admin_bp)
 
 from utils.exceptions import AppException
 
