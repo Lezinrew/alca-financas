@@ -45,8 +45,9 @@ run_backend_tests() {
 
     # Run tests
     if [ "$TEST_TYPE" = "unit" ] || [ "$TEST_TYPE" = "all" ]; then
-        echo -e "${YELLOW}📝 Testes unitários...${NC}"
-        pytest tests/unit -v --cov=. --cov-report=term --cov-report=html
+        echo -e "${YELLOW}📝 Testes unitários e gerais...${NC}"
+        # Run tests in tests/unit AND tests/test_*.py
+        pytest tests/unit tests/test_*.py -v --cov=. --cov-report=term --cov-report=html
     fi
 
     if [ "$TEST_TYPE" = "integration" ] || [ "$TEST_TYPE" = "all" ]; then
