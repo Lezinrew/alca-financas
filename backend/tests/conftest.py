@@ -16,7 +16,22 @@ def app():
         'TESTING': True,
         'MONGO_URL': os.getenv('MONGO_URL', 'mongodb://localhost:27017/alca_financas_test'),
         'JWT_SECRET': os.getenv('JWT_SECRET', 'test-secret-key'),
+        'RATELIMIT_ENABLED': True,
+        'RATELIMIT_STORAGE_URI': 'memory://'
     })
+
+    # Re-initialize DB connection for tests to ensure we use the test database
+    mongo_url = flask_app.config['MONGO_URL']
+    mongo_client = MongoClient(mongo_url)
+    db_name = mongo_url.split('/')[-1]
+    db = mongo_client[db_name]
+    
+    flask_app.config['DB'] = db
+    flask_app.config['USERS'] = db.users
+    flask_app.config['CATEGORIES'] = db.categories
+    flask_app.config['TRANSACTIONS'] = db.transactions
+    flask_app.config['ACCOUNTS'] = db.accounts
+
     yield flask_app
 
 
@@ -44,7 +59,7 @@ def db(app):
 @pytest.fixture
 def test_user(db):
     """Create a test user"""
-    from werkzeug.security import generate_password_hash
+    from utils.auth_utils import hash_password
     import uuid
 
     user_id = str(uuid.uuid4())
@@ -52,7 +67,7 @@ def test_user(db):
         '_id': user_id,
         'name': 'Test User',
         'email': 'test@alcahub.com.br',
-        'password': generate_password_hash('TestPassword123!'),
+        'password': hash_password('TestPassword123!'),
         'created_at': datetime.utcnow()
     }
     db.users.insert_one(user)
@@ -75,10 +90,12 @@ def auth_token(app, test_user):
 
 
 @pytest.fixture
-def auth_headers(auth_token):
-    """Generate authorization headers"""
+def auth_headers(test_user):
+    from utils.auth_utils import generate_jwt
+    tokens = generate_jwt(test_user['_id'])
+    token = tokens['access_token']
     return {
-        'Authorization': f'Bearer {auth_token}',
+        'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
 

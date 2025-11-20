@@ -3,51 +3,62 @@ import uuid
 import pandas as pd
 from datetime import datetime
 from utils.auth_utils import require_auth
-from services.account_service import list_accounts, create_account, update_account, delete_account
-
+from repositories.account_repository import AccountRepository
+from repositories.transaction_repository import TransactionRepository
+from repositories.category_repository import CategoryRepository
+from services.account_service import AccountService
+from services.transaction_service import TransactionService
+from services.category_service import CategoryService
+from utils.exceptions import ValidationException, NotFoundException
 
 bp = Blueprint('accounts', __name__, url_prefix='/api/accounts')
-
 
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 def accounts():
     accounts_collection = current_app.config['ACCOUNTS']
-    if request.method == 'GET':
-        return jsonify(list_accounts(accounts_collection, request.user_id))
-    data = request.get_json()
-    if not data.get('name') or not data.get('type'):
-        return jsonify({'error': 'Nome e tipo da conta são obrigatórios'}), 400
-    if data['type'] not in ['wallet', 'checking', 'savings', 'credit_card', 'investment']:
-        return jsonify({'error': 'Tipo de conta inválido'}), 400
-    account = create_account(accounts_collection, request.user_id, data)
-    return jsonify(account), 201
+    transactions_collection = current_app.config['TRANSACTIONS']
+    
+    repo = AccountRepository(accounts_collection)
+    service = AccountService(repo, transactions_collection)
 
+    if request.method == 'GET':
+        return jsonify(service.list_accounts(request.user_id))
+    
+    try:
+        data = request.get_json()
+        account = service.create_account(request.user_id, data)
+        return jsonify(account), 201
+    except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
 
 @bp.route('/<account_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
 def account_detail(account_id: str):
     accounts_collection = current_app.config['ACCOUNTS']
     transactions_collection = current_app.config['TRANSACTIONS']
-    account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
-    if not account:
-        return jsonify({'error': 'Conta não encontrada'}), 404
     
-    if request.method == 'GET':
-        account['id'] = account['_id']
-        account.pop('_id', None)
-        return jsonify(account)
-    
-    if request.method == 'DELETE':
-        ok = delete_account(accounts_collection, transactions_collection, request.user_id, account_id)
-        if not ok:
-            count = transactions_collection.count_documents({'account_id': account_id})
-            return jsonify({'error': f'Não é possível deletar. Existem {count} transações nesta conta'}), 400
-        return jsonify({'message': 'Conta deletada com sucesso'})
-    data = request.get_json()
-    update_account(accounts_collection, request.user_id, account_id, data)
-    return jsonify({'message': 'Conta atualizada com sucesso'})
+    repo = AccountRepository(accounts_collection)
+    service = AccountService(repo, transactions_collection)
 
+    try:
+        if request.method == 'GET':
+            account = repo.find_by_id(account_id)
+            if not account or account['user_id'] != request.user_id:
+                return jsonify({'error': 'Conta não encontrada'}), 404
+            account['id'] = account['_id']
+            account.pop('_id', None)
+            return jsonify(account)
+        
+        if request.method == 'DELETE':
+            service.delete_account(request.user_id, account_id)
+            return jsonify({'message': 'Conta deletada com sucesso'})
+        
+        data = request.get_json()
+        result = service.update_account(request.user_id, account_id, data)
+        return jsonify(result)
+    except (ValidationException, NotFoundException) as e:
+        return jsonify(e.to_dict()), e.status_code
 
 @bp.route('/<account_id>/import', methods=['POST'])
 @require_auth
@@ -59,9 +70,18 @@ def import_credit_card_statement(account_id: str):
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
     
+    account_repo = AccountRepository(accounts_collection)
+    account_service = AccountService(account_repo, transactions_collection)
+    
+    category_repo = CategoryRepository(categories_collection)
+    category_service = CategoryService(category_repo, transactions_collection)
+    
+    transaction_repo = TransactionRepository(transactions_collection)
+    transaction_service = TransactionService(transaction_repo, categories_collection, accounts_collection)
+    
     # Verifica se a conta existe e é um cartão de crédito
-    account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
-    if not account:
+    account = account_repo.find_by_id(account_id)
+    if not account or account['user_id'] != request.user_id:
         return jsonify({'error': 'Conta não encontrada'}), 404
     
     if account.get('type') != 'credit_card':
@@ -120,7 +140,7 @@ def import_credit_card_statement(account_id: str):
                         # Tenta criar a categoria se não existir
                         try:
                             category_id = get_or_create_category(
-                                categories_collection,
+                                category_service,
                                 request.user_id,
                                 tx['category_name'],
                                 'expense'
@@ -139,7 +159,7 @@ def import_credit_card_statement(account_id: str):
                         category_name, color, icon = detected
                         try:
                             category_id = get_or_create_category(
-                                categories_collection,
+                                category_service,
                                 request.user_id,
                                 category_name,
                                 'expense',
@@ -193,11 +213,13 @@ def import_credit_card_statement(account_id: str):
                 errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
         
         if imported_transactions:
-            transactions_collection.insert_many(imported_transactions)
+            transaction_service.create_many_transactions(imported_transactions)
             
             # Atualiza o saldo do cartão (diminui o current_balance)
-            from services.transaction_service import apply_account_balance_updates
-            apply_account_balance_updates(accounts_collection, account_id, imported_transactions)
+            # Calcula o total
+            total_amount = sum(t['amount'] for t in imported_transactions)
+            # Como são despesas, subtrai
+            account_service.update_balance(account_id, -total_amount)
         
         result = {
             'message': f'{len(imported_transactions)} transações importadas com sucesso',

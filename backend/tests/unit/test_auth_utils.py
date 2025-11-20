@@ -12,14 +12,14 @@ class TestAuthUtils:
 
     def test_password_hashing(self):
         """Test password hashing and verification"""
-        from werkzeug.security import generate_password_hash
+        from utils.auth_utils import hash_password, check_password
 
         password = "SecurePassword123!"
-        hashed = generate_password_hash(password)
+        hashed = hash_password(password)
 
         assert hashed != password
-        assert check_password_hash(hashed, password)
-        assert not check_password_hash(hashed, "WrongPassword")
+        assert check_password(password, hashed)
+        assert not check_password("WrongPassword", hashed)
 
     def test_jwt_token_generation(self, app):
         """Test JWT token generation"""

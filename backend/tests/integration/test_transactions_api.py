@@ -19,8 +19,10 @@ class TestTransactionsAPI:
 
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert isinstance(data, list)
-        assert len(data) > 0
+        # Expect paginated response
+        assert 'data' in data
+        assert isinstance(data['data'], list)
+        assert len(data['data']) > 0
 
     def test_list_transactions_with_filters(self, client, auth_headers):
         """Test listing transactions with filters"""
@@ -31,7 +33,8 @@ class TestTransactionsAPI:
 
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert isinstance(data, list)
+        assert 'data' in data
+        assert isinstance(data['data'], list)
 
     def test_create_transaction_success(self, client, auth_headers, test_category):
         """Test creating a transaction"""
@@ -40,7 +43,7 @@ class TestTransactionsAPI:
             'amount': 100.0,
             'type': 'expense',
             'category_id': test_category['_id'],
-            'date': datetime.utcnow().isoformat()
+            'date': datetime.utcnow().strftime('%Y-%m-%d')
         }
 
         response = client.post(
@@ -74,7 +77,7 @@ class TestTransactionsAPI:
             'amount': 100.0,
             'type': 'invalid_type',
             'category_id': test_category['_id'],
-            'date': datetime.utcnow().isoformat()
+            'date': datetime.utcnow().strftime('%Y-%m-%d')
         }
 
         response = client.post(
@@ -92,7 +95,7 @@ class TestTransactionsAPI:
             'amount': 300.0,
             'type': 'expense',
             'category_id': test_category['_id'],
-            'date': datetime.utcnow().isoformat(),
+            'date': datetime.utcnow().strftime('%Y-%m-%d'),
             'installments': 3
         }
 
@@ -121,6 +124,17 @@ class TestTransactionsAPI:
 
         assert response.status_code == 200
 
+    def test_get_transaction_detail(self, client, auth_headers, test_transaction):
+        """Test getting transaction details"""
+        response = client.get(
+            f'/api/transactions/{test_transaction["_id"]}',
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['description'] == test_transaction['description']
+
     def test_delete_transaction(self, client, auth_headers, test_transaction):
         """Test deleting a transaction"""
         response = client.delete(
@@ -144,3 +158,55 @@ class TestTransactionsAPI:
         response = client.get('/api/transactions')
 
         assert response.status_code == 401
+
+    def test_import_transactions_csv(self, client, auth_headers, test_account):
+        """Test importing transactions from CSV (Nubank format)"""
+        import io
+        
+        # Use Nubank CSV format which is actually supported
+        csv_content = b"date,title,amount\n2025-01-15,Uber,50.00\n2025-01-16,Salary,100.00\n"
+        data = {
+            'file': (io.BytesIO(csv_content), 'nubank.csv'),
+            'account_id': test_account['_id']
+        }
+        
+        response = client.post(
+            '/api/transactions/import',
+            data=data,
+            headers=auth_headers,
+            content_type='multipart/form-data'
+        )
+        
+        assert response.status_code in [200, 201]
+        result = json.loads(response.data)
+        assert 'imported_count' in result
+
+    def test_import_transactions_no_file(self, client, auth_headers):
+        """Test import without file"""
+        response = client.post(
+            '/api/transactions/import',
+            data={},
+            headers=auth_headers,
+            content_type='multipart/form-data'
+        )
+        
+        assert response.status_code == 400
+        result = json.loads(response.data)
+        assert 'error' in result
+
+    def test_import_transactions_invalid_format(self, client, auth_headers):
+        """Test import with invalid file format"""
+        import io
+        
+        data = {
+            'file': (io.BytesIO(b"invalid"), 'file.txt')
+        }
+        
+        response = client.post(
+            '/api/transactions/import',
+            data=data,
+            headers=auth_headers,
+            content_type='multipart/form-data'
+        )
+        
+        assert response.status_code == 400

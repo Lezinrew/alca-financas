@@ -5,11 +5,11 @@ import uuid
 from datetime import datetime
 
 from utils.auth_utils import require_auth
-from services.transaction_service import build_filter, list_transactions, create_installments, apply_account_balance_updates
-
+from repositories.transaction_repository import TransactionRepository
+from services.transaction_service import TransactionService
+from utils.exceptions import ValidationException, NotFoundException
 
 bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
-
 
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
@@ -17,80 +17,79 @@ def transactions():
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
     accounts_collection = current_app.config['ACCOUNTS']
+    
+    repo = TransactionRepository(transactions_collection)
+    service = TransactionService(repo, categories_collection, accounts_collection)
 
     if request.method == 'GET':
-        month = request.args.get('month')
-        year = request.args.get('year')
-        category_id = request.args.get('category_id')
-        transaction_type = request.args.get('type')
-        account_id = request.args.get('account_id')
-        filter_query = build_filter(request.user_id, month, year, category_id, transaction_type, account_id)
-        return jsonify(list_transactions(transactions_collection, categories_collection, filter_query))
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('limit', 20))
+        
+        filters = {
+            'month': request.args.get('month'),
+            'year': request.args.get('year'),
+            'category_id': request.args.get('category_id'),
+            'type': request.args.get('type'),
+            'account_id': request.args.get('account_id')
+        }
+        
+        return jsonify(service.list_transactions(request.user_id, filters, page, per_page))
 
-    data = request.get_json()
-    required_fields = ['description', 'amount', 'type', 'category_id', 'date']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'error': f'Campo {field} é obrigatório'}), 400
-    if data['type'] not in ['income', 'expense']:
-        return jsonify({'error': 'Tipo deve ser income ou expense'}), 400
-
-    category = categories_collection.find_one({'_id': data['category_id'], 'user_id': request.user_id})
-    if not category:
-        return jsonify({'error': 'Categoria não encontrada'}), 404
-    if data['type'] != category['type']:
-        return jsonify({'error': 'Tipo da transação não combina com tipo da categoria'}), 400
-
-    account_id = data.get('account_id')
-    if account_id:
-        account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
-        if not account:
-            return jsonify({'error': 'Conta não encontrada'}), 404
-
-    base_date = pd.to_datetime(data['date']).to_pydatetime()
-    to_create = create_installments(data, request.user_id, base_date, account_id)
-    if to_create:
-        transactions_collection.insert_many(to_create)
-        if account_id:
-            apply_account_balance_updates(accounts_collection, account_id, to_create)
-    return jsonify({'message': f'{len(to_create)} transação(ões) criada(s) com sucesso', 'count': len(to_create)}), 201
+    try:
+        data = request.get_json()
+        result = service.create_transaction(request.user_id, data)
+        return jsonify({'message': f"{result['count']} transação(ões) criada(s) com sucesso", 'count': result['count']}), 201
+    except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
 
 
-@bp.route('/<transaction_id>', methods=['PUT', 'DELETE'])
+@bp.route('/<transaction_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
 def transaction_detail(transaction_id: str):
+    categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
-    transaction = transactions_collection.find_one({'_id': transaction_id, 'user_id': request.user_id})
-    if not transaction:
-        return jsonify({'error': 'Transação não encontrada'}), 404
-    if request.method == 'DELETE':
-        transactions_collection.delete_one({'_id': transaction_id})
-        return jsonify({'message': 'Transação deletada com sucesso'})
+    accounts_collection = current_app.config['ACCOUNTS']
+    
+    repo = TransactionRepository(transactions_collection)
+    service = TransactionService(repo, categories_collection, accounts_collection)
 
-    data = request.get_json()
-    allowed_fields = ['description', 'amount', 'category_id', 'date', 'status', 'responsible_person']
-    update_data = {}
-    for field in allowed_fields:
-        if field in data:
-            if field == 'date':
-                update_data[field] = pd.to_datetime(data[field]).to_pydatetime()
-            elif field == 'amount':
-                update_data[field] = float(data[field])
-            else:
-                update_data[field] = data[field]
-    if update_data:
-        transactions_collection.update_one({'_id': transaction_id, 'user_id': request.user_id}, {'$set': update_data})
-    return jsonify({'message': 'Transação atualizada com sucesso'})
+    try:
+        if request.method == 'GET':
+            result = service.get_transaction(request.user_id, transaction_id)
+            return jsonify(result)
+
+        if request.method == 'DELETE':
+            service.delete_transaction(request.user_id, transaction_id)
+            return jsonify({'message': 'Transação deletada com sucesso'})
+
+        data = request.get_json()
+        result = service.update_transaction(request.user_id, transaction_id, data)
+        return jsonify(result)
+    except (ValidationException, NotFoundException) as e:
+        return jsonify(e.to_dict()), e.status_code
 
 
 @bp.route('/import', methods=['POST'])
 @require_auth
 def import_transactions():
     from services.import_service import parse_import_file
+    from repositories.account_repository import AccountRepository
+    from repositories.category_repository import CategoryRepository
+    from services.account_service import AccountService
+    from services.category_service import CategoryService
     
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
     accounts_collection = current_app.config['ACCOUNTS']
+    
+    repo = TransactionRepository(transactions_collection)
+    service = TransactionService(repo, categories_collection, accounts_collection)
+    
+    account_repo = AccountRepository(accounts_collection)
+    account_service = AccountService(account_repo, transactions_collection)
+    
+    category_repo = CategoryRepository(categories_collection)
+    category_service = CategoryService(category_repo, transactions_collection)
     
     if 'file' not in request.files:
         return jsonify({'error': 'Arquivo é obrigatório'}), 400
@@ -183,7 +182,7 @@ def import_transactions():
                         # Tenta criar a categoria se não existir
                         try:
                             category_id = get_or_create_category(
-                                categories_collection,
+                                category_service,
                                 request.user_id,
                                 tx['category_name'],
                                 tx['type']
@@ -202,7 +201,7 @@ def import_transactions():
                         category_name, color, icon = detected
                         try:
                             category_id = get_or_create_category(
-                                categories_collection,
+                                category_service,
                                 request.user_id,
                                 category_name,
                                 tx['type'],
@@ -265,12 +264,19 @@ def import_transactions():
                 errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
         
         if imported_transactions:
-            transactions_collection.insert_many(imported_transactions)
+            service.create_many_transactions(imported_transactions)
             
             # Atualiza o saldo da conta se account_id foi fornecido
             if account_id:
-                from services.transaction_service import apply_account_balance_updates
-                apply_account_balance_updates(accounts_collection, account_id, imported_transactions)
+                # Calcula o saldo a ser atualizado
+                total_change = 0
+                for tx in imported_transactions:
+                    amount = tx['amount']
+                    if tx['type'] == 'expense':
+                        amount = -amount
+                    total_change += amount
+                
+                account_service.update_balance(account_id, total_change)
         
         result = {
             'message': f'{len(imported_transactions)} transações importadas com sucesso',

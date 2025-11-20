@@ -20,7 +20,14 @@ load_dotenv()
 
 app = Flask(__name__)
 # SECRET_KEY necessário para sessões (ex.: OAuth). Usa default seguro em dev se não definido.
+from extensions import limiter
+
+# ... imports ...
+
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
+
+# Rate Limiting
+limiter.init_app(app)
 
 # CORS configuration - permite localhost e IPs locais
 cors_origins = os.getenv('CORS_ORIGINS', '*')
@@ -69,5 +76,17 @@ app.register_blueprint(accounts_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(reports_bp)
 
+from utils.exceptions import AppException
+
+@app.errorhandler(AppException)
+def handle_app_exception(e):
+    return jsonify(e.to_dict()), e.status_code
+
+def create_indices(db):
+    db.transactions.create_index([('user_id', 1), ('date', -1)])
+    db.transactions.create_index([('user_id', 1), ('category_id', 1)])
+    db.users.create_index('email', unique=True)
+
 if __name__ == '__main__':
+    create_indices(db)
     app.run(host='0.0.0.0', port=8001, debug=True)

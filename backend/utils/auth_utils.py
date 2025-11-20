@@ -18,22 +18,40 @@ def check_password(password: str, hashed: bytes) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed)
 
 
-def generate_jwt(user_id: str) -> str:
-    payload = {
+import uuid
+
+def generate_jwt(user_id: str) -> dict:
+    access_payload = {
         'user_id': str(user_id),
-        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRES_HOURS)
+        'type': 'access',
+        'exp': datetime.utcnow() + timedelta(minutes=15),
+        'jti': str(uuid.uuid4())
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+    refresh_payload = {
+        'user_id': str(user_id),
+        'type': 'refresh',
+        'exp': datetime.utcnow() + timedelta(days=7),
+        'jti': str(uuid.uuid4())
+    }
+    
+    return {
+        'access_token': jwt.encode(access_payload, JWT_SECRET, algorithm='HS256'),
+        'refresh_token': jwt.encode(refresh_payload, JWT_SECRET, algorithm='HS256')
+    }
+
+
+def decode_token(token: str, type_required: str = 'access'):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        if payload.get('type') != type_required:
+            return None
+        return payload['user_id']
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
 
 
 def verify_jwt(token: str):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
-        return payload['user_id']
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
+    return decode_token(token, 'access')
 
 
 def require_auth(f):

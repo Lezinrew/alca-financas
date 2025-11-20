@@ -8,8 +8,11 @@ import os
 import base64
 import json
 
-from utils.auth_utils import hash_password, check_password, generate_jwt, require_auth
+from utils.auth_utils import hash_password, check_password, generate_jwt, require_auth, decode_token
 from services.user_service import create_user, create_default_categories, get_user_public
+from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
+from extensions import limiter
+from pydantic import ValidationError
 
 
 # Remova o 'url_prefix' daqui. Ele será definido em app.py
@@ -18,35 +21,78 @@ bp = Blueprint('auth', __name__)
 
 # Adicione '/auth' a todas as rotas de autenticação para agrupar logicamente os endpoints.
 @bp.route('/auth/register', methods=['POST'])
+@limiter.limit("3 per hour")
 def register():
-    data = request.get_json()
-    if not data.get('name') or not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'Nome, email e senha são obrigatórios'}), 400
+    try:
+        data = UserRegisterSchema(**request.get_json())
+    except ValidationError as e:
+        return jsonify({'error': e.errors()}), 400
 
     users_collection = current_app.config['USERS']
     categories_collection = current_app.config['CATEGORIES']
 
-    if users_collection.find_one({'email': data['email']}):
+    if users_collection.find_one({'email': data.email}):
         return jsonify({'error': 'Email já cadastrado'}), 400
 
-    user = create_user(users_collection, data, hash_password)
+    user_data = data.model_dump()
+    user = create_user(users_collection, user_data, hash_password)
     create_default_categories(categories_collection, user['_id'])
 
-    token = generate_jwt(user['_id'])
-    return jsonify({'message': 'Usuário criado com sucesso', 'token': token, 'user': get_user_public(user)}), 201
+    tokens = generate_jwt(user['_id'])
+    return jsonify({
+        'message': 'Usuário criado com sucesso',
+        'access_token': tokens['access_token'],
+        'refresh_token': tokens['refresh_token'],
+        'user': get_user_public(user)
+    }), 201
 
 
 @bp.route('/auth/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
-    data = request.get_json()
-    if not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'Email e senha são obrigatórios'}), 400
+    try:
+        data = UserLoginSchema(**request.get_json())
+    except ValidationError as e:
+        return jsonify({'error': e.errors()}), 400
+
     users_collection = current_app.config['USERS']
-    user = users_collection.find_one({'email': data['email']})
-    if not user or not check_password(data['password'], user['password']):
+    user = users_collection.find_one({'email': data.email})
+    
+    if not user or not check_password(data.password, user['password']):
         return jsonify({'error': 'Email ou senha incorretos'}), 401
-    token = generate_jwt(user['_id'])
-    return jsonify({'message': 'Login realizado com sucesso', 'token': token, 'user': get_user_public(user)})
+        
+    tokens = generate_jwt(user['_id'])
+    return jsonify({
+        'message': 'Login realizado com sucesso',
+        'access_token': tokens['access_token'],
+        'refresh_token': tokens['refresh_token'],
+        'user': get_user_public(user)
+    })
+
+
+@bp.route('/auth/refresh', methods=['POST'])
+@limiter.limit("10 per minute")
+def refresh():
+    try:
+        data = RefreshTokenSchema(**request.get_json())
+    except ValidationError as e:
+        return jsonify({'error': e.errors()}), 400
+        
+    user_id = decode_token(data.refresh_token, 'refresh')
+    if not user_id:
+        return jsonify({'error': 'Refresh token inválido ou expirado'}), 401
+        
+    # Opcional: Verificar se o usuário ainda existe / está ativo
+    users_collection = current_app.config['USERS']
+    user = users_collection.find_one({'_id': user_id})
+    if not user:
+        return jsonify({'error': 'Usuário não encontrado'}), 401
+        
+    tokens = generate_jwt(user_id)
+    return jsonify({
+        'access_token': tokens['access_token'],
+        'refresh_token': tokens['refresh_token']
+    })
 
 
 @bp.route('/auth/forgot-password', methods=['POST'])

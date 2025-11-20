@@ -37,6 +37,47 @@ if [ "$confirm" != "yes" ]; then
     exit 0
 fi
 
+# Verificar branch
+echo -e "${BLUE}🔍 Verificando branch e status do git...${NC}"
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+    echo -e "${YELLOW}⚠️  Você não está na branch main/master (atual: $CURRENT_BRANCH)${NC}"
+    read -p "Continuar mesmo assim? (yes/no): " force_deploy
+    if [ "$force_deploy" != "yes" ]; then
+        echo "Deploy cancelado"
+        exit 0
+    fi
+fi
+
+# Verificar se há mudanças não commitadas
+if ! git diff-index --quiet HEAD --; then
+    echo -e "${RED}❌ Há mudanças não commitadas:${NC}"
+    git status --short
+    echo ""
+    read -p "Continuar mesmo assim? (yes/no): " force_uncommitted
+    if [ "$force_uncommitted" != "yes" ]; then
+        echo "Deploy cancelado"
+        exit 0
+    fi
+fi
+
+echo -e "${GREEN}✅ Verificações de git passaram${NC}\n"
+
+# Função de rollback
+rollback() {
+    echo ""
+    echo -e "${YELLOW}🔄 Erro detectado! Iniciando rollback...${NC}"
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && ./scripts/rollback.sh" || {
+        echo -e "${RED}❌ Erro ao executar rollback${NC}"
+    }
+    echo -e "${RED}❌ Deploy falhou. Rollback concluído.${NC}"
+    exit 1
+}
+
+# Configurar trap para rollback em caso de erro
+trap rollback ERR
+
+
 # Run tests first
 echo -e "${BLUE}🧪 Executando testes antes do deploy...${NC}"
 ./scripts/run-tests.sh all local
@@ -87,21 +128,21 @@ echo -e "${BLUE}🏥 Running health checks...${NC}"
 sleep 5
 
 # Check API
-API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.alcahub.com.br/api/health)
+API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://api.alcahub.com.br/api/health)
 if [ "$API_STATUS" = "200" ]; then
     echo -e "${GREEN}✅ API is healthy${NC}"
 else
     echo -e "${RED}❌ API health check failed (Status: $API_STATUS)${NC}"
-    exit 1
+    rollback
 fi
 
 # Check Frontend
-WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://alcahub.com.br)
+WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://alcahub.com.br)
 if [ "$WEB_STATUS" = "200" ]; then
     echo -e "${GREEN}✅ Frontend is healthy${NC}"
 else
     echo -e "${RED}❌ Frontend health check failed (Status: $WEB_STATUS)${NC}"
-    exit 1
+    rollback
 fi
 
 # Run smoke tests
@@ -121,6 +162,9 @@ fi
 echo "🧹 Cleaning up..."
 ssh ${DEPLOY_USER}@${DEPLOY_HOST} "docker system prune -f"
 
+# Desabilitar trap de erro (deploy foi bem sucedido)
+trap - ERR
+
 echo ""
 echo -e "${GREEN}✅ Deploy concluído com sucesso!${NC}"
 echo ""
@@ -131,3 +175,13 @@ echo ""
 echo "📊 Monitore os logs:"
 echo "   ssh ${DEPLOY_USER}@${DEPLOY_HOST} 'docker-compose logs -f'"
 echo ""
+
+# Notificação opcional (Slack/Discord/Email)
+if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+    echo "📢 Enviando notificação..."
+    COMMIT_MSG=$(git log -1 --pretty=%B)
+    COMMIT_HASH=$(git rev-parse --short HEAD)
+    curl -X POST -H 'Content-type: application/json' \
+        --data "{\"text\":\"✅ Deploy para produção concluído!\n\nCommit: \`$COMMIT_HASH\`\nMensagem: $COMMIT_MSG\n\nFrontend: https://alcahub.com.br\nAPI: https://api.alcahub.com.br\"}" \
+        "$SLACK_WEBHOOK_URL" 2>/dev/null || true
+fi

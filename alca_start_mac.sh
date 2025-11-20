@@ -165,6 +165,19 @@ source .venv/bin/activate
 python -m pip install --upgrade pip >/dev/null
 pip install -r requirements.txt
 
+# Verificar instalação de dependências críticas
+echo "  🔍 Verificando dependências críticas..."
+python -c "import email_validator" 2>/dev/null || {
+    echo -e "  ${YELLOW}⚠️  email-validator não encontrado. Reinstalando...${NC}"
+    pip install email-validator==2.2.0
+}
+python -c "import flask, pymongo, pydantic" 2>/dev/null || {
+    echo -e "  ${RED}❌ Erro ao importar dependências básicas${NC}"
+    exit 1
+}
+echo -e "  ${GREEN}✅ Todas as dependências instaladas${NC}"
+
+
 # Variáveis de ambiente padrão
 export SECRET_KEY="${SECRET_KEY:-dev-secret-key}"
 export MONGO_URI="${MONGO_URI:-mongodb://localhost:27017/alca_financas}"
@@ -228,7 +241,7 @@ echo $BACKEND_PID > "$REPO_DIR/.backend.pid"
 # Aguardar saúde do backend
 echo -n "Aguardando backend ficar pronto"
 for i in {1..30}; do
-  if curl -sS http://localhost:"$PORT"/api/health >/dev/null 2>&1; then
+  if curl -sS http://localhost:"$PORT"/api/health 2>/dev/null | grep -q '"status"'; then
     echo " - ok"
     break
   fi
@@ -238,9 +251,21 @@ done
 echo
 
 # Verificação final do backend
-if ! curl -sS http://localhost:"$PORT"/api/health >/dev/null 2>&1; then
-  echo "Erro: Backend não está respondendo em localhost:$PORT"
-  echo "Verifique os logs: $BACKEND_LOG"
+if ! curl -sS http://localhost:"$PORT"/api/health 2>/dev/null | grep -q '"status"'; then
+  echo ""
+  echo -e "${RED}❌ Backend não está respondendo em localhost:$PORT${NC}"
+  echo ""
+  echo -e "${BLUE}📋 Últimas 30 linhas do log:${NC}"
+  echo -e "${YELLOW}────────────────────────────────────────${NC}"
+  tail -30 "$BACKEND_LOG"
+  echo -e "${YELLOW}────────────────────────────────────────${NC}"
+  echo ""
+  echo -e "${BLUE}📄 Log completo: ${YELLOW}$BACKEND_LOG${NC}"
+  echo ""
+  echo -e "${YELLOW}💡 Dicas:${NC}"
+  echo "   • Verifique se todas as dependências estão instaladas"
+  echo "   • Verifique se o MongoDB está acessível"
+  echo "   • Verifique se há erros de sintaxe no código"
   exit 1
 fi
 
