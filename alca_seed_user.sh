@@ -19,6 +19,6 @@ def create_user(username, password):
     db.users.insert_one({"username": username, "password_hash": hashed})
     print(f"Usuário {username} criado com sucesso.")
 
-create_user("teste@alca.com", "1234561")
+create_user("teste@alca.com", "1234567")
 PY
 echo "==> Concluído. Use login: teste@alca.com / senha: 1234567"

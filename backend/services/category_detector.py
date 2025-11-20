@@ -177,7 +177,7 @@ def detect_category_from_description(description: str) -> Optional[Tuple[str, st
 
 
 def get_or_create_category(
-    categories_collection,
+    category_service,
     user_id: str,
     category_name: str,
     category_type: str,
@@ -188,19 +188,16 @@ def get_or_create_category(
     Busca uma categoria pelo nome ou cria uma nova se não existir.
     Retorna o ID da categoria.
     """
-    # Busca categoria existente
-    existing_category = categories_collection.find_one({
-        'user_id': user_id,
-        'name': category_name,
-        'type': category_type
-    })
+    # Busca categoria existente usando o repositório do serviço
+    # O serviço não tem find_by_name exposto publicamente que retorna o objeto completo com _id
+    # Mas podemos usar o repositório acessível via serviço
     
-    if existing_category:
-        return existing_category['_id']
+    existing = category_service.category_repo.find_by_name(user_id, category_name, category_type)
+    
+    if existing:
+        return existing['_id']
     
     # Cria nova categoria
-    from services.category_service import create_category
-    
     category_data = {
         'name': category_name,
         'type': category_type,
@@ -208,6 +205,6 @@ def get_or_create_category(
         'icon': icon or 'circle'
     }
     
-    new_category = create_category(categories_collection, user_id, category_data)
+    new_category = category_service.create_category(user_id, category_data)
     return new_category['id']
 

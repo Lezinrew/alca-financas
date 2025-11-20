@@ -50,6 +50,19 @@ def extract_account_info_from_ofx(content: bytes) -> Optional[Dict[str, Any]]:
         bankid_elem = root.find('.//BANKID') or root.find('.//bankid') or root.find('.//BankId')
         if bankid_elem is not None and bankid_elem.text:
             bank_id = bankid_elem.text.strip()
+            
+        # Se não encontrou instituição no ORG, tenta pelo BANKID
+        if not institution and bank_id:
+            bank_map = {
+                '001': 'Banco do Brasil',
+                '033': 'Santander',
+                '077': 'Banco Inter',
+                '104': 'Caixa Econômica Federal',
+                '237': 'Bradesco',
+                '260': 'Nubank',
+                '341': 'Itaú'
+            }
+            institution = bank_map.get(bank_id)
         
         # Busca informações da conta
         acct_from = root.find('.//BANKACCTFROM') or root.find('.//bankacctfrom') or root.find('.//BankAcctFrom')
@@ -105,6 +118,18 @@ def extract_account_info_from_ofx_regex(content_str: str) -> Optional[Dict[str, 
         # Extrai BANKID
         bankid_match = re.search(r'<BANKID[^>]*>([^<]+)', content_str, re.IGNORECASE)
         bank_id = bankid_match.group(1).strip() if bankid_match else None
+        
+        if not institution and bank_id:
+            bank_map = {
+                '001': 'Banco do Brasil',
+                '033': 'Santander',
+                '077': 'Banco Inter',
+                '104': 'Caixa Econômica Federal',
+                '237': 'Bradesco',
+                '260': 'Nubank',
+                '341': 'Itaú'
+            }
+            institution = bank_map.get(bank_id)
         
         # Extrai ACCTID
         acctid_match = re.search(r'<ACCTID[^>]*>([^<]+)', content_str, re.IGNORECASE)

@@ -156,7 +156,7 @@ SECRET_KEY=SUA_CHAVE_SECRETA_SUPER_SEGURA_AQUI_GERE_UMA_ALEATORIA
 JWT_EXPIRES_HOURS=24
 
 # CORS (ajuste com seu domínio)
-CORS_ORIGINS=https://seudominio.com.br,https://www.seudominio.com.br
+CORS_ORIGINS=https://seudominio.com.br,https://www.seudominio.com.br,https://app.seudominio.com.br
 
 # OAuth (opcional)
 GOOGLE_CLIENT_ID=seu-google-client-id
@@ -301,6 +301,95 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Configuração com subdomínios dedicados (recomendado para SaaS)
+
+Este formato separa responsabilidades:
+
+- `app.seudominio.com.br` → build do frontend (SPA)
+- `api.seudominio.com.br` → backend/Gunicorn
+- `chat.seudominio.com.br` → serviço de chatbot/tempo real (pode ser um placeholder inicial)
+- `seudominio.com.br` → redireciona para `app` ou exibe landing page/marketing
+
+```nginx
+# Redireciona domínio raiz para o app
+server {
+    listen 80;
+    server_name seudominio.com.br www.seudominio.com.br;
+    return 301 https://app.seudominio.com.br$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name seudominio.com.br www.seudominio.com.br;
+    return 301 https://app.seudominio.com.br$request_uri;
+}
+
+# Frontend
+server {
+    listen 80;
+    server_name app.seudominio.com.br;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name app.seudominio.com.br;
+    ssl_certificate /etc/letsencrypt/live/app.seudominio.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/app.seudominio.com.br/privkey.pem;
+    include snippets/ssl-params.conf;
+
+    root /var/www/alca-financas/frontend/dist;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+}
+
+# API
+server {
+    listen 80;
+    server_name api.seudominio.com.br;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.seudominio.com.br;
+    ssl_certificate /etc/letsencrypt/live/api.seudominio.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.seudominio.com.br/privkey.pem;
+    include snippets/ssl-params.conf;
+
+    location / {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Chatbot / serviços em tempo real (ajuste quando o serviço existir)
+server {
+    listen 80;
+    server_name chat.seudominio.com.br;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name chat.seudominio.com.br;
+    ssl_certificate /etc/letsencrypt/live/chat.seudominio.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/chat.seudominio.com.br/privkey.pem;
+    include snippets/ssl-params.conf;
+
+    location / {
+        return 200 'Chat placeholder';
+        add_header Content-Type text/plain;
     }
 }
 ```

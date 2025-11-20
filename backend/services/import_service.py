@@ -215,13 +215,38 @@ def parse_ofx(content: bytes) -> List[Dict[str, Any]]:
     
     for stmttrn in stmttrn_list:
         try:
-            # Data da transação
-            dtposted = stmttrn.find('DTPOSTED') or stmttrn.find('dtposted') or stmttrn.find('DtPosted')
-            if dtposted is None or dtposted.text is None:
+            # Itera sobre os filhos para encontrar os campos, já que find() pode falhar com namespaces ou estruturas complexas
+            dtposted_text = None
+            memo_text = None
+            name_text = None
+            trnamt_text = None
+            fitid_text = None
+            trntype_text = None
+            
+            for child in stmttrn:
+                tag_lower = child.tag.lower()
+                # Remove namespace se existir (ex: {http://...}TAG)
+                if '}' in tag_lower:
+                    tag_lower = tag_lower.split('}')[1]
+                
+                if tag_lower == 'dtposted':
+                    dtposted_text = child.text
+                elif tag_lower == 'memo':
+                    memo_text = child.text
+                elif tag_lower == 'name':
+                    name_text = child.text
+                elif tag_lower == 'trnamt':
+                    trnamt_text = child.text
+                elif tag_lower == 'fitid':
+                    fitid_text = child.text
+                elif tag_lower == 'trntype':
+                    trntype_text = child.text
+
+            if not dtposted_text:
                 continue
             
             # OFX data format: YYYYMMDDHHMMSS ou YYYYMMDD
-            dtposted_text = dtposted.text.strip()
+            dtposted_text = dtposted_text.strip()
             if len(dtposted_text) >= 8:
                 year = int(dtposted_text[0:4])
                 month = int(dtposted_text[4:6])
@@ -231,19 +256,16 @@ def parse_ofx(content: bytes) -> List[Dict[str, Any]]:
                 continue
             
             # Descrição
-            memo = stmttrn.find('MEMO') or stmttrn.find('memo') or stmttrn.find('Memo')
-            name = stmttrn.find('NAME') or stmttrn.find('name') or stmttrn.find('Name')
-            description = (memo.text if memo is not None and memo.text else '') or \
-                         (name.text if name is not None and name.text else '') or \
+            description = (memo_text if memo_text else '') or \
+                         (name_text if name_text else '') or \
                          'Transação sem descrição'
             
             # Valor
-            trnamt = stmttrn.find('TRNAMT') or stmttrn.find('trnamt') or stmttrn.find('TrnAmt')
-            if trnamt is None or trnamt.text is None:
+            if not trnamt_text:
                 continue
             
             try:
-                amount = float(trnamt.text.strip().replace(',', '.'))
+                amount = float(trnamt_text.strip().replace(',', '.'))
             except:
                 continue
             
@@ -257,11 +279,11 @@ def parse_ofx(content: bytes) -> List[Dict[str, Any]]:
                 'amount': amount,
                 'type': transaction_type,
                 'raw_data': {
-                    'fitid': (stmttrn.find('FITID') or stmttrn.find('fitid') or stmttrn.find('FitId')).text if (stmttrn.find('FITID') or stmttrn.find('fitid') or stmttrn.find('FitId')) is not None else None,
-                    'trntype': (stmttrn.find('TRNTYPE') or stmttrn.find('trntype') or stmttrn.find('TrnType')).text if (stmttrn.find('TRNTYPE') or stmttrn.find('trntype') or stmttrn.find('TrnType')) is not None else None
+                    'fitid': fitid_text,
+                    'trntype': trntype_text
                 }
             })
-        except Exception as e:
+        except Exception:
             continue
     
     return transactions
