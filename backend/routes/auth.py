@@ -254,9 +254,10 @@ def google_callback():
         # Usa uma página HTML intermediária que processa o token e redireciona
         frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.com.br')
         
-        # Codifica os dados para passar via URL ou usar base64
-        user_json = json.dumps(user_data)
-        user_encoded = base64.urlsafe_b64encode(user_json.encode()).decode()
+        # Prepara dados para o frontend
+        access_token = jwt_token['access_token']
+        refresh_token = jwt_token['refresh_token']
+        user_json_str = json.dumps(user_data)
         
         # Retorna HTML que processa o token e redireciona
         html = f"""<!DOCTYPE html>
@@ -269,8 +270,9 @@ def google_callback():
     <script>
         // Salva token e dados do usuário no localStorage
         try {{
-            localStorage.setItem('auth_token', {json.dumps(jwt_token['access_token'])});
-            localStorage.setItem('user_data', {json.dumps(user_json)});
+            localStorage.setItem('auth_token', {json.dumps(access_token)});
+            localStorage.setItem('refresh_token', {json.dumps(refresh_token)});
+            localStorage.setItem('user_data', {json.dumps(user_json_str)});
             
             // Redireciona para o dashboard
             window.location.href = {json.dumps(frontend_url + '/dashboard')};

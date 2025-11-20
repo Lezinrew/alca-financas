@@ -99,10 +99,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = async (credentials: { email: string; password: string }) => {
     try {
       const response = await authAPI.login(credentials);
-      const { token, user: userData } = response.data;
+      const { access_token, refresh_token, user: userData } = response.data;
 
       // Salva dados no localStorage
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token', access_token);
+      if (refresh_token) {
+        localStorage.setItem('refresh_token', refresh_token);
+      }
       localStorage.setItem('user_data', JSON.stringify(userData));
 
       setUser(userData);
@@ -120,10 +123,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const register = async (userData: { name: string; email: string; password: string }) => {
     try {
       const response = await authAPI.register(userData);
-      const { token, user: newUser } = response.data;
+      const { access_token, refresh_token, user: newUser } = response.data;
 
       // Salva dados no localStorage
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token', access_token);
+      if (refresh_token) {
+        localStorage.setItem('refresh_token', refresh_token);
+      }
       localStorage.setItem('user_data', JSON.stringify(newUser));
 
       setUser(newUser);
@@ -147,10 +153,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         password: 'demo123'
       });
 
-      const { token, user: userData } = response.data;
+      const { access_token, refresh_token, user: userData } = response.data;
 
       // Salva dados no localStorage
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token', access_token);
+      if (refresh_token) {
+        localStorage.setItem('refresh_token', refresh_token);
+      }
       localStorage.setItem('user_data', JSON.stringify(userData));
 
       setUser(userData);
@@ -166,9 +175,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           password: 'demo123'
         });
 
-        const { token, user: userData } = registerResponse.data;
+        const { access_token, refresh_token, user: userData } = registerResponse.data;
 
-        localStorage.setItem('auth_token', token);
+        localStorage.setItem('auth_token', access_token);
+        if (refresh_token) {
+          localStorage.setItem('refresh_token', refresh_token);
+        }
         localStorage.setItem('user_data', JSON.stringify(userData));
 
         setUser(userData);
@@ -186,6 +198,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
     setUser(null);
     setIsAuthenticated(false);
