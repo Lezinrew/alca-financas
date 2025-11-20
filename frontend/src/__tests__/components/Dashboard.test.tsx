@@ -34,7 +34,7 @@ describe('Dashboard Component', () => {
     localStorage.setItem('auth_token', 'test-token')
 
     // Mock dashboard data
-    vi.mocked(dashboardAPI.getAdvanced).mockResolvedValue({
+    const mockDashboardResponse = {
       data: {
         summary: {
           total_income: 3000,
@@ -43,8 +43,13 @@ describe('Dashboard Component', () => {
         monthly_evolution: [],
         expense_by_category: [],
         recent_transactions: []
-      }
-    })
+      },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {}
+    }
+    vi.mocked(dashboardAPI.getAdvanced).mockResolvedValue(mockDashboardResponse as any)
 
     // Mock fetch for accounts
     global.fetch = vi.fn().mockResolvedValue({
