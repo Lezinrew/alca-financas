@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
 
+import { authAPI } from '../utils/api'
+
 // Mock the API
 vi.mock('../utils/api', () => ({
   authAPI: {
@@ -89,6 +91,16 @@ describe('AuthContext', () => {
   })
 
   it('should handle AI login successfully', async () => {
+    const mockUser = { id: '1', name: 'Demo User', email: 'demo@alca.fin' }
+    const mockResponse = {
+      data: {
+        access_token: 'mock_access_token',
+        refresh_token: 'mock_refresh_token',
+        user: mockUser
+      }
+    }
+    vi.mocked(authAPI.login).mockResolvedValue(mockResponse as any)
+
     const user = userEvent.setup()
     renderWithProvider()
 
@@ -113,6 +125,16 @@ describe('AuthContext', () => {
   })
 
   it('should handle logout correctly', async () => {
+    const mockUser = { id: '1', name: 'Demo User', email: 'demo@alca.fin' }
+    const mockResponse = {
+      data: {
+        access_token: 'mock_access_token',
+        refresh_token: 'mock_refresh_token',
+        user: mockUser
+      }
+    }
+    vi.mocked(authAPI.login).mockResolvedValue(mockResponse as any)
+
     const user = userEvent.setup()
     renderWithProvider()
 
