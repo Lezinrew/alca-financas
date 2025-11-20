@@ -11,6 +11,7 @@ interface User {
   name: string;
   email: string;
   auth_providers?: AuthProviderInfo[];
+  is_admin?: boolean;
 }
 
 interface AuthContextType {

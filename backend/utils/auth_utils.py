@@ -73,5 +73,23 @@ def require_auth(f):
         request.user_id = user_id
         return f(*args, **kwargs)
     return decorated
+    return decorated
 
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Assumes @require_auth is used before this or request.user_id is set
+        if not hasattr(request, 'user_id'):
+            return jsonify({'error': 'Autenticação necessária'}), 401
+
+        from flask import current_app
+        users_collection = current_app.config['USERS']
+        user = users_collection.find_one({'_id': request.user_id})
+        
+        if not user or not user.get('is_admin'):
+            return jsonify({'error': 'Acesso negado. Requer privilégios de administrador.'}), 403
+            
+        return f(*args, **kwargs)
+    return decorated
 

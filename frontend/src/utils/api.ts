@@ -200,6 +200,15 @@ export const oauthAPI = {
   appleLogin: () => `${API_BASE_URL}/auth/apple/login`,
 };
 
+// Funções de Admin
+export const adminAPI = {
+  getStats: () => api.get('/admin/stats'),
+  getUsers: (page = 1, perPage = 10, search = '') => api.get(`/admin/users?page=${page}&per_page=${perPage}&search=${search}`),
+  createUser: (userData: any) => api.post('/admin/users', userData),
+  updateUserStatus: (id: string, data: { is_blocked?: boolean; is_admin?: boolean }) => api.put(`/admin/users/${id}`, data),
+  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
+};
+
 // Utilitários
 export const formatCurrency = (value: number, currency = 'BRL') => {
   return new Intl.NumberFormat('pt-BR', {

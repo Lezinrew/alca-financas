@@ -20,6 +20,8 @@ import Accounts from './components/accounts/Accounts';
 import Planning from './components/planning/Planning';
 import CreditCards from './components/credit-cards/CreditCards';
 import CreditCardDetail from './components/credit-cards/CreditCardDetail';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import UserManagement from './pages/admin/UserManagement';
 
 // Type definitions
 interface RouteWrapperProps {
@@ -110,6 +112,11 @@ const AppRoutes: React.FC = () => {
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="import" element={<Import />} />
+
+          {/* Admin Routes */}
+          <Route path="admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="admin/dashboard" element={<AdminDashboard />} />
+          <Route path="admin/users" element={<UserManagement />} />
         </Route>
 
         {/* Redirecionar qualquer outra rota */}
