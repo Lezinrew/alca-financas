@@ -31,6 +31,7 @@ import { dashboardAPI } from '@/utils/api'
 describe('Dashboard Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.setItem('auth_token', 'test-token')
 
     // Mock dashboard data
     vi.mocked(dashboardAPI.getAdvanced).mockResolvedValue({
