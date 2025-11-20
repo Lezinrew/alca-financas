@@ -58,7 +58,13 @@ def login():
     users_collection = current_app.config['USERS']
     user = users_collection.find_one({'email': data.email})
     
-    if not user or not check_password(data.password, user['password']):
+    if not user:
+        return jsonify({'error': 'Email ou senha incorretos'}), 401
+
+    if user.get('password') is None:
+        return jsonify({'error': 'Este email está vinculado ao Google. Por favor, faça login via Google.'}), 400
+    
+    if not check_password(data.password, user['password']):
         return jsonify({'error': 'Email ou senha incorretos'}), 401
         
     tokens = generate_jwt(user['_id'])
@@ -263,7 +269,7 @@ def google_callback():
     <script>
         // Salva token e dados do usuário no localStorage
         try {{
-            localStorage.setItem('auth_token', {json.dumps(jwt_token)});
+            localStorage.setItem('auth_token', {json.dumps(jwt_token['access_token'])});
             localStorage.setItem('user_data', {json.dumps(user_json)});
             
             // Redireciona para o dashboard

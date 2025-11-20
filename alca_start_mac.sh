@@ -216,6 +216,7 @@ export PORT="${PORT:-$BACKEND_PORT}"
 echo -e "  ${GREEN}✅ Backend irá iniciar na porta $PORT${NC}"
 export MONGO_URI="${MONGO_URI:-${MONGO_URL:-mongodb://localhost:27017/alca_financas}}"
 export MONGO_DB="${MONGO_DB:-alca_financas}"
+export FRONTEND_URL="http://localhost:$FRONTEND_PORT"
 
 # Detecta IP local para acesso em rede (fallback para hostname)
 HOST_IP="${HOST_IP:-}"
