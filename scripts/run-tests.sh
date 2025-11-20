@@ -33,7 +33,10 @@ run_backend_tests() {
     cd backend
 
     # Activate venv
-    if [ -d "venv" ]; then
+    # Activate venv
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate
+    elif [ -d "venv" ]; then
         source venv/bin/activate
     else
         echo -e "${RED}❌ Ambiente virtual não encontrado. Execute deploy-local.sh primeiro.${NC}"
