@@ -28,19 +28,19 @@ const TestComponent = () => {
       <div data-testid="user-info">
         {user ? `User: ${user.name} (${user.email})` : 'No user'}
       </div>
-      <button 
+      <button
         data-testid="login-btn"
         onClick={() => login({ email: 'test@test.com', password: '123' })}
       >
         Login
       </button>
-      <button 
+      <button
         data-testid="ai-login-btn"
         onClick={() => loginWithAI()}
       >
         AI Login
       </button>
-      <button 
+      <button
         data-testid="logout-btn"
         onClick={logout}
       >
@@ -80,11 +80,11 @@ describe('AuthContext', () => {
 
   it('should show not authenticated state when no user is logged in', async () => {
     renderWithProvider()
-    
+
     await waitFor(() => {
       expect(screen.getByTestId('auth-status')).toHaveTextContent('Not Authenticated')
     })
-    
+
     expect(screen.getByTestId('user-info')).toHaveTextContent('No user')
   })
 
@@ -106,7 +106,7 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('user-info')).toHaveTextContent('User: Demo User (demo@alca.fin)')
-    
+
     // Check localStorage
     expect(localStorage.getItem('user_data')).toBeTruthy()
     expect(localStorage.getItem('auth_token')).toBeTruthy()
@@ -122,7 +122,7 @@ describe('AuthContext', () => {
     })
 
     await user.click(screen.getByTestId('ai-login-btn'))
-    
+
     await waitFor(() => {
       expect(screen.getByTestId('auth-status')).toHaveTextContent('Authenticated')
     })
@@ -135,7 +135,7 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('user-info')).toHaveTextContent('No user')
-    
+
     // Check localStorage is cleared
     expect(localStorage.getItem('user_data')).toBeNull()
     expect(localStorage.getItem('auth_token')).toBeNull()
@@ -144,8 +144,9 @@ describe('AuthContext', () => {
   it('should restore user from localStorage on mount', async () => {
     // Pre-populate localStorage
     const mockUser = { id: 1, name: 'Test User', email: 'test@example.com' }
-    const mockToken = btoa(JSON.stringify({ user: mockUser, exp: Date.now() + 10000 }))
-    
+    // Prepend space to avoid 'eyJ' prefix (which would be treated as real JWT)
+    const mockToken = btoa(' ' + JSON.stringify({ user: mockUser, exp: Date.now() + 10000 }))
+
     localStorage.setItem('user_data', JSON.stringify(mockUser))
     localStorage.setItem('auth_token', mockToken)
 
@@ -161,8 +162,9 @@ describe('AuthContext', () => {
   it('should handle expired token correctly', async () => {
     // Pre-populate localStorage with expired token
     const mockUser = { id: 1, name: 'Test User', email: 'test@example.com' }
-    const expiredToken = btoa(JSON.stringify({ user: mockUser, exp: Date.now() - 10000 }))
-    
+    // Prepend space to avoid 'eyJ' prefix
+    const expiredToken = btoa(' ' + JSON.stringify({ user: mockUser, exp: Date.now() - 10000 }))
+
     localStorage.setItem('user_data', JSON.stringify(mockUser))
     localStorage.setItem('auth_token', expiredToken)
 
@@ -173,7 +175,7 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('user-info')).toHaveTextContent('No user')
-    
+
     // Check localStorage is cleared for expired token
     expect(localStorage.getItem('user_data')).toBeNull()
     expect(localStorage.getItem('auth_token')).toBeNull()
