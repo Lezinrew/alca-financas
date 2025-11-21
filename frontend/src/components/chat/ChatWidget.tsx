@@ -15,6 +15,7 @@ interface Message {
 }
 
 const CHATBOT_API_URL = 'https://chat.alcahub.com.br/api/chat';
+const CHATBOT_WS_URL = 'wss://chat.alcahub.com.br/api/chat/ws';
 
 export const ChatWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,7 +31,10 @@ export const ChatWidget: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [useWebSocket, setUseWebSocket] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const { isAuthenticated } = useAuth();
   
   const getToken = () => {
@@ -44,6 +48,106 @@ export const ChatWidget: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Conectar WebSocket quando o chat for aberto
+  useEffect(() => {
+    if (isOpen && isAuthenticated && useWebSocket) {
+      connectWebSocket();
+    } else if (wsRef.current) {
+      disconnectWebSocket();
+    }
+
+    return () => {
+      if (wsRef.current) {
+        disconnectWebSocket();
+      }
+    };
+  }, [isOpen, isAuthenticated, useWebSocket]);
+
+  const connectWebSocket = () => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const ws = new WebSocket(`${CHATBOT_WS_URL}?token=${token}`);
+      
+      ws.onopen = () => {
+        setIsConnected(true);
+        wsRef.current = ws;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'message') {
+            const botMessage: Message = {
+              id: Date.now().toString(),
+              text: data.reply,
+              isUser: false,
+              timestamp: new Date(data.timestamp || Date.now()),
+              suggestions: data.suggestions,
+            };
+            setMessages((prev) => [...prev, botMessage]);
+            if (data.conversation_id) {
+              setConversationId(data.conversation_id);
+            }
+          } else if (data.type === 'system') {
+            const systemMessage: Message = {
+              id: Date.now().toString(),
+              text: data.message,
+              isUser: false,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, systemMessage]);
+            if (data.conversation_id) {
+              setConversationId(data.conversation_id);
+            }
+          } else if (data.type === 'error') {
+            const errorMessage: Message = {
+              id: Date.now().toString(),
+              text: data.message,
+              isUser: false,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+          }
+        } catch (error) {
+          console.error('Erro ao processar mensagem WebSocket:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('Erro WebSocket:', error);
+        setIsConnected(false);
+        setUseWebSocket(false); // Fallback para HTTP
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        wsRef.current = null;
+        // Tentar reconectar após 3 segundos se o chat ainda estiver aberto
+        if (isOpen && isAuthenticated) {
+          setTimeout(() => {
+            if (isOpen && !wsRef.current) {
+              connectWebSocket();
+            }
+          }, 3000);
+        }
+      };
+    } catch (error) {
+      console.error('Erro ao conectar WebSocket:', error);
+      setUseWebSocket(false); // Fallback para HTTP
+    }
+  };
+
+  const disconnectWebSocket = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+  };
 
   const sendMessage = async (text?: string) => {
     const messageText = text || input.trim();
@@ -60,6 +164,22 @@ export const ChatWidget: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
+    // Usar WebSocket se disponível
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({
+          message: messageText,
+          conversation_id: conversationId,
+        }));
+        setIsLoading(false);
+        return;
+      } catch (error) {
+        console.error('Erro ao enviar via WebSocket:', error);
+        // Fallback para HTTP
+      }
+    }
+
+    // Fallback para HTTP
     try {
       const token = getToken();
       if (!token) {
@@ -140,6 +260,9 @@ export const ChatWidget: React.FC = () => {
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5" />
           <h3 className="font-semibold">Assistente Virtual</h3>
+          {isConnected && (
+            <span className="ml-2 w-2 h-2 bg-green-300 rounded-full animate-pulse" title="Conectado em tempo real"></span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
