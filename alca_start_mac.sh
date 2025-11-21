@@ -216,6 +216,9 @@ export PORT="${PORT:-$BACKEND_PORT}"
 echo -e "  ${GREEN}✅ Backend irá iniciar na porta $PORT${NC}"
 export MONGO_URI="${MONGO_URI:-${MONGO_URL:-mongodb://localhost:27017/alca_financas}}"
 export MONGO_DB="${MONGO_DB:-alca_financas}"
+
+# Define FRONTEND_PORT com valor padrão antes de usar
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 export FRONTEND_URL="http://localhost:$FRONTEND_PORT"
 
 # Detecta IP local para acesso em rede (fallback para hostname)
@@ -296,10 +299,10 @@ fi
 echo "==> Iniciando frontend de desenvolvimento (Vite)"
 
 # Detectar porta disponível (preferência: 3000, fallback: 5173)
-FRONTEND_PORT=3000
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo -e "  ${YELLOW}⚠️  Porta 3000 ocupada, Vite usará porta padrão (5173)${NC}"
-    FRONTEND_PORT=5173
+    FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 fi
 
 echo -e "  ${GREEN}✅ Frontend irá iniciar na porta $FRONTEND_PORT${NC}"
@@ -313,12 +316,12 @@ echo -n "Aguardando frontend (Vite) ficar pronto"
 VITE_READY=0
 for i in {1..40}; do
   if curl -sS http://localhost:3000 >/dev/null 2>&1; then
-    FRONTEND_PORT=3000
+    FRONTEND_PORT="${FRONTEND_PORT:-3000}"
     VITE_READY=1
     echo " - ok"
     break
   elif curl -sS http://localhost:5173 >/dev/null 2>&1; then
-    FRONTEND_PORT=5173
+    FRONTEND_PORT="${FRONTEND_PORT:-5173}"
     VITE_READY=1
     echo " - ok"
     break
