@@ -252,7 +252,7 @@ def google_callback():
         
         # Redireciona para o frontend com o token e dados do usuário
         # Usa uma página HTML intermediária que processa o token e redireciona
-        frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.com.br')
+        frontend_url = os.getenv('FRONTEND_URL', 'https://app.alcahub.com.br')
         
         # Prepara dados para o frontend
         access_token = jwt_token['access_token']
