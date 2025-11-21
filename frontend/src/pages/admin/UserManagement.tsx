@@ -210,10 +210,10 @@ const UserManagement: React.FC = () => {
                     >
                         Próxima
                     </button>
-                </div>
-            </div>
-        </Layout>
-    );
-};
+                  </div>
+              </div>
+          </div>
+      );
+  };
 
 export default UserManagement;
