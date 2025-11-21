@@ -59,10 +59,6 @@ sshpass -p "4203434@Mudar" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile
     "$SERVER_USER@$SERVER_HOST" bash <<EOF
     cat > /etc/nginx/sites-available/chat.alcahub.com.br <<NGINXEOF
 server {
-    if (\$host = chat.alcahub.com.br) {
-        return 301 https://\$host\$request_uri;
-    }
-
     listen 80;
     server_name chat.alcahub.com.br;
     return 301 https://\$host\$request_uri;
