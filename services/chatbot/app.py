@@ -7,10 +7,11 @@ import requests
 from typing import Optional
 from datetime import datetime
 
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
+import json
 
 SERVICE_NAME = "Alça Finanças Chatbot"
 DEFAULT_GREETING = (
@@ -318,6 +319,117 @@ def chat_public(request: ChatRequest) -> ChatResponse:
         conversation_id=conversation_id,
         suggestions=suggestions
     )
+
+
+# Gerenciador de conexões WebSocket
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, WebSocket] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+    
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+    
+    async def send_personal_message(self, message: dict, user_id: str):
+        if user_id in self.active_connections:
+            try:
+                await self.active_connections[user_id].send_json(message)
+            except Exception:
+                self.disconnect(user_id)
+    
+    async def broadcast(self, message: dict):
+        disconnected = []
+        for user_id, connection in self.active_connections.items():
+            try:
+                await connection.send_json(message)
+            except Exception:
+                disconnected.append(user_id)
+        for user_id in disconnected:
+            self.disconnect(user_id)
+
+
+manager = ConnectionManager()
+
+
+def verify_ws_token(token: str) -> Optional[str]:
+    """Verifica token JWT para WebSocket."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        if payload.get("type") != "access":
+            return None
+        return payload["user_id"]
+    except Exception:
+        return None
+
+
+@app.websocket("/api/chat/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Endpoint WebSocket para chat em tempo real."""
+    # Obter token da query string ou header
+    token = websocket.query_params.get("token") or websocket.headers.get("authorization", "").replace("Bearer ", "")
+    
+    if not token:
+        await websocket.close(code=1008, reason="Token não fornecido")
+        return
+    
+    user_id = verify_ws_token(token)
+    if not user_id:
+        await websocket.close(code=1008, reason="Token inválido")
+        return
+    
+    await manager.connect(websocket, user_id)
+    
+    try:
+        # Enviar mensagem de boas-vindas
+        await manager.send_personal_message({
+            "type": "system",
+            "message": "Conectado ao chat em tempo real!",
+            "conversation_id": str(uuid.uuid4())
+        }, user_id)
+        
+        while True:
+            # Receber mensagem do cliente
+            data = await websocket.receive_text()
+            try:
+                message_data = json.loads(data)
+                message_text = message_data.get("message", "")
+                conversation_id = message_data.get("conversation_id") or str(uuid.uuid4())
+                
+                if not message_text:
+                    continue
+                
+                # Processar mensagem
+                reply, suggestions = build_reply(message_text, user_id, token)
+                
+                # Enviar resposta
+                await manager.send_personal_message({
+                    "type": "message",
+                    "reply": reply,
+                    "conversation_id": conversation_id,
+                    "suggestions": suggestions,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, user_id)
+                
+            except json.JSONDecodeError:
+                await manager.send_personal_message({
+                    "type": "error",
+                    "message": "Formato de mensagem inválido"
+                }, user_id)
+            except Exception as e:
+                await manager.send_personal_message({
+                    "type": "error",
+                    "message": f"Erro ao processar mensagem: {str(e)}"
+                }, user_id)
+                
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
+    except Exception as e:
+        manager.disconnect(user_id)
+        print(f"Erro na conexão WebSocket: {e}")
 
 
 CHATBOT_PORT = int(os.getenv("CHATBOT_PORT", "8100"))
