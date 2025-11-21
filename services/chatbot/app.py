@@ -186,20 +186,70 @@ def build_reply(message: str, user_id: Optional[str] = None, token: Optional[str
             "Quer que eu mostre algum relatório específico?"
         ), ["Ver relatórios", "Ver gráficos", "Exportar dados"]
     
+    # Comandos de criação rápida
+    if any(word in lower_msg for word in ["adicionar transação", "nova transação", "criar transação"]):
+        return (
+            "💸 **Adicionar Transação:**\n\n"
+            "Para adicionar uma nova transação:\n"
+            "1. Acesse 'Transações' no menu\n"
+            "2. Clique em 'Nova Transação'\n"
+            "3. Preencha os dados:\n"
+            "   • Descrição\n"
+            "   • Valor\n"
+            "   • Tipo (Receita/Despesa)\n"
+            "   • Categoria\n"
+            "   • Data\n"
+            "   • Conta\n\n"
+            "Você também pode adicionar parcelas para despesas recorrentes!"
+        ), ["Ver transações", "Adicionar transação", "Ver categorias"]
+    
+    # Exportação de dados
+    if any(word in lower_msg for word in ["exportar", "download", "baixar", "csv", "excel"]):
+        return (
+            "📥 **Exportar Dados:**\n\n"
+            "Para exportar seus dados:\n"
+            "1. Acesse 'Relatórios' no menu\n"
+            "2. Configure os filtros desejados\n"
+            "3. Clique em 'Exportar'\n\n"
+            "Formatos disponíveis:\n"
+            "• CSV (para planilhas)\n"
+            "• JSON (para backup)\n\n"
+            "Você pode exportar transações, relatórios e análises!"
+        ), ["Ver relatórios", "Ver transações"]
+    
+    # Importação
+    if any(word in lower_msg for word in ["importar", "upload", "enviar arquivo", "csv import"]):
+        return (
+            "📤 **Importar Dados:**\n\n"
+            "Para importar transações de um arquivo CSV:\n"
+            "1. Acesse 'Importar' no menu\n"
+            "2. Selecione seu arquivo CSV\n"
+            "3. Configure o mapeamento das colunas\n"
+            "4. Clique em 'Importar'\n\n"
+            "O sistema detecta automaticamente:\n"
+            "• Categorias\n"
+            "• Contas\n"
+            "• Tipos de transação\n\n"
+            "Suporta formatos de bancos brasileiros!"
+        ), ["Ver importar", "Ver transações"]
+    
     # Ajuda geral
-    if any(word in lower_msg for word in ["ajuda", "help", "como usar", "funcionalidades"]):
+    if any(word in lower_msg for word in ["ajuda", "help", "como usar", "funcionalidades", "comandos"]):
         return (
             "🤖 **Como posso ajudar:**\n\n"
             "Posso responder sobre:\n"
-            "• Saldo e contas\n"
-            "• Transações recentes\n"
-            "• Categorias\n"
-            "• Resumo financeiro\n"
-            "• Cartões de crédito\n"
-            "• Planejamento\n"
-            "• Relatórios\n\n"
+            "• 💰 Saldo e contas\n"
+            "• 📝 Transações recentes\n"
+            "• 🏷️ Categorias\n"
+            "• 📊 Resumo financeiro\n"
+            "• 💳 Cartões de crédito\n"
+            "• 📅 Planejamento\n"
+            "• 📈 Relatórios\n"
+            "• ➕ Adicionar transações\n"
+            "• 📥 Exportar dados\n"
+            "• 📤 Importar dados\n\n"
             "Basta me perguntar! 😊"
-        ), ["Ver saldo", "Ver transações", "Ver dashboard"]
+        ), ["Ver saldo", "Ver transações", "Ver dashboard", "Ajuda"]
     
     # App mobile
     if any(word in lower_msg for word in ["app", "mobile", "celular", "android", "ios"]):
