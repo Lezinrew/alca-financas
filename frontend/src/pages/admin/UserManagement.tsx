@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
-import Layout from '../../components/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -75,7 +74,7 @@ const UserManagement: React.FC = () => {
     };
 
     return (
-        <Layout title="Gerenciar Usuários">
+        <div className="p-6">
             <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="relative w-full md:w-96">
                     <input

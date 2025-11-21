@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { adminAPI, formatCurrency } from '../../utils/api';
-import Layout from '../../components/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -45,16 +44,14 @@ const AdminDashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <Layout title="Admin Dashboard">
-                <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-            </Layout>
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
         );
     }
 
     return (
-        <Layout title="Admin Dashboard">
+        <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 {/* Card Usuários */}
                 <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -159,7 +156,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </Layout>
+        </div>
     );
 };
 
