@@ -22,6 +22,7 @@ import CreditCards from './components/credit-cards/CreditCards';
 import CreditCardDetail from './components/credit-cards/CreditCardDetail';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
+import { ChatWidget } from './components/chat/ChatWidget';
 
 // Type definitions
 interface RouteWrapperProps {
@@ -133,6 +134,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <div className="App">
           <AppRoutes />
+          <ChatWidget />
         </div>
       </AuthProvider>
     </ThemeProvider>
