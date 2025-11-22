@@ -220,13 +220,14 @@ loglevel = "info"
     print_step("Configurando serviço systemd...")
     service_config = f"""[Unit]
 Description=Alca Financas Backend API
-After=network.target
+After=network.target mongod.service
 
 [Service]
 User={SERVER_USER}
 Group={SERVER_USER}
 WorkingDirectory={PROJECT_DIR}/backend
 Environment="PATH={PROJECT_DIR}/backend/venv/bin"
+EnvironmentFile={PROJECT_DIR}/backend/.env
 ExecStart={PROJECT_DIR}/backend/venv/bin/gunicorn -c gunicorn_config.py app:app
 Restart=always
 RestartSec=10
