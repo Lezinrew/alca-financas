@@ -9,20 +9,24 @@ import Register from './components/auth/Register';
 
 // Componentes Principais
 import AppShell from './components/layout/AppShell';
-import Dashboard from './components/dashboard/Dashboard';
-import Transactions from './components/transactions/Transactions';
-import Categories from './components/categories/Categories';
-import Settings from './components/settings/Settings';
-import Profile from './components/profile/Profile';
-import Import from './components/import/Import';
-import Reports from './components/reports/Reports';
-import Accounts from './components/accounts/Accounts';
-import Planning from './components/planning/Planning';
-import CreditCards from './components/credit-cards/CreditCards';
-import CreditCardDetail from './components/credit-cards/CreditCardDetail';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import UserManagement from './pages/admin/UserManagement';
 import { ChatWidget } from './components/chat/ChatWidget';
+
+// Lazy loading para melhor performance
+import { lazy, Suspense } from 'react';
+
+const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
+const Transactions = lazy(() => import('./components/transactions/Transactions'));
+const Categories = lazy(() => import('./components/categories/Categories'));
+const Settings = lazy(() => import('./components/settings/Settings'));
+const Profile = lazy(() => import('./components/profile/Profile'));
+const Import = lazy(() => import('./components/import/Import'));
+const Reports = lazy(() => import('./components/reports/Reports'));
+const Accounts = lazy(() => import('./components/accounts/Accounts'));
+const Planning = lazy(() => import('./components/planning/Planning'));
+const CreditCards = lazy(() => import('./components/credit-cards/CreditCards'));
+const CreditCardDetail = lazy(() => import('./components/credit-cards/CreditCardDetail'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
 
 // Type definitions
 interface RouteWrapperProps {
