@@ -33,14 +33,28 @@ const Accounts: React.FC = () => {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Muitas requisições. Aguarde alguns instantes e tente novamente.');
+        }
         throw new Error('Erro ao carregar contas');
       }
 
       const data = await response.json();
       setAccounts(data);
-    } catch (err) {
-      setError('Erro ao carregar contas');
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Erro ao carregar contas';
+      setError(errorMessage);
       console.error('Load accounts error:', err);
+      
+      // Se for rate limit, não mostra erro crítico, apenas aviso
+      if (errorMessage.includes('Muitas requisições')) {
+        // Tenta novamente após 5 segundos
+        setTimeout(() => {
+          if (isAuthenticated && !authLoading) {
+            loadAccounts();
+          }
+        }, 5000);
+      }
     } finally {
       setLoading(false);
     }
@@ -82,10 +96,16 @@ const Accounts: React.FC = () => {
 
   const handleFormSubmit = async (formData: AccountPayload) => {
     try {
+      console.log('Accounts: handleFormSubmit chamado com dados:', formData);
+
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
       const url = editingAccount
         ? `${API_URL}/api/accounts/${editingAccount.id}`
         : `${API_URL}/api/accounts`;
+
+      console.log('Accounts: Enviando requisição para:', url);
+      console.log('Accounts: Método:', editingAccount ? 'PUT' : 'POST');
+      console.log('Accounts: Dados:', JSON.stringify(formData));
 
       const response = await fetch(url, {
         method: editingAccount ? 'PUT' : 'POST',
@@ -96,15 +116,29 @@ const Accounts: React.FC = () => {
         body: JSON.stringify(formData)
       });
 
+      console.log('Accounts: Resposta recebida - Status:', response.status);
+      console.log('Accounts: Resposta recebida - OK:', response.ok);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar conta');
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('Accounts: Erro do servidor:', errorData);
+        } catch (e) {
+          errorData = { error: `Erro HTTP ${response.status}: ${response.statusText}` };
+        }
+        throw new Error(errorData.error || errorData.message || 'Erro ao salvar conta');
       }
+
+      const responseData = await response.json();
+      console.log('Accounts: Conta criada/editada com sucesso:', responseData);
 
       setShowForm(false);
       setEditingAccount(null);
       await loadAccounts();
     } catch (err: any) {
+      console.error('Accounts: Erro ao salvar conta:', err);
+      console.error('Accounts: Erro message:', err?.message);
       throw err;
     }
   };
@@ -121,11 +155,13 @@ const Accounts: React.FC = () => {
     );
   }
 
-  const activeAccounts = accounts.filter(acc => acc.is_active);
+  // Filtra apenas contas ativas e exclui cartões de crédito (que ficam na página de cartões)
+  const activeAccounts = accounts.filter(acc => acc.is_active && acc.type !== 'credit_card');
+  // Calcula saldo total apenas de contas (excluindo cartões de crédito)
   const totalBalance = activeAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
+  // Usa o saldo previsto calculado pelo backend para cada conta
   const projectedBalance = activeAccounts.reduce((sum, acc) => {
-    // Saldo previsto = saldo atual (por enquanto, pode ser melhorado com transações futuras)
-    return sum + (acc.current_balance || 0);
+    return sum + ((acc.projected_balance ?? acc.current_balance) || 0);
   }, 0);
 
   return (
@@ -187,29 +223,40 @@ const Accounts: React.FC = () => {
           {/* Saldo Atual */}
           <div className="card-base p-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">Saldo atual</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">Saldo atual</p>
+                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Saldo atual considerando apenas transações pagas"></i>
+              </div>
               <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
                 <i className="bi bi-currency-dollar text-blue-600 dark:text-blue-400 text-sm"></i>
               </div>
             </div>
             <p className="text-xl font-bold text-slate-900 dark:text-white mb-1">{formatCurrency(totalBalance)}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Valor total em contas ativas
+              Valor total em contas ativas (apenas transações pagas)
             </p>
           </div>
 
           {/* Saldo Previsto */}
           <div className="card-base p-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">Saldo previsto</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">Saldo previsto</p>
+                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Projeção incluindo transações pendentes e futuras"></i>
+              </div>
               <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
                 <i className="bi bi-currency-dollar text-purple-600 dark:text-purple-400 text-sm"></i>
               </div>
             </div>
             <p className="text-xl font-bold text-slate-900 dark:text-white mb-1">{formatCurrency(projectedBalance)}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Projeção do saldo futuro
+              Projeção incluindo transações pendentes e futuras
             </p>
+            {projectedBalance !== totalBalance && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                {projectedBalance > totalBalance ? '↑' : '↓'} {formatCurrency(Math.abs(projectedBalance - totalBalance))} de diferença
+              </p>
+            )}
           </div>
         </div>
       </div>

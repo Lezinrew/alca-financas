@@ -78,8 +78,19 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
     }
   };
 
+  const isCreditCard = account.type === 'credit_card';
+  
+  // Para cartões de crédito: usa initial_balance como limite total, current_balance como gasto
+  // Para outras contas: usa current_balance e projected_balance normalmente
   const currentBalance = account.current_balance ?? 0;
-  const projectedBalance = currentBalance;
+  const projectedBalance = account.projected_balance ?? currentBalance;
+  
+  // Para cartões de crédito
+  const creditLimit = account.limit ?? account.initial_balance ?? 0; // Limite total
+  // current_balance em cartões de crédito pode ser negativo (gasto) ou positivo
+  // Vamos sempre calcular o gasto como valor absoluto
+  const creditUsed = Math.abs(currentBalance); // Valor gasto (sempre positivo)
+  const creditAvailable = creditLimit - creditUsed; // Limite disponível
 
   const handleAddExpense = () => {
     if (!account.id) return;
@@ -185,34 +196,79 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
         </div>
       </div>
 
-      {/* Saldos */}
+      {/* Saldos ou Limites (dependendo do tipo de conta) */}
       <div className="space-y-3 mb-4">
-        {/* Saldo Atual */}
-        <div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Saldo atual</p>
-          <p className={`text-xl font-bold ${
-            currentBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-            currentBalance < 0 ? 'text-red-600 dark:text-red-400' :
-            'text-slate-600 dark:text-slate-400'
-          }`}>
-            {formatCurrency(currentBalance)}
-          </p>
-        </div>
+        {isCreditCard ? (
+          <>
+            {/* Limite Total */}
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Limite total</p>
+                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Limite total do cartão de crédito"></i>
+              </div>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {formatCurrency(creditLimit)}
+              </p>
+            </div>
 
-        {/* Saldo Previsto */}
-        <div>
-          <div className="flex items-center gap-1 mb-1">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Saldo previsto</p>
-            <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Projeção do saldo futuro"></i>
-          </div>
-          <p className={`text-lg font-semibold ${
-            projectedBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-            projectedBalance < 0 ? 'text-red-600 dark:text-red-400' :
-            'text-slate-600 dark:text-slate-400'
-          }`}>
-            {formatCurrency(projectedBalance)}
-          </p>
-        </div>
+            {/* Limite Disponível */}
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Limite disponível</p>
+                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Limite disponível para uso (limite total - gasto atual)"></i>
+              </div>
+              <p className={`text-lg font-semibold ${
+                creditAvailable > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+                creditAvailable < 0 ? 'text-red-600 dark:text-red-400' :
+                'text-slate-600 dark:text-slate-400'
+              }`}>
+                {formatCurrency(creditAvailable)}
+              </p>
+              {creditUsed > 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Gasto: {formatCurrency(creditUsed)} de {formatCurrency(creditLimit)}
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Saldo Atual */}
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Saldo atual</p>
+                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Saldo atual considerando apenas transações pagas"></i>
+              </div>
+              <p className={`text-xl font-bold ${
+                currentBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+                currentBalance < 0 ? 'text-red-600 dark:text-red-400' :
+                'text-slate-600 dark:text-slate-400'
+              }`}>
+                {formatCurrency(currentBalance)}
+              </p>
+            </div>
+
+            {/* Saldo Previsto */}
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Saldo previsto</p>
+                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Projeção incluindo transações pendentes e futuras"></i>
+              </div>
+              <p className={`text-lg font-semibold ${
+                projectedBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+                projectedBalance < 0 ? 'text-red-600 dark:text-red-400' :
+                'text-slate-600 dark:text-slate-400'
+              }`}>
+                {formatCurrency(projectedBalance)}
+              </p>
+              {projectedBalance !== currentBalance && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  {projectedBalance > currentBalance ? '↑' : '↓'} {formatCurrency(Math.abs(projectedBalance - currentBalance))} de diferença
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Botão Adicionar Despesa */}

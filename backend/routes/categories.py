@@ -19,11 +19,37 @@ def categories():
         return jsonify(service.list_categories(request.user_id))
     
     try:
-        data = request.get_json()
+        # Debug: verifica Content-Type
+        content_type = request.content_type
+        print(f"DEBUG: Content-Type recebido: {content_type}")
+        
+        data = request.get_json(force=True)  # force=True para tentar parsear mesmo sem Content-Type correto
+        print(f"DEBUG: Dados recebidos: {data}")
+        print(f"DEBUG: Tipo dos dados: {type(data)}")
+        
+        if not data:
+            # Tenta pegar dados do form se JSON não funcionou
+            if request.form:
+                data = dict(request.form)
+                print(f"DEBUG: Dados do form: {data}")
+            else:
+                return jsonify({'error': 'Dados não fornecidos. Certifique-se de enviar JSON válido.'}), 400
+        
+        # Validação básica antes de chamar o serviço
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Dados devem ser um objeto JSON'}), 400
+        
+        print(f"DEBUG: Chamando create_category com user_id={request.user_id}, data={data}")
         category = service.create_category(request.user_id, data)
         return jsonify(category), 201
     except ValidationException as e:
+        print(f"DEBUG: ValidationException: {e.to_dict()}")
         return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        import traceback
+        print(f"DEBUG: Exception: {str(e)}")
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return jsonify({'error': f'Erro ao criar categoria: {str(e)}'}), 500
 
 @bp.route('/<category_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth

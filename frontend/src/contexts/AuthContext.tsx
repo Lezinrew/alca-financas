@@ -99,7 +99,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (credentials: { email: string; password: string }) => {
     try {
+      console.log('AuthContext: Fazendo login:', { ...credentials, password: '***' });
       const response = await authAPI.login(credentials);
+      console.log('AuthContext: Resposta do login:', response.data);
+
       const { access_token, refresh_token, user: userData } = response.data;
 
       // Salva dados no localStorage
@@ -113,17 +116,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsAuthenticated(true);
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
+      console.error('AuthContext: Erro no login:', error);
+      console.error('AuthContext: Response:', error?.response);
+      console.error('AuthContext: Response data:', error?.response?.data);
+
+      const errorMessage = error?.response?.data?.error || error?.message || 'Erro no login';
       return {
         success: false,
-        message: (error as any).response?.data?.error || 'Erro no login'
+        message: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
       };
     }
   };
 
   const register = async (userData: { name: string; email: string; password: string }) => {
     try {
+      console.log('AuthContext: Registrando usuário:', { ...userData, password: '***' });
       const response = await authAPI.register(userData);
+      console.log('AuthContext: Resposta do registro:', response.data);
+
       const { access_token, refresh_token, user: newUser } = response.data;
 
       // Salva dados no localStorage
@@ -137,10 +148,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsAuthenticated(true);
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
+      console.error('AuthContext: Erro no registro:', error);
+      console.error('AuthContext: Response:', error?.response);
+      console.error('AuthContext: Response data:', error?.response?.data);
+
+      const errorMessage = error?.response?.data?.error || error?.message || 'Erro no cadastro';
       return {
         success: false,
-        message: (error as any).response?.data?.error || 'Erro no cadastro'
+        message: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
       };
     }
   };

@@ -309,7 +309,8 @@ def find_or_create_account(
         return best_match['_id'], False
     
     # Se não encontrou, cria nova conta
-    from services.account_service import create_account
+    from repositories.account_repository import AccountRepository
+    from services.account_service import AccountService
     
     # Gera nome da conta
     account_name = f"{institution}"
@@ -324,7 +325,7 @@ def find_or_create_account(
         'savings': {'color': '#10B981', 'icon': 'piggy-bank'},
         'credit_card': {'color': '#8B5CF6', 'icon': 'credit-card'},
         'wallet': {'color': '#6366F1', 'icon': 'wallet2'},
-        'investment': {'color': '#F59E0B', 'icon': 'graph-up'}
+        'investment': {'color': '#F59E0B', 'icon': 'graph-up-arrow'}
     }
     
     config = type_config.get(account_type, type_config['wallet'])
@@ -346,8 +347,16 @@ def find_or_create_account(
         account_data['due_day'] = 15  # Padrão
     
     try:
-        new_account = create_account(accounts_collection, user_id, account_data)
-        return new_account['id'], True
+        import uuid
+        from repositories.account_repository import AccountRepository
+        from services.account_service import AccountService
+        
+        account_repo = AccountRepository(accounts_collection)
+        # Cria service com transactions_collection como None (não é necessário para criar conta)
+        account_service = AccountService(account_repo, None)
+        new_account = account_service.create_account(user_id, account_data)
+        return new_account.get('id'), True
     except Exception as e:
+        # Se falhar ao criar, retorna None mas não quebra a importação
         return None, False
 

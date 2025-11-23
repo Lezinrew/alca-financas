@@ -140,6 +140,7 @@ interface ReportOverviewParams {
   month: string;
   year: string;
   type: string;
+  account_id?: string;
 }
 
 // Funções de transações
@@ -147,7 +148,11 @@ export const transactionsAPI = {
   getAll: (filters: Record<string, any> = {}) => {
     const params = new URLSearchParams();
     Object.keys(filters).forEach(key => {
-      if (filters[key]) params.append(key, filters[key]);
+      // Só adiciona parâmetros que têm valor (não vazio, não null, não undefined)
+      const value = filters[key];
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, String(value));
+      }
     });
     return api.get(`/transactions?${params.toString()}`);
   },
@@ -171,7 +176,13 @@ export const transactionsAPI = {
 // Funções de relatórios
 export const reportsAPI = {
   getOverview: (params: ReportOverviewParams) => {
-    const searchParams = new URLSearchParams(Object.entries(params));
+    const searchParams = new URLSearchParams();
+    // Só adiciona parâmetros que têm valor
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        searchParams.append(key, String(value));
+      }
+    });
     return api.get<ReportOverviewResponse>(`/reports/overview?${searchParams.toString()}`);
   },
 };

@@ -105,10 +105,14 @@ def monthly_evolution(transactions_collection, user_id: str, months_back: int):
     return evolution_data
 
 
-def overview_report(transactions_collection, categories_collection, accounts_collection, user_id: str, month: int, year: int, report_type: str) -> Dict[str, Any]:
+def overview_report(transactions_collection, categories_collection, accounts_collection, user_id: str, month: int, year: int, report_type: str, account_id: str = None) -> Dict[str, Any]:
     start_date = datetime(year, month, 1)
     end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     period_filter = {'user_id': user_id, 'date': {'$gte': start_date, '$lt': end_date}}
+    
+    # Adiciona filtro por conta se fornecido
+    if account_id:
+        period_filter['account_id'] = account_id
 
     result: Dict[str, Any] = {
         'period': {
@@ -129,19 +133,19 @@ def overview_report(transactions_collection, categories_collection, accounts_col
         total_amount = 0.0
         categories_data: List[Dict[str, Any]] = []
         for item in transactions_collection.aggregate(pipeline):
-            category = categories_collection.find_one({'_id': item['_id']})
+            category = categories_collection.find_one({'_id': item['_id']}) if item.get('_id') else None
             if category:
-                total_amount += item['total']
+                total_amount += item.get('total', 0)
                 categories_data.append({
-                    'category_id': item['_id'],
-                    'category_name': category['name'],
-                    'category_color': category['color'],
-                    'category_icon': category['icon'],
-                    'total': item['total'],
-                    'count': item['count']
+                    'category_id': item.get('_id'),
+                    'category_name': category.get('name', 'Sem categoria'),
+                    'category_color': category.get('color', '#6b7280'),
+                    'category_icon': category.get('icon', 'circle'),
+                    'total': item.get('total', 0),
+                    'count': item.get('count', 0)
                 })
         for item in categories_data:
-            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+            item['percentage'] = (item.get('total', 0) / total_amount * 100) if total_amount > 0 else 0
         result['data'] = categories_data
         result['total_amount'] = total_amount
 
@@ -154,19 +158,19 @@ def overview_report(transactions_collection, categories_collection, accounts_col
         total_amount = 0.0
         categories_data: List[Dict[str, Any]] = []
         for item in transactions_collection.aggregate(pipeline):
-            category = categories_collection.find_one({'_id': item['_id']})
+            category = categories_collection.find_one({'_id': item['_id']}) if item.get('_id') else None
             if category:
-                total_amount += item['total']
+                total_amount += item.get('total', 0)
                 categories_data.append({
-                    'category_id': item['_id'],
-                    'category_name': category['name'],
-                    'category_color': category['color'],
-                    'category_icon': category['icon'],
-                    'total': item['total'],
-                    'count': item['count']
+                    'category_id': item.get('_id'),
+                    'category_name': category.get('name', 'Sem categoria'),
+                    'category_color': category.get('color', '#6b7280'),
+                    'category_icon': category.get('icon', 'circle'),
+                    'total': item.get('total', 0),
+                    'count': item.get('count', 0)
                 })
         for item in categories_data:
-            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+            item['percentage'] = (item.get('total', 0) / total_amount * 100) if total_amount > 0 else 0
         result['data'] = categories_data
         result['total_amount'] = total_amount
 
@@ -180,7 +184,8 @@ def overview_report(transactions_collection, categories_collection, accounts_col
         accounts_data: List[Dict[str, Any]] = []
         for item in transactions_collection.aggregate(pipeline):
             account = accounts_collection.find_one({'_id': item['_id']}) if item['_id'] else None
-            account_name = account['name'] if account else 'Conta Padrão'
+            # Se não encontrar a conta, indica que são transações sem conta associada
+            account_name = account['name'] if account else 'Sem conta associada'
             account_color = account['color'] if account else '#6c757d'
             account_icon = account['icon'] if account else 'wallet2'
             total_amount += item['total']
@@ -193,7 +198,7 @@ def overview_report(transactions_collection, categories_collection, accounts_col
                 'count': item['count']
             })
         for item in accounts_data:
-            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+            item['percentage'] = (item.get('total', 0) / total_amount * 100) if total_amount > 0 else 0
         result['data'] = accounts_data
         result['total_amount'] = total_amount
 
@@ -206,21 +211,22 @@ def overview_report(transactions_collection, categories_collection, accounts_col
         total_amount = 0.0
         accounts_data: List[Dict[str, Any]] = []
         for item in transactions_collection.aggregate(pipeline):
-            account = accounts_collection.find_one({'_id': item['_id']}) if item['_id'] else None
-            account_name = account['name'] if account else 'Conta Padrão'
-            account_color = account['color'] if account else '#6c757d'
-            account_icon = account['icon'] if account else 'wallet2'
-            total_amount += item['total']
+            account = accounts_collection.find_one({'_id': item['_id']}) if item.get('_id') else None
+            # Se não encontrar a conta, indica que são transações sem conta associada
+            account_name = account.get('name', 'Sem conta associada') if account else 'Sem conta associada'
+            account_color = account.get('color', '#6c757d') if account else '#6c757d'
+            account_icon = account.get('icon', 'wallet2') if account else 'wallet2'
+            total_amount += item.get('total', 0)
             accounts_data.append({
-                'account_id': item['_id'],
+                'account_id': item.get('_id'),
                 'account_name': account_name,
                 'account_color': account_color,
                 'account_icon': account_icon,
-                'total': item['total'],
-                'count': item['count']
+                'total': item.get('total', 0),
+                'count': item.get('count', 0)
             })
         for item in accounts_data:
-            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+            item['percentage'] = (item.get('total', 0) / total_amount * 100) if total_amount > 0 else 0
         result['data'] = accounts_data
         result['total_amount'] = total_amount
 
@@ -228,23 +234,33 @@ def overview_report(transactions_collection, categories_collection, accounts_col
         accounts_list = list(accounts_collection.find({'user_id': user_id, 'is_active': True}))
         accounts_data: List[Dict[str, Any]] = []
         for account in accounts_list:
-            account_transactions = list(transactions_collection.find({'user_id': user_id, 'account_id': account['_id']}))
-            income_total = sum(t['amount'] for t in account_transactions if t['type'] == 'income')
-            expense_total = sum(t['amount'] for t in account_transactions if t['type'] == 'expense')
+            account_transactions = list(transactions_collection.find({'user_id': user_id, 'account_id': account.get('_id')}))
+            income_total = sum(t.get('amount', 0) for t in account_transactions if t.get('type') == 'income')
+            expense_total = sum(t.get('amount', 0) for t in account_transactions if t.get('type') == 'expense')
             current_balance = account.get('initial_balance', 0) + income_total - expense_total
             accounts_data.append({
-                'account_id': account['_id'],
-                'account_name': account['name'],
-                'account_color': account['color'],
-                'account_icon': account['icon'],
-                'account_type': account['type'],
+                'account_id': account.get('_id'),
+                'account_name': account.get('name', 'Sem nome'),
+                'account_color': account.get('color', '#6b7280'),
+                'account_icon': account.get('icon', 'wallet2'),
+                'account_type': account.get('type', 'wallet'),
                 'initial_balance': account.get('initial_balance', 0),
                 'current_balance': current_balance,
                 'total_income': income_total,
                 'total_expense': expense_total
             })
         result['data'] = accounts_data
-        result['total_amount'] = sum(item['current_balance'] for item in accounts_data)
+        result['total_amount'] = sum(item.get('current_balance', 0) for item in accounts_data)
+    else:
+        # Tipo de relatório não reconhecido - retorna estrutura vazia
+        result['data'] = []
+        result['total_amount'] = 0.0
+
+    # Garante que sempre há uma lista de dados, mesmo que vazia
+    if 'data' not in result:
+        result['data'] = []
+    if 'total_amount' not in result:
+        result['total_amount'] = 0.0
 
     return result
 

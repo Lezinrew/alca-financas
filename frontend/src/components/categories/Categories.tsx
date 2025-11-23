@@ -46,7 +46,14 @@ const Categories = () => {
       setLoading(true);
       setError('');
       const response = await categoriesAPI.getAll();
-      setCategories(response.data as Category[]);
+      // Garante que categories seja sempre um array
+      const categoriesData = response.data;
+      const categoriesArray = Array.isArray(categoriesData)
+        ? categoriesData
+        : (categoriesData?.data && Array.isArray(categoriesData.data))
+          ? categoriesData.data
+          : [];
+      setCategories(categoriesArray as Category[]);
     } catch (err) {
       setError('Erro ao carregar categorias');
       console.error('Load categories error:', err);

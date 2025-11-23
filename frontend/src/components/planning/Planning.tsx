@@ -33,8 +33,8 @@ const Planning: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [budget, setBudget] = useState<Budget | null>(null);
-  const [categories, setCategories] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [actualSummary, setActualSummary] = useState<ActualSummary>({
     totalIncome: 0,
     totalExpenses: 0,
@@ -64,14 +64,30 @@ const Planning: React.FC = () => {
           year: currentYear
         })
       ]);
-      setCategories(categoriesRes.data);
-      setTransactions(transactionsRes.data);
 
-      const totalIncome = transactionsRes.data
+      // Garante que categories seja sempre um array
+      const categoriesData = categoriesRes?.data;
+      const categoriesArray = Array.isArray(categoriesData)
+        ? categoriesData
+        : (categoriesData?.data && Array.isArray(categoriesData.data))
+          ? categoriesData.data
+          : [];
+      setCategories(categoriesArray);
+
+      // Garante que transactions seja sempre um array
+      const transactionsData = transactionsRes?.data;
+      const transactionsArray = Array.isArray(transactionsData)
+        ? transactionsData
+        : (transactionsData?.data && Array.isArray(transactionsData.data))
+          ? transactionsData.data
+          : [];
+      setTransactions(transactionsArray);
+
+      const totalIncome = transactionsArray
         .filter((tx: any) => tx.type === 'income')
         .reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
 
-      const totalExpenses = transactionsRes.data
+      const totalExpenses = transactionsArray
         .filter((tx: any) => tx.type === 'expense')
         .reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
 
@@ -93,9 +109,13 @@ const Planning: React.FC = () => {
       } else {
         setBudget(null);
       }
-    } catch (err) {
-      setError('Erro ao carregar dados');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Erro ao carregar dados';
+      setError(errorMessage);
       console.error('Load planning error:', err);
+      // Garante que os estados sejam arrays vazios em caso de erro
+      setCategories([]);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -109,7 +129,7 @@ const Planning: React.FC = () => {
     const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
     const prevBudget = localStorage.getItem(`budget_${prevYear}_${prevMonth}`);
-    
+
     if (prevBudget) {
       const budgetData = JSON.parse(prevBudget);
       budgetData.month = currentMonth;
@@ -252,7 +272,7 @@ const Planning: React.FC = () => {
                     <i className="bi bi-graph-up-arrow text-6xl text-purple-600 dark:text-purple-400"></i>
                   </div>
                 </div>
-                
+
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
                   Nenhum orçamento definido para este mês.
                 </h3>
@@ -343,7 +363,7 @@ const Planning: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                       {categories
-                        .filter((cat: any) => 
+                        .filter((cat: any) =>
                           budget.category_budgets?.some(cb => cb.category_id === String(cat.id))
                         )
                         .map((category: any) => {
@@ -369,11 +389,11 @@ const Planning: React.FC = () => {
                           );
                           const totalSpent = paidAmount + pendingAmount;
                           const remaining = (categoryBudget?.amount || 0) - totalSpent;
-                          const paidPercentage = categoryBudget?.amount 
-                            ? (paidAmount / categoryBudget.amount) * 100 
+                          const paidPercentage = categoryBudget?.amount
+                            ? (paidAmount / categoryBudget.amount) * 100
                             : 0;
-                          const pendingPercentage = categoryBudget?.amount 
-                            ? (pendingAmount / categoryBudget.amount) * 100 
+                          const pendingPercentage = categoryBudget?.amount
+                            ? (pendingAmount / categoryBudget.amount) * 100
                             : 0;
 
                           return (

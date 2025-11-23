@@ -17,21 +17,28 @@ class CategoryService:
         return categories
 
     def create_category(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        if not data.get('name') or not data.get('type'):
-            raise ValidationException('Nome e tipo da categoria são obrigatórios')
+        # Validação mais robusta
+        name = data.get('name', '').strip() if data.get('name') else ''
+        category_type = data.get('type', '').strip() if data.get('type') else ''
         
-        if data['type'] not in ['income', 'expense']:
+        if not name:
+            raise ValidationException('Nome da categoria é obrigatório')
+        
+        if not category_type:
+            raise ValidationException('Tipo da categoria é obrigatório')
+        
+        if category_type not in ['income', 'expense']:
             raise ValidationException('Tipo deve ser income ou expense')
 
-        existing = self.category_repo.find_by_name_and_type(user_id, data['name'], data['type'])
+        existing = self.category_repo.find_by_name_and_type(user_id, name, category_type)
         if existing:
-            raise ValidationException(f'Categoria "{data["name"]}" já existe para este tipo')
+            raise ValidationException(f'Categoria "{name}" já existe para este tipo')
 
         category_data = {
             '_id': str(uuid.uuid4()),
             'user_id': user_id,
-            'name': data['name'],
-            'type': data['type'],
+            'name': name,
+            'type': category_type,
             'color': data.get('color', '#6366f1'),
             'icon': data.get('icon', 'circle'),
             'description': data.get('description', '')

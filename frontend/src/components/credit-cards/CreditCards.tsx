@@ -26,12 +26,29 @@ const CreditCards: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
   const [activeTab, setActiveTab] = useState<'open' | 'closed'>('open');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
       loadCards();
     }
   }, [isAuthenticated, authLoading]);
+
+  // Fecha menu ao clicar fora
+  useEffect(() => {
+    if (openMenuId) {
+      const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.card-menu')) {
+          setOpenMenuId(null);
+        }
+      };
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [openMenuId]);
 
   const loadCards = async () => {
     try {
@@ -40,7 +57,14 @@ const CreditCards: React.FC = () => {
 
       // Carrega categorias
       const categoriesRes = await categoriesAPI.getAll();
-      setCategories(categoriesRes.data);
+      // Garante que categories seja sempre um array
+      const categoriesData = categoriesRes.data;
+      const categoriesArray = Array.isArray(categoriesData)
+        ? categoriesData
+        : (categoriesData?.data && Array.isArray(categoriesData.data))
+          ? categoriesData.data
+          : [];
+      setCategories(categoriesArray);
 
       // Carrega contas do tipo credit_card
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -55,19 +79,44 @@ const CreditCards: React.FC = () => {
         // Filtra apenas contas do tipo credit_card e converte para o formato de CreditCard
         const creditCards = accounts
           .filter((acc: any) => acc.type === 'credit_card' && acc.is_active)
-          .map((acc: any) => ({
-            id: acc.id,
-            name: acc.name,
-            limit: acc.initial_balance || 0, // Usa initial_balance como limite
-            used: (acc.initial_balance || 0) - (acc.current_balance || 0), // Calcula usado
-            closingDay: acc.closing_day || 10, // TODO: Adicionar campo no backend
-            dueDay: acc.due_day || 15, // TODO: Adicionar campo no backend
-            color: acc.color || '#6366f1',
-            icon: acc.icon || 'credit-card',
-            is_active: acc.is_active,
-            account_id: acc.account_id,
-            card_type: acc.card_type
-          }));
+          .map((acc: any) => {
+            // Limite total: usa 'limit' se disponível, senão 'initial_balance'
+            const limit = acc.limit ?? acc.initial_balance ?? 0;
+            const currentBalance = acc.current_balance ?? 0;
+            
+            // Para cartões de crédito:
+            // - Se current_balance é negativo, representa gasto (ex: -1252.13 = gasto de R$ 1.252,13)
+            // - Se current_balance é positivo, também representa gasto (dependendo da implementação)
+            // O valor usado é sempre o valor absoluto
+            const used = Math.abs(currentBalance);
+            
+            // Limite disponível = limite total - valor usado
+            const available = limit - used;
+            
+            // Debug log para verificar valores
+            console.log(`Cartão ${acc.name}:`, {
+              limit,
+              currentBalance,
+              used,
+              available,
+              initial_balance: acc.initial_balance
+            });
+            
+            return {
+              id: acc.id,
+              name: acc.name,
+              limit: limit, // Limite total
+              used: used, // Valor gasto (sempre positivo)
+              available: available, // Limite disponível (pode ser negativo)
+              closingDay: acc.closing_day || 10,
+              dueDay: acc.due_day || 15,
+              color: acc.color || '#6366f1',
+              icon: acc.icon || 'credit-card',
+              is_active: acc.is_active,
+              account_id: acc.account_id,
+              card_type: acc.card_type
+            };
+          });
         setCards(creditCards);
       }
     } catch (err) {
@@ -108,13 +157,15 @@ const CreditCards: React.FC = () => {
       const accountData = {
         name: cardData.name,
         type: 'credit_card',
-        initial_balance: cardData.limit,
-        current_balance: cardData.limit, // Inicia com o limite disponível
+        initial_balance: cardData.limit, // Limite total do cartão
+        current_balance: 0, // Cartões começam com saldo 0 (sem gastos)
         color: cardData.color,
         icon: cardData.icon,
         is_active: cardData.is_active,
-        closing_day: cardData.closingDay, // TODO: Backend precisa suportar
-        due_day: cardData.dueDay // TODO: Backend precisa suportar
+        closing_day: cardData.closingDay,
+        due_day: cardData.dueDay,
+        card_type: cardData.card_type,
+        account_id: cardData.account_id
       };
 
       const response = await fetch(url, {
@@ -145,8 +196,14 @@ const CreditCards: React.FC = () => {
   };
 
   const calculateAvailable = (card: CreditCard) => {
+    // Se o card já tem 'available' calculado, usa ele
+    if (card.available !== undefined) {
+      return card.available;
+    }
+    // Caso contrário, calcula: limite total - valor usado
     const used = card.used ?? 0;
-    return card.limit - used;
+    const limit = card.limit ?? 0;
+    return limit - used;
   };
 
   const calculateUsedPercentage = (card: CreditCard) => {
@@ -216,21 +273,19 @@ const CreditCards: React.FC = () => {
         <div className="flex border-b border-slate-200 dark:border-slate-700/50">
           <button
             onClick={() => setActiveTab('open')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'open'
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'open'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             Faturas abertas
           </button>
           <button
             onClick={() => setActiveTab('closed')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'closed'
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'closed'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             Faturas fechadas
           </button>
@@ -279,12 +334,14 @@ const CreditCards: React.FC = () => {
             return (
               <div
                 key={card.id}
-                className="card-base p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => handleCardClick(card)}
+                className="card-base p-6 hover:shadow-lg transition-shadow"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                  <div 
+                    className="flex items-center gap-3 flex-1 cursor-pointer"
+                    onClick={() => handleCardClick(card)}
+                  >
                     <div
                       className="w-12 h-12 rounded-xl flex items-center justify-center"
                       style={{ backgroundColor: card.color }}
@@ -298,9 +355,44 @@ const CreditCards: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                    <i className="bi bi-three-dots-vertical text-slate-600 dark:text-slate-400"></i>
-                  </button>
+                  <div className="relative card-menu">
+                    <button 
+                      className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === card.id ? null : card.id);
+                      }}
+                    >
+                      <i className="bi bi-three-dots-vertical text-slate-600 dark:text-slate-400"></i>
+                    </button>
+                    {openMenuId === card.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(null);
+                            setEditingCard(card);
+                            setShowCardForm(true);
+                          }}
+                        >
+                          <i className="bi bi-pencil text-blue-600 dark:text-blue-400"></i>
+                          <span>Editar</span>
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(null);
+                            handleCardClick(card);
+                          }}
+                        >
+                          <i className="bi bi-list-ul text-blue-600 dark:text-blue-400"></i>
+                          <span>Ver despesas</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Days Until Closing */}
@@ -312,10 +404,17 @@ const CreditCards: React.FC = () => {
                 </div>
 
                 {/* Limit Info */}
-                <div className="space-y-4">
+                <div 
+                  className="space-y-4 cursor-pointer"
+                  onClick={() => handleCardClick(card)}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-600 dark:text-slate-400">Limite Disponível</span>
-                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className={`text-lg font-bold ${
+                      available >= 0 
+                        ? 'text-emerald-600 dark:text-emerald-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
                       {formatCurrency(available)}
                     </span>
                   </div>
@@ -335,15 +434,18 @@ const CreditCards: React.FC = () => {
                 </div>
 
                 {/* Footer */}
-                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                <div 
+                  className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50 cursor-pointer"
+                  onClick={() => handleCardClick(card)}
+                >
                   <div className="flex items-center justify-between text-sm">
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Usado: </span>
                       <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(card.used ?? 0)}</span>
                     </div>
-                    <button className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-                      Ver detalhes
-                    </button>
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">
+                      Ver detalhes →
+                    </span>
                   </div>
                 </div>
               </div>

@@ -139,9 +139,11 @@ const ReportChart: React.FC<ReportChartProps> = ({ data, chartType }) => {
   if (!chartData) {
     return (
       <div className="flex items-center justify-center" style={{ height: '300px' }}>
-        <div className="text-center text-slate-400">
-          <i className="bi bi-pie-chart text-6xl mb-3 block"></i>
-          <p className="text-sm">Nenhum dado para exibir</p>
+        <div className="text-center text-slate-400 dark:text-slate-600">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 mb-3">
+            <i className="bi bi-pie-chart text-3xl"></i>
+          </div>
+          <p className="text-sm font-medium">Nenhum dado para exibir</p>
         </div>
       </div>
     );
@@ -169,7 +171,7 @@ const ReportChart: React.FC<ReportChartProps> = ({ data, chartType }) => {
   };
 
   return (
-    <div style={{ height: '300px', position: 'relative' }}>
+    <div style={{ height: '350px', position: 'relative' }} className="animate-in fade-in zoom-in duration-500">
       {renderChart()}
     </div>
   );

@@ -81,39 +81,66 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
 
   const handleChange = (e: InputChangeEvent) => {
     const { name, value } = e.target;
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
+
+    console.log('CategoryForm: handleChange - name:', name, 'value:', value);
+
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: value
+      };
+      console.log('CategoryForm: Novo formData:', newData);
+      return newData;
+    });
+
     setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    console.log('CategoryForm: handleSubmit chamado');
+    console.log('CategoryForm: formData atual:', formData);
+
     setLoading(true);
     setError('');
 
     try {
-      // Validações
-      if (!formData.name.trim()) {
-        throw new Error('Nome da categoria é obrigatório');
+      // Validações mais robustas
+      const trimmedName = formData.name?.trim() || '';
+      if (!trimmedName) {
+        setError('Nome da categoria é obrigatório');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.type || (formData.type !== 'income' && formData.type !== 'expense')) {
+        setError('Tipo da categoria é obrigatório');
+        setLoading(false);
+        return;
       }
 
       // Prepara dados para envio
       const submitData = {
-        name: formData.name.trim(),
+        name: trimmedName,
         type: formData.type,
-        color: formData.color,
-        icon: formData.icon
+        color: formData.color || '#6366f1',
+        icon: formData.icon || 'circle'
       };
 
+      console.log('CategoryForm: Enviando dados para API:', submitData);
       await onSubmit(submitData);
-    } catch (err) {
-      const apiError = (err as any)?.response?.data?.error;
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao salvar categoria';
-      setError(apiError || errorMessage);
+      console.log('CategoryForm: Categoria criada com sucesso');
+    } catch (err: any) {
+      console.error('CategoryForm: Erro ao enviar:', err);
+      console.error('CategoryForm: Response:', err?.response);
+      console.error('CategoryForm: Response data:', err?.response?.data);
+      console.error('CategoryForm: Response status:', err?.response?.status);
+
+      const apiError = err?.response?.data?.error || err?.response?.data?.message || err?.message;
+      const errorMessage = apiError || 'Erro ao salvar categoria';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -154,25 +181,25 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
                   </div>
                 )}
 
-              {/* Preview da Categoria */}
-              <div className="text-center mb-4">
-                <div 
-                  className="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-2"
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    backgroundColor: formData.color
-                  }}
-                >
-                  <i className={`bi bi-${formData.icon} text-white`} style={{ fontSize: '2rem' }}></i>
+                {/* Preview da Categoria */}
+                <div className="text-center mb-4">
+                  <div
+                    className="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-2"
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      backgroundColor: formData.color
+                    }}
+                  >
+                    <i className={`bi bi-${formData.icon} text-white`} style={{ fontSize: '2rem' }}></i>
+                  </div>
+                  <h5 className="mb-0">{formData.name || 'Nome da Categoria'}</h5>
+                  <small className="text-muted">
+                    {formData.type === 'income' ? t('categories.income') : t('categories.expense')}
+                  </small>
                 </div>
-                <h5 className="mb-0">{formData.name || 'Nome da Categoria'}</h5>
-                <small className="text-muted">
-                  {formData.type === 'income' ? t('categories.income') : t('categories.expense')}
-                </small>
-              </div>
 
-              <div className="row g-3">
+                <div className="row g-3">
                   {/* Nome */}
                   <div className="col-12">
                     <label htmlFor="category-name" className="form-label">{t('categories.name')}</label>

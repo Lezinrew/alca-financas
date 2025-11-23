@@ -111,7 +111,7 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      
+
       const currentDate = new Date();
       const month = currentDate.getMonth() + 1;
       const year = currentDate.getFullYear();
@@ -129,15 +129,20 @@ const Dashboard: React.FC = () => {
       const dashboardData = dashboardRes.data;
       const accounts = Array.isArray(accountsRes) ? accountsRes : [];
 
-      // Calcula saldo total das contas ativas
+      // Filtrar apenas cartões de crédito que estão explicitamente ativos (is_active === true)
+      const creditCards = accounts.filter((acc: any) => 
+        acc.type === 'credit_card' && acc.is_active === true
+      );
+
+      // Calcula saldo total das contas ativas (excluindo cartões de crédito)
       const totalBalance = accounts
-        .filter((acc: any) => acc.is_active)
+        .filter((acc: any) => acc.is_active && acc.type !== 'credit_card')
         .reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0);
 
       // Calcula variação de receitas e despesas (comparando com mês anterior)
       const currentIncome = dashboardData.summary?.total_income || 0;
       const currentExpense = dashboardData.summary?.total_expense || 0;
-      
+
       // Para calcular variação, precisaríamos dos dados do mês anterior
       // Por enquanto, deixamos como 0
       const incomeChange = 0;
@@ -168,7 +173,7 @@ const Dashboard: React.FC = () => {
         },
         {
           title: 'Cartões de Crédito',
-          value: accounts.filter((acc: any) => acc.type === 'credit_card').length,
+          value: Math.max(0, creditCards.length), // Garante que seja sempre um número não-negativo
           change: 0,
           changeType: 'increase',
           icon: 'credit-card',
@@ -214,7 +219,7 @@ const Dashboard: React.FC = () => {
     } catch (err: any) {
       console.error('Load dashboard error:', err);
       setError('Erro ao carregar dados do dashboard');
-      
+
       // Define dados vazios em caso de erro
       setFinanceData({
         kpis: [
@@ -235,13 +240,13 @@ const Dashboard: React.FC = () => {
   const handleNewTransaction = (type: 'expense' | 'income' | 'card_expense' | 'transfer') => {
     setShowNewMenu(false);
     // Navega para a página de transações com o tipo pré-selecionado
-    navigate('/transactions', { 
-      state: { 
-        openForm: true, 
+    navigate('/transactions', {
+      state: {
+        openForm: true,
         transactionType: type === 'card_expense' ? 'expense' : type === 'transfer' ? 'expense' : type,
         isCardExpense: type === 'card_expense',
         isTransfer: type === 'transfer'
-      } 
+      }
     });
   };
 
@@ -294,8 +299,8 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Botão Novo - Fixo no canto inferior direito */}
-      <div className="fixed bottom-8 right-8 z-40 new-transaction-menu">
+      {/* Botão Novo - Fixo no canto inferior direito (ajustado para não sobrepor o chatbot) */}
+      <div className="fixed bottom-24 right-8 z-40 new-transaction-menu">
         <div className="relative">
           <button
             type="button"
@@ -408,11 +413,16 @@ const Dashboard: React.FC = () => {
             onClickHandler = () => navigate('/credit-cards');
           }
 
+          // Determina se é contagem (cartões) ou valor monetário
+          const isCount = kpi.title.toLowerCase().includes('cartão') || 
+                         kpi.title.toLowerCase().includes('cartao') ||
+                         kpi.title.toLowerCase().includes('cartões');
+          
           return (
             <KPICard
               key={kpi.title}
               title={kpi.title}
-              value={kpi.title.includes('Cartão') || kpi.title.includes('Cartao') ? kpi.value.toString() : formatCurrency(kpi.value)}
+              value={isCount ? Math.floor(kpi.value).toString() : formatCurrency(kpi.value)}
               change={kpi.change}
               changeType={kpi.changeType}
               icon={iconMap[kpi.icon as keyof typeof iconMap] || Wallet}
@@ -444,52 +454,52 @@ const Dashboard: React.FC = () => {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={financeData.monthlyData}>
-                  <defs>
-                    <linearGradient id="income" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="expenses" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
-                  <XAxis 
-                    dataKey="month" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    className="dark:[&_text]:fill-slate-400"
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                    className="dark:[&_text]:fill-slate-400"
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="income"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    fill="url(#income)"
-                    name="Receitas"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="expenses"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    fill="url(#expenses)"
-                    name="Despesas"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                    <defs>
+                      <linearGradient id="income" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="expenses" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                      className="dark:[&_text]:fill-slate-400"
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                      className="dark:[&_text]:fill-slate-400"
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fill="url(#income)"
+                      name="Receitas"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      fill="url(#expenses)"
+                      name="Despesas"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         </div>
@@ -545,9 +555,9 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent Transactions */}
-            <div className="card-base p-6">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Transações Recentes</h3>
+      <div className="card-base p-6">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Transações Recentes</h3>
           <p className="text-sm text-slate-600 dark:text-slate-400">Últimas movimentações da conta</p>
         </div>
         <div>
@@ -555,9 +565,8 @@ const Dashboard: React.FC = () => {
             {financeData.recentTransactions.slice(0, 5).map((transaction) => (
               <div key={transaction.id} className="flex items-center justify-between p-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    transaction.type === 'income' ? 'bg-emerald-50' : 'bg-red-50'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${transaction.type === 'income' ? 'bg-emerald-50' : 'bg-red-50'
+                    }`}>
                     {transaction.type === 'income' ? (
                       <TrendingUp className="w-5 h-5 text-emerald-600" />
                     ) : (
@@ -571,9 +580,8 @@ const Dashboard: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className={`text-lg font-semibold ${
-                  transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
-                }`}>
+                <div className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+                  }`}>
                   {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                 </div>
               </div>

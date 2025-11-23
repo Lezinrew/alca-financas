@@ -66,7 +66,7 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
       if (response.ok) {
         const data = await response.json();
         // Filtra apenas contas que não são cartões de crédito
-        const filteredAccounts = data.filter((acc: any) => 
+        const filteredAccounts = data.filter((acc: any) =>
           acc.type !== 'credit_card' && acc.is_active
         );
         setAccounts(filteredAccounts);
@@ -83,9 +83,18 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
   // Preenche o formulário se estiver editando
   useEffect(() => {
     if (card && show) {
+      // Formata o limite com vírgula decimal
+      const formatLimit = (limit?: number): string => {
+        if (!limit && limit !== 0) return '';
+        return limit.toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+      };
+
       setFormData({
         name: card.name || '',
-        limit: card.limit?.toString() || '',
+        limit: formatLimit(card.limit),
         closingDay: card.closingDay?.toString() || '1',
         dueDay: card.dueDay?.toString() || '5',
         color: card.color || '#6366f1',
@@ -180,7 +189,7 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
       };
 
       await onSubmit(submitData);
-      
+
       // Se "Salvar e criar novo" foi clicado, reseta o formulário
       if (saveAndCreateNew) {
         setFormData({
@@ -216,52 +225,43 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="modal-backdrop"
-        onClick={handleClose}
-      ></div>
-
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="modal-content pointer-events-auto max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <form onSubmit={handleSubmit}>
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700/50">
-              <h2 className="text-xl font-semibold text-primary">
+      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }} onClick={handleClose}></div>
+      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
+        <div className="modal-dialog modal-lg" role="document" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">
                 {card ? 'Editar Cartão de Crédito' : 'Novo Cartão de Crédito'}
-              </h2>
+              </h5>
               <button
                 type="button"
+                className="btn-close"
                 onClick={handleClose}
                 disabled={loading}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
                 aria-label="Fechar"
-              >
-                <i className="bi bi-x-lg text-xl"></i>
-              </button>
+              ></button>
             </div>
 
-            {/* Body */}
-            <div className="p-6">
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
-                  <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
-                  <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
-                </div>
-              )}
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger" role="alert">
+                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                    {error}
+                  </div>
+                )}
 
-              <div className="space-y-5">
-                {/* Limite */}
-                <div>
-                  <label htmlFor="card-limit" className="block text-sm font-medium text-secondary mb-2">
-                    Limite
-                  </label>
-                  <div className="relative">
+                <div className="row g-3">
+                  {/* Limite */}
+                  <div className="col-12">
+                    <label htmlFor="card-limit" className="form-label">
+                      <i className="bi bi-currency-dollar me-2"></i>
+                      Limite
+                    </label>
                     <CurrencyInput
                       id="card-limit"
                       name="limit"
-                      className={`input-base ${limitError ? 'border-orange-500 dark:border-orange-500 focus:border-orange-500 focus:ring-orange-500' : ''}`}
+                      className={`form-control ${limitError ? 'border-warning' : ''}`}
                       value={formData.limit}
                       onValueChange={handleLimitChange}
                       required
@@ -271,23 +271,24 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
                       aria-required="true"
                     />
                     {limitError && (
-                      <p className="mt-1 text-sm text-orange-600 dark:text-orange-400">{limitError}</p>
+                      <div className="form-text text-warning">
+                        <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                        {limitError}
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* Descrição/Nome */}
-                <div>
-                  <label htmlFor="card-name" className="block text-sm font-medium text-secondary mb-2">
-                    Descrição
-                  </label>
-                  <div className="relative">
-                    <i className="bi bi-file-text absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"></i>
+                  {/* Descrição/Nome */}
+                  <div className="col-12">
+                    <label htmlFor="card-name" className="form-label">
+                      <i className="bi bi-file-text me-2"></i>
+                      Descrição
+                    </label>
                     <input
                       type="text"
                       id="card-name"
                       name="name"
-                      className="input-base pl-10"
+                      className="form-control"
                       value={formData.name}
                       onChange={handleChange}
                       required
@@ -297,19 +298,17 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
                       aria-required="true"
                     />
                   </div>
-                </div>
 
-                {/* Tipo de Cartão */}
-                <div>
-                  <label htmlFor="card-type" className="block text-sm font-medium text-secondary mb-2">
-                    Tipo de Cartão
-                  </label>
-                  <div className="relative">
-                    <i className="bi bi-credit-card absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"></i>
+                  {/* Tipo de Cartão */}
+                  <div className="col-md-6">
+                    <label htmlFor="card-type" className="form-label">
+                      <i className="bi bi-credit-card me-2"></i>
+                      Tipo de Cartão
+                    </label>
                     <select
                       id="card-type"
                       name="card_type"
-                      className="select-base pl-10"
+                      className="form-select"
                       value={formData.card_type}
                       onChange={handleChange}
                       disabled={loading}
@@ -322,19 +321,17 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
                       ))}
                     </select>
                   </div>
-                </div>
 
-                {/* Carteira/Conta */}
-                <div>
-                  <label htmlFor="card-account" className="block text-sm font-medium text-secondary mb-2">
-                    Carteira
-                  </label>
-                  <div className="relative">
-                    <i className="bi bi-building absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"></i>
+                  {/* Carteira/Conta */}
+                  <div className="col-md-6">
+                    <label htmlFor="card-account" className="form-label">
+                      <i className="bi bi-wallet2 me-2"></i>
+                      Carteira
+                    </label>
                     <select
                       id="card-account"
                       name="account_id"
-                      className="select-base pl-10"
+                      className="form-select"
                       value={formData.account_id}
                       onChange={handleChange}
                       disabled={loading || accounts.length === 0}
@@ -346,103 +343,97 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
                       ) : (
                         accounts.map(account => (
                           <option key={account.id} value={account.id}>
-                            {account.icon && <i className={`bi bi-${account.icon}`}></i>} {account.name}
+                            {account.name}
                           </option>
                         ))
                       )}
                     </select>
                   </div>
-                </div>
 
-                {/* Dia de Fechamento e Vencimento */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="card-closing-day" className="block text-sm font-medium text-secondary mb-2">
+                  {/* Dia de Fechamento e Vencimento */}
+                  <div className="col-md-6">
+                    <label htmlFor="card-closing-day" className="form-label">
+                      <i className="bi bi-calendar me-2"></i>
                       Dia de fechamento
                     </label>
-                    <div className="relative">
-                      <i className="bi bi-calendar absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"></i>
-                      <select
-                        id="card-closing-day"
-                        name="closingDay"
-                        className="select-base pl-10"
-                        value={formData.closingDay}
-                        onChange={handleChange}
-                        required
-                        disabled={loading}
-                        aria-required="true"
-                      >
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                          <option key={day} value={day.toString()}>{day}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <select
+                      id="card-closing-day"
+                      name="closingDay"
+                      className="form-select"
+                      value={formData.closingDay}
+                      onChange={handleChange}
+                      required
+                      disabled={loading}
+                      aria-required="true"
+                    >
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                        <option key={day} value={day.toString()}>{day}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div>
-                    <label htmlFor="card-due-day" className="block text-sm font-medium text-secondary mb-2">
+                  <div className="col-md-6">
+                    <label htmlFor="card-due-day" className="form-label">
+                      <i className="bi bi-calendar-check me-2"></i>
                       Dia do vencimento
                     </label>
-                    <div className="relative">
-                      <i className="bi bi-calendar absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"></i>
-                      <select
-                        id="card-due-day"
-                        name="dueDay"
-                        className="select-base pl-10"
-                        value={formData.dueDay}
-                        onChange={handleChange}
-                        required
-                        disabled={loading}
-                        aria-required="true"
-                      >
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                          <option key={day} value={day.toString()}>{day}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <select
+                      id="card-due-day"
+                      name="dueDay"
+                      className="form-select"
+                      value={formData.dueDay}
+                      onChange={handleChange}
+                      required
+                      disabled={loading}
+                      aria-required="true"
+                    >
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                        <option key={day} value={day.toString()}>{day}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700/50">
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={loading}
-                className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
-              >
-                <i className="bi bi-x-lg text-xl"></i>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSaveAndCreateNew(true);
-                  handleSubmit();
-                }}
-                disabled={loading || !!limitError}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                SALVAR E CRIAR NOVO
-              </button>
-              <button
-                type="submit"
-                disabled={loading || !!limitError}
-                onClick={() => setSaveAndCreateNew(false)}
-                className="px-4 py-2 bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-100 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <>
-                    <i className="bi bi-hourglass-split animate-spin mr-2"></i>
-                    Salvando...
-                  </>
-                ) : (
-                  'SALVAR'
-                )}
-              </button>
-            </div>
-          </form>
+              {/* Footer */}
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleClose}
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary"
+                  onClick={() => {
+                    setSaveAndCreateNew(true);
+                    handleSubmit();
+                  }}
+                  disabled={loading || !!limitError}
+                >
+                  Salvar e Criar Novo
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading || !!limitError}
+                  onClick={() => setSaveAndCreateNew(false)}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Salvando...
+                    </>
+                  ) : (
+                    'Salvar'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </>
