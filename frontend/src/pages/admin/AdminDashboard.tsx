@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { adminAPI, formatCurrency } from '../../utils/api';
+import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 

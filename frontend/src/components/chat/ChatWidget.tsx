@@ -36,7 +36,7 @@ export const ChatWidget: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const { isAuthenticated } = useAuth();
-  
+
   const getToken = () => {
     return localStorage.getItem('auth_token');
   };
@@ -70,7 +70,7 @@ export const ChatWidget: React.FC = () => {
 
     try {
       const ws = new WebSocket(`${CHATBOT_WS_URL}?token=${token}`);
-      
+
       ws.onopen = () => {
         setIsConnected(true);
         wsRef.current = ws;
@@ -79,7 +79,7 @@ export const ChatWidget: React.FC = () => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           if (data.type === 'message') {
             const botMessage: Message = {
               id: Date.now().toString(),
@@ -117,8 +117,9 @@ export const ChatWidget: React.FC = () => {
         }
       };
 
-      ws.onerror = (error) => {
-        console.error('Erro WebSocket:', error);
+      ws.onerror = () => {
+        // Não loga erros de WebSocket repetidamente para não poluir o console
+        // Apenas marca como desconectado e usa fallback HTTP
         setIsConnected(false);
         setUseWebSocket(false); // Fallback para HTTP
       };
@@ -185,7 +186,7 @@ export const ChatWidget: React.FC = () => {
       if (!token) {
         throw new Error('Não autenticado');
       }
-      
+
       const response = await axios.post(
         CHATBOT_API_URL,
         {
@@ -247,6 +248,7 @@ export const ChatWidget: React.FC = () => {
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center z-50 transition-all"
         aria-label="Abrir chat"
+        style={{ marginBottom: '0' }}
       >
         <Bot className="w-6 h-6" />
       </button>
@@ -294,11 +296,10 @@ export const ChatWidget: React.FC = () => {
                 className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    message.isUser
+                  className={`max-w-[80%] rounded-lg p-3 ${message.isUser
                       ? 'bg-emerald-500 text-white'
                       : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border'
-                  }`}
+                    }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                   {message.suggestions && message.suggestions.length > 0 && (

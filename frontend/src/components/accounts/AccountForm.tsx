@@ -8,6 +8,7 @@ interface AccountFormData {
   type: AccountType;
   institution: string;
   initial_balance: string;
+  current_balance: string;
   color: string;
   icon: string;
   is_active: boolean;
@@ -32,6 +33,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
     type: 'wallet',
     institution: '',
     initial_balance: '',
+    current_balance: '',
     color: '#6366f1',
     icon: 'wallet2',
     is_active: true
@@ -39,11 +41,11 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
+  // Remove cartão de crédito da lista - cartões devem ser criados na página de cartões
   const accountTypes: AccountTypeOption[] = [
     { value: 'wallet', label: 'Carteira', icon: 'wallet2' },
     { value: 'checking', label: 'Conta Corrente', icon: 'bank' },
     { value: 'savings', label: 'Poupança', icon: 'piggy-bank' },
-    { value: 'credit_card', label: 'Cartão de Crédito', icon: 'credit-card' },
     { value: 'investment', label: 'Investimento', icon: 'graph-up-arrow' }
   ];
 
@@ -67,6 +69,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
         type: account.type || 'wallet',
         institution: account.institution || '',
         initial_balance: account.initial_balance?.toString() || '0',
+        current_balance: account.current_balance?.toString() || account.initial_balance?.toString() || '0',
         color: account.color || '#6366f1',
         icon: account.icon || 'wallet2',
         is_active: account.is_active !== false
@@ -78,6 +81,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
         type: 'wallet',
         institution: '',
         initial_balance: '',
+        current_balance: '',
         color: '#6366f1',
         icon: 'wallet2',
         is_active: true
@@ -117,31 +121,60 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    console.log('AccountForm: handleSubmit chamado');
+    console.log('AccountForm: formData atual:', formData);
+
     setLoading(true);
     setError('');
 
     try {
-      // Validações
-      if (!formData.name.trim()) {
-        throw new Error('Nome da conta é obrigatório');
+      // Validações mais robustas
+      const trimmedName = formData.name?.trim() || '';
+      if (!trimmedName) {
+        setError('Nome da conta é obrigatório');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.type) {
+        setError('Tipo da conta é obrigatório');
+        setLoading(false);
+        return;
       }
 
       // Prepara dados para envio
-      const initialBalanceValue = parseCurrencyString(formData.initial_balance);
-
+      const initialBalanceValue = parseCurrencyString(formData.initial_balance || '0');
+      
       const submitData: AccountPayload = {
-        name: formData.name.trim(),
+        name: trimmedName,
         type: formData.type,
-        institution: formData.institution.trim(),
+        institution: formData.institution?.trim() || '',
         initial_balance: initialBalanceValue,
-        color: formData.color,
-        icon: formData.icon,
-        is_active: formData.is_active
+        color: formData.color || '#6366f1',
+        icon: formData.icon || 'wallet2',
+        is_active: formData.is_active !== false
       };
 
+      // Para novas contas, current_balance será igual ao initial_balance (backend faz isso)
+      // Para contas existentes, permite editar o current_balance
+      if (account) {
+        const currentBalanceValue = parseCurrencyString(formData.current_balance || formData.initial_balance || '0');
+        submitData.current_balance = currentBalanceValue;
+      }
+
+      console.log('AccountForm: Enviando dados para API:', submitData);
       await onSubmit(submitData);
-    } catch (err) {
-      setError((err as Error).message || 'Erro ao salvar conta');
+      console.log('AccountForm: Conta criada com sucesso');
+    } catch (err: any) {
+      console.error('AccountForm: Erro ao enviar:', err);
+      console.error('AccountForm: Response:', err?.response);
+      console.error('AccountForm: Response data:', err?.response?.data);
+
+      const apiError = err?.response?.data?.error || err?.response?.data?.message || err?.message;
+      const errorMessage = apiError || 'Erro ao salvar conta';
+      setError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
     } finally {
       setLoading(false);
     }
@@ -184,7 +217,7 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
 
                 {/* Preview da Conta */}
                 <div className="text-center mb-4">
-                  <div 
+                  <div
                     className="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-2"
                     style={{
                       width: '80px',
@@ -241,122 +274,148 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
                     </select>
                   </div>
 
-                {/* Saldo Inicial */}
-                <div className="col-md-6">
-                  <label htmlFor="account-initial-balance" className="form-label">Saldo Inicial</label>
-                  <CurrencyInput
-                    id="account-initial-balance"
-                    name="initial_balance"
-                    className="form-control"
-                    value={formData.initial_balance}
-                    onValueChange={(value) => handleManualChange('initial_balance', value ?? '')}
-                    disabled={loading}
-                    placeholder="0,00"
-                    autoComplete="off"
-                    aria-label="Saldo inicial da conta"
-                  />
-                </div>
+                  {/* Saldo Inicial */}
+                  <div className="col-md-6">
+                    <label htmlFor="account-initial-balance" className="form-label">Saldo Inicial</label>
+                    <CurrencyInput
+                      id="account-initial-balance"
+                      name="initial_balance"
+                      className="form-control"
+                      value={formData.initial_balance}
+                      onValueChange={(value) => handleManualChange('initial_balance', value ?? '')}
+                      disabled={loading}
+                      placeholder="0,00"
+                      autoComplete="off"
+                      aria-label="Saldo inicial da conta"
+                    />
+                    <div className="form-text">Saldo inicial quando a conta foi criada</div>
+                  </div>
 
-                {/* Instituição */}
-                <div className="col-12">
-                  <label htmlFor="account-institution" className="form-label">Instituição (Opcional)</label>
-                  <input
-                    type="text"
-                    id="account-institution"
-                    name="institution"
-                    className="form-control"
-                    value={formData.institution}
-                    onChange={handleChange}
-                    disabled={loading}
-                    placeholder="Ex: Banco do Brasil, Nubank, Caixa"
-                    autoComplete="organization"
-                    aria-label="Instituição financeira (opcional)"
-                  />
-                </div>
-
-                {/* Cor */}
-                <div className="col-md-6">
-                  <label htmlFor="account-color" className="form-label">Cor</label>
-                  <div className="d-flex flex-wrap gap-2 mb-2" role="group" aria-label="Selecionar cor">
-                    {availableColors.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        name={`account-color-${color}`}
-                        aria-label={`Selecionar cor ${color}`}
-                        className={`btn p-0 border ${formData.color === color ? 'border-dark border-3' : 'border-2'}`}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          backgroundColor: color,
-                          borderRadius: '50%'
-                        }}
-                        onClick={() => handleManualChange('color', color)}
+                  {/* Saldo Atual - Apenas ao editar */}
+                  {account && (
+                    <div className="col-md-6">
+                      <label htmlFor="account-current-balance" className="form-label">
+                        <i className="bi bi-wallet2 me-2"></i>
+                        Saldo Atual <span className="text-warning">(Editável)</span>
+                      </label>
+                      <CurrencyInput
+                        id="account-current-balance"
+                        name="current_balance"
+                        className="form-control border-warning"
+                        value={formData.current_balance}
+                        onValueChange={(value) => handleManualChange('current_balance', value ?? '')}
                         disabled={loading}
+                        placeholder="0,00"
+                        autoComplete="off"
+                        aria-label="Saldo atual da conta"
                       />
-                    ))}
-                  </div>
-                  <input
-                    type="color"
-                    id="account-color"
-                    name="color"
-                    className="form-control form-control-color"
-                    value={formData.color}
-                    onChange={handleChange}
-                    disabled={loading}
-                    aria-label="Escolher cor personalizada"
-                    title="Escolher cor personalizada"
-                  />
-                </div>
+                      <div className="form-text text-warning">
+                        <i className="bi bi-info-circle me-1"></i>
+                        Ajuste o saldo atual se necessário. Este valor será atualizado automaticamente pelas transações futuras.
+                      </div>
+                    </div>
+                  )}
 
-                {/* Ícone */}
-                <div className="col-md-6">
-                  <label className="form-label">Ícone</label>
-                  <div className="d-flex flex-wrap gap-1" role="group" aria-label="Selecionar ícone">
-                    {availableIcons.map((icon) => (
-                      <button
-                        key={icon}
-                        type="button"
-                        name={`account-icon-${icon}`}
-                        aria-label={`Selecionar ícone ${icon}`}
-                        className={`btn btn-outline-secondary btn-sm ${formData.icon === icon ? 'active' : ''}`}
-                        style={{ width: '40px', height: '40px' }}
-                        onClick={() => handleManualChange('icon', icon)}
-                        disabled={loading}
-                      >
-                        <i className={`bi bi-${icon}`}></i>
-                      </button>
-                    ))}
-                  </div>
-                  {/* Campo oculto para associar o label */}
-                  <input
-                    type="hidden"
-                    id="account-icon"
-                    name="icon"
-                    value={formData.icon}
-                  />
-                </div>
-
-                {/* Status Ativo */}
-                <div className="col-12">
-                  <div className="form-check">
+                  {/* Instituição */}
+                  <div className="col-12">
+                    <label htmlFor="account-institution" className="form-label">Instituição (Opcional)</label>
                     <input
-                      type="checkbox"
-                      name="is_active"
-                      className="form-check-input"
-                      id="is_active"
-                      checked={formData.is_active}
+                      type="text"
+                      id="account-institution"
+                      name="institution"
+                      className="form-control"
+                      value={formData.institution}
                       onChange={handleChange}
                       disabled={loading}
+                      placeholder="Ex: Banco do Brasil, Nubank, Caixa"
+                      autoComplete="organization"
+                      aria-label="Instituição financeira (opcional)"
                     />
-                    <label className="form-check-label" htmlFor="is_active">
-                      Conta ativa
-                    </label>
-                    <div className="form-text">
-                      Contas inativas não aparecem nos relatórios
+                  </div>
+
+                  {/* Cor */}
+                  <div className="col-md-6">
+                    <label htmlFor="account-color" className="form-label">Cor</label>
+                    <div className="d-flex flex-wrap gap-2 mb-2" role="group" aria-label="Selecionar cor">
+                      {availableColors.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          name={`account-color-${color}`}
+                          aria-label={`Selecionar cor ${color}`}
+                          className={`btn p-0 border ${formData.color === color ? 'border-dark border-3' : 'border-2'}`}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            backgroundColor: color,
+                            borderRadius: '50%'
+                          }}
+                          onClick={() => handleManualChange('color', color)}
+                          disabled={loading}
+                        />
+                      ))}
+                    </div>
+                    <input
+                      type="color"
+                      id="account-color"
+                      name="color"
+                      className="form-control form-control-color"
+                      value={formData.color}
+                      onChange={handleChange}
+                      disabled={loading}
+                      aria-label="Escolher cor personalizada"
+                      title="Escolher cor personalizada"
+                    />
+                  </div>
+
+                  {/* Ícone */}
+                  <div className="col-md-6">
+                    <label className="form-label">Ícone</label>
+                    <div className="d-flex flex-wrap gap-1" role="group" aria-label="Selecionar ícone">
+                      {availableIcons.map((icon) => (
+                        <button
+                          key={icon}
+                          type="button"
+                          name={`account-icon-${icon}`}
+                          aria-label={`Selecionar ícone ${icon}`}
+                          className={`btn btn-outline-secondary btn-sm ${formData.icon === icon ? 'active' : ''}`}
+                          style={{ width: '40px', height: '40px' }}
+                          onClick={() => handleManualChange('icon', icon)}
+                          disabled={loading}
+                        >
+                          <i className={`bi bi-${icon}`}></i>
+                        </button>
+                      ))}
+                    </div>
+                    {/* Campo oculto para associar o label */}
+                    <input
+                      type="hidden"
+                      id="account-icon"
+                      name="icon"
+                      value={formData.icon}
+                    />
+                  </div>
+
+                  {/* Status Ativo */}
+                  <div className="col-12">
+                    <div className="form-check">
+                      <input
+                        type="checkbox"
+                        name="is_active"
+                        className="form-check-input"
+                        id="is_active"
+                        checked={formData.is_active}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                      <label className="form-check-label" htmlFor="is_active">
+                        Conta ativa
+                      </label>
+                      <div className="form-text">
+                        Contas inativas não aparecem nos relatórios
+                      </div>
                     </div>
                   </div>
-                </div>
                 </div>
               </div>
 

@@ -19,12 +19,13 @@ const Transactions = () => {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
   const [initialTransactionType, setInitialTransactionType] = useState<TransactionType | null>(null);
-  
+
   // Inicializa filtros com base no state da navegação (se houver)
   type FilterType = '' | TransactionType;
 
@@ -32,18 +33,33 @@ const Transactions = () => {
     month: number;
     year: number;
     category_id: string;
+    account_id: string;
     type: FilterType;
   }
 
   const getInitialFilters = (): TransactionFilters => {
+    // Lê parâmetros da URL
+    const searchParams = new URLSearchParams(location.search);
+    const urlMonth = searchParams.get('month');
+    const urlYear = searchParams.get('year');
+    const urlCategoryId = searchParams.get('category_id');
+    const urlAccountId = searchParams.get('account_id');
+    const urlType = searchParams.get('type');
+    
+    // Lê state da navegação (para compatibilidade com código existente)
     const state = location.state as { filterType?: FilterType } | null;
-    const initialType: FilterType =
+    const stateType: FilterType =
       state?.filterType === 'income' || state?.filterType === 'expense' ? state.filterType : '';
+    
+    // Prioriza URL params, depois state, depois padrão
+    const initialType: FilterType = 
+      (urlType === 'income' || urlType === 'expense') ? urlType : stateType;
 
     return {
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      category_id: '',
+      month: urlMonth ? parseInt(urlMonth, 10) : new Date().getMonth() + 1,
+      year: urlYear ? parseInt(urlYear, 10) : new Date().getFullYear(),
+      category_id: urlCategoryId || '',
+      account_id: urlAccountId || '',
       type: initialType,
     };
   };
@@ -55,26 +71,129 @@ const Transactions = () => {
     try {
       setLoading(true);
       setError('');
-      
+
+      // Carrega transações e categorias primeiro (essenciais)
       const [transactionsRes, categoriesRes] = await Promise.all([
         transactionsAPI.getAll(filters),
         categoriesAPI.getAll()
       ]);
+
+      // Carrega contas separadamente (não crítico - se falhar, não quebra a página)
+      let accountsRes: any[] = [];
+      try {
+        const accountsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001'}/api/accounts`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+        if (accountsResponse.ok) {
+          accountsRes = await accountsResponse.json();
+        }
+      } catch (accountsErr) {
+        console.warn('Erro ao carregar contas (não crítico):', accountsErr);
+        // Não quebra o fluxo se falhar ao carregar contas
+      }
+
+      // Garante que transactions seja sempre um array
+      // O backend retorna {data: [...], pagination: {...}}
+      const transactionsData = transactionsRes.data;
+      let transactionsArray: TransactionRecord[] = [];
       
-      setTransactions(transactionsRes.data as TransactionRecord[]);
-      setCategories(
-        categoriesRes.data.map((c: TransactionCategory) => ({
+      if (Array.isArray(transactionsData)) {
+        // Se já é um array direto
+        transactionsArray = transactionsData;
+      } else if (transactionsData?.data && Array.isArray(transactionsData.data)) {
+        // Se está dentro de um objeto com propriedade 'data'
+        transactionsArray = transactionsData.data;
+      } else {
+        // Se não encontrou dados, usa array vazio
+        transactionsArray = [];
+      }
+
+      setTransactions(transactionsArray as TransactionRecord[]);
+
+      // Garante que categories seja sempre um array
+      const categoriesData = categoriesRes.data;
+      const categoriesArray = Array.isArray(categoriesData)
+        ? categoriesData
+        : (categoriesData?.data && Array.isArray(categoriesData.data))
+          ? categoriesData.data
+          : [];
+
+      // Filtra apenas categorias válidas (não contas)
+      const validCategories = categoriesArray
+        .filter((c: any) => {
+          // Categorias devem ter type (income ou expense) e não devem ter campos de conta
+          return c.type && (c.type === 'income' || c.type === 'expense') && !c.account_id;
+        })
+        .map((c: TransactionCategory) => ({
           ...c,
           id: String(c.id),
-        }))
-      );
+        }));
+
+      setCategories(validCategories);
+
+      // Processa contas (se foram carregadas com sucesso)
+      if (accountsRes) {
+        const accountsArray = Array.isArray(accountsRes) ? accountsRes : [];
+        // Filtra apenas contas ativas (incluindo cartões de crédito para o filtro)
+        // E garante que não há contas duplicadas ou inválidas
+        const activeAccounts = accountsArray
+          .filter((acc: any) => {
+            // Filtra contas ativas e válidas
+            const isActive = acc.is_active !== false;
+            const hasId = acc.id || acc._id;
+            const hasName = acc.name && acc.name.trim() !== '';
+            return isActive && hasId && hasName;
+          })
+          .map((acc: any) => ({
+            ...acc,
+            id: String(acc.id || acc._id || ''),
+            name: String(acc.name || 'Sem nome').trim()
+          }))
+          .filter((acc: any) => acc.id && acc.name !== 'Sem nome')
+          // Remove duplicatas baseado no ID
+          .filter((acc: any, index: number, self: any[]) => 
+            index === self.findIndex((a: any) => a.id === acc.id)
+          );
+        
+        setAccounts(activeAccounts);
+      } else {
+        // Se não conseguiu carregar, mantém o array vazio
+        setAccounts([]);
+      }
     } catch (err) {
       setError('Erro ao carregar transações');
       console.error('Load transactions error:', err);
+      // Garante que transactions seja um array vazio em caso de erro
+      setTransactions([]);
+      // Mantém contas vazias em caso de erro
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // Atualiza filtros quando a URL mudar (query params)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const urlMonth = searchParams.get('month');
+    const urlYear = searchParams.get('year');
+    const urlCategoryId = searchParams.get('category_id');
+    const urlAccountId = searchParams.get('account_id');
+    const urlType = searchParams.get('type');
+    
+    if (urlMonth || urlYear || urlCategoryId || urlAccountId || urlType) {
+      setFilters(prev => ({
+        ...prev,
+        month: urlMonth ? parseInt(urlMonth, 10) : prev.month,
+        year: urlYear ? parseInt(urlYear, 10) : prev.year,
+        category_id: urlCategoryId || prev.category_id,
+        account_id: urlAccountId || prev.account_id,
+        type: (urlType === 'income' || urlType === 'expense') ? urlType : prev.type,
+      }));
+    }
+  }, [location.search]);
 
   useEffect(() => {
     // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
@@ -88,13 +207,13 @@ const Transactions = () => {
   useEffect(() => {
     if (location.state) {
       const state = location.state as any;
-      
+
       // Se veio com instrução para abrir o formulário
       if (state.openForm) {
         setInitialTransactionType(state.transactionType || 'expense');
         setShowForm(true);
       }
-      
+
       // Se veio com filtro de tipo (Receitas ou Despesas) e ainda não foi aplicado
       if (state.filterType && (state.filterType === 'income' || state.filterType === 'expense')) {
         setFilters(prev => {
@@ -108,7 +227,7 @@ const Transactions = () => {
           return prev;
         });
       }
-      
+
       // Limpa o state para não aplicar novamente ao navegar
       window.history.replaceState({}, document.title);
     }
@@ -127,7 +246,7 @@ const Transactions = () => {
 
   const handleDeleteTransaction = async (transactionId: string) => {
     console.log('Transactions: handleDeleteTransaction chamado para:', transactionId);
-    
+
     if (!window.confirm('Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.')) {
       return;
     }
@@ -136,17 +255,17 @@ const Transactions = () => {
       setLoading(true);
       setError('');
       console.log('Deletando transação:', transactionId);
-      
+
       await transactionsAPI.delete(transactionId);
       console.log('Transação deletada com sucesso');
-      
+
       // Recarrega a lista de transações
       await loadData();
     } catch (err: any) {
       console.error('Delete transaction error:', err);
       const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Erro ao deletar transação';
       setError(errorMessage);
-      
+
       // Remove a mensagem de erro após 5 segundos
       setTimeout(() => setError(''), 5000);
     } finally {
@@ -162,7 +281,7 @@ const Transactions = () => {
       } else {
         await transactionsAPI.create(formData);
       }
-      
+
       // Fecha o modal apenas se a requisição foi bem-sucedida
       setShowForm(false);
       setEditingTransaction(null);
@@ -239,8 +358,27 @@ const Transactions = () => {
 
       {/* Filtros */}
       <div className="card-base p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Filtros</h3>
+          {(filters.account_id || filters.category_id || filters.type) && (
+            <button
+              onClick={() => {
+                setFilters({
+                  month: filters.month,
+                  year: filters.year,
+                  category_id: '',
+                  account_id: '',
+                  type: ''
+                });
+              }}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label htmlFor="filter-month" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t('common.filter')} por Mês</label>
               <select
@@ -305,6 +443,34 @@ const Transactions = () => {
                 <option value="">Todos os tipos</option>
                 <option value="income">{t('transactions.income')}</option>
                 <option value="expense">{t('transactions.expense')}</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-account" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Conta
+                {filters.account_id && (
+                  <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Filtrado)</span>
+                )}
+              </label>
+              <select
+                id="filter-account"
+                name="account_id"
+                className="select-base"
+                value={filters.account_id || ''}
+                onChange={(e) => handleFilterChange('account_id', e.target.value)}
+                disabled={loading}
+              >
+                <option value="">Todas as contas</option>
+                {accounts.length > 0 ? (
+                  accounts.map((account) => (
+                    <option key={account.id || account._id} value={account.id || account._id}>
+                      {account.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Carregando contas...</option>
+                )}
               </select>
             </div>
           </div>

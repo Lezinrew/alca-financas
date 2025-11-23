@@ -48,7 +48,7 @@ const CreditCardDetail: React.FC = () => {
       setError('');
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      
+
       // Carrega o cartão
       const cardResponse = await fetch(`${API_URL}/api/accounts/${cardId}`, {
         headers: {
@@ -61,13 +61,28 @@ const CreditCardDetail: React.FC = () => {
       }
 
       const accountData = await cardResponse.json();
-      
+
       // Converte para formato CreditCard
+      const limit = accountData.limit ?? accountData.initial_balance ?? 0; // Limite total
+      const currentBalance = accountData.current_balance ?? 0;
+      // Para cartões de crédito, current_balance geralmente é negativo (gasto)
+      // O valor usado é o valor absoluto do current_balance
+      const used = Math.abs(currentBalance);
+      
+      // Debug para verificar valores do backend
+      console.log('CreditCardDetail - Dados do backend:', {
+        accountData,
+        limit,
+        currentBalance,
+        used,
+        initial_balance: accountData.initial_balance
+      });
+      
       const creditCard: CreditCard = {
         id: accountData.id,
         name: accountData.name,
-        limit: accountData.initial_balance || 0,
-        used: (accountData.initial_balance || 0) - (accountData.current_balance || 0),
+        limit: limit, // Limite total
+        used: used, // Valor gasto (sempre positivo)
         closingDay: accountData.closing_day || 10,
         dueDay: accountData.due_day || 15,
         color: accountData.color || '#6366f1',
@@ -88,8 +103,22 @@ const CreditCardDetail: React.FC = () => {
       );
 
       if (expensesResponse.ok) {
-        const expensesData = await expensesResponse.json();
-        setExpenses(expensesData);
+        try {
+          const expensesData = await expensesResponse.json();
+          // Garante que expenses seja sempre um array
+          const expensesArray = Array.isArray(expensesData)
+            ? expensesData
+            : (expensesData?.data && Array.isArray(expensesData.data))
+              ? expensesData.data
+              : [];
+          setExpenses(expensesArray);
+        } catch (parseError) {
+          console.error('Erro ao processar despesas:', parseError);
+          setExpenses([]);
+        }
+      } else {
+        // Se a resposta não for OK, define expenses como array vazio
+        setExpenses([]);
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar dados do cartão');
@@ -102,7 +131,14 @@ const CreditCardDetail: React.FC = () => {
   const loadCategories = async () => {
     try {
       const response = await categoriesAPI.getAll();
-      setCategories(response.data);
+      // Garante que categories seja sempre um array
+      const categoriesData = response.data;
+      const categoriesArray = Array.isArray(categoriesData)
+        ? categoriesData
+        : (categoriesData?.data && Array.isArray(categoriesData.data))
+          ? categoriesData.data
+          : [];
+      setCategories(categoriesArray);
     } catch (err) {
       console.error('Load categories error:', err);
     }
@@ -133,7 +169,9 @@ const CreditCardDetail: React.FC = () => {
     }
   };
 
-  const sortedExpenses = [...expenses].sort((a, b) => {
+  // Garante que expenses seja sempre um array antes de ordenar
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const sortedExpenses = [...safeExpenses].sort((a, b) => {
     let aValue: any = a[sortField];
     let bValue: any = b[sortField];
 
@@ -173,14 +211,14 @@ const CreditCardDetail: React.FC = () => {
     if (!card) return null;
     const closingDate = getNextClosingDate();
     if (!closingDate) return null;
-    
+
     const dueDate = new Date(closingDate);
     dueDate.setDate(dueDate.getDate() + (card.dueDay - card.closingDay));
     if (dueDate.getDate() < card.dueDay) {
       dueDate.setMonth(dueDate.getMonth() + 1);
       dueDate.setDate(card.dueDay);
     }
-    
+
     return dueDate;
   };
 
@@ -207,8 +245,26 @@ const CreditCardDetail: React.FC = () => {
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const availableLimit = card ? card.limit - (card.used ?? 0) : 0;
+  // Valor da fatura = total de despesas do mês selecionado (fatura atual)
+  const totalExpenses = safeExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+  
+  // Limite disponível = limite total - valor total gasto no cartão (não apenas do mês)
+  // O card.used já representa o valor total gasto (sempre positivo)
+  const totalUsed = card ? (card.used ?? 0) : 0;
+  const availableLimit = card ? (card.limit ?? 0) - totalUsed : 0;
+  
+  // Debug para verificar valores
+  console.log('CreditCardDetail - Valores:', {
+    cardName: card?.name,
+    limit: card?.limit,
+    used: card?.used,
+    totalUsed,
+    availableLimit,
+    totalExpenses,
+    month: selectedMonth,
+    year: selectedYear,
+    expensesCount: safeExpenses.length
+  });
 
   if (authLoading || loading) {
     return (
@@ -304,7 +360,7 @@ const CreditCardDetail: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
                       Situação
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                       onClick={() => handleSort('date')}
                     >
@@ -315,7 +371,7 @@ const CreditCardDetail: React.FC = () => {
                         )}
                       </div>
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                       onClick={() => handleSort('description')}
                     >
@@ -329,7 +385,7 @@ const CreditCardDetail: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
                       Categoria
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                       onClick={() => handleSort('amount')}
                     >
@@ -361,42 +417,46 @@ const CreditCardDetail: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    sortedExpenses.map((expense) => (
-                      <tr key={expense.id} className="table-row">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                            {expense.status === 'paid' ? 'Pago' : 'Pendente'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-secondary">
-                          {formatDate(expense.date)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-primary font-medium">
-                          {expense.description}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {expense.category && (
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-6 h-6 rounded-full flex items-center justify-center"
-                                style={{ backgroundColor: expense.category.color }}
-                              >
-                                <i className={`bi bi-${expense.category.icon} text-white text-xs`}></i>
+                    sortedExpenses
+                      .filter((expense) => expense && expense.id) // Filtra itens inválidos
+                      .map((expense) => (
+                        <tr key={expense.id} className="table-row">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                              {expense.status === 'paid' ? 'Pago' : 'Pendente'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-secondary">
+                            {expense.date ? formatDate(expense.date) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-primary font-medium">
+                            {expense.description || 'Sem descrição'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {expense.category && expense.category.name ? (
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                                  style={{ backgroundColor: expense.category.color || '#6b7280' }}
+                                >
+                                  <i className={`bi bi-${expense.category.icon || 'circle'} text-white text-xs`}></i>
+                                </div>
+                                <span className="text-sm text-secondary">{expense.category.name}</span>
                               </div>
-                              <span className="text-sm text-secondary">{expense.category.name}</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">
-                          {formatCurrency(expense.amount)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm">
-                          <button className="text-blue-600 dark:text-blue-400 hover:underline">
-                            Editar
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                            ) : (
+                              <span className="text-sm text-slate-400">Sem categoria</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">
+                            {formatCurrency(expense.amount || 0)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm">
+                            <button className="text-blue-600 dark:text-blue-400 hover:underline">
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
                   )}
                 </tbody>
               </table>
@@ -424,9 +484,15 @@ const CreditCardDetail: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-secondary mb-1">Limite disponível</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(availableLimit)}</p>
+                <p className={`text-2xl font-bold ${
+                  availableLimit >= 0 
+                    ? 'text-emerald-600 dark:text-emerald-400' 
+                    : 'text-red-600 dark:text-red-400'
+                }`}>
+                  {formatCurrency(availableLimit)}
+                </p>
                 <p className="text-xs text-secondary mt-1">
-                  Limite total de {formatCurrency(card.limit)}
+                  Limite total: {formatCurrency(card.limit)} | Usado: {formatCurrency(totalUsed)}
                 </p>
               </div>
               <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
@@ -435,10 +501,14 @@ const CreditCardDetail: React.FC = () => {
             </div>
             <div className="mt-4 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div
-                className="h-full bg-amber-500 rounded-full transition-all"
+                className={`h-full rounded-full transition-all ${
+                  availableLimit >= 0 
+                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500' 
+                    : 'bg-red-500'
+                }`}
                 style={{
                   width: `${Math.min(
-                    card.limit > 0 ? (availableLimit / card.limit) * 100 : 0,
+                    card.limit > 0 ? Math.max(0, (totalUsed / card.limit) * 100) : 0,
                     100
                   )}%`
                 }}

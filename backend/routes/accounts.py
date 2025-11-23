@@ -10,11 +10,13 @@ from services.account_service import AccountService
 from services.transaction_service import TransactionService
 from services.category_service import CategoryService
 from utils.exceptions import ValidationException, NotFoundException
+from extensions import limiter
 
 bp = Blueprint('accounts', __name__, url_prefix='/api/accounts')
 
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
+@limiter.limit("200 per hour")  # Aumenta limite para GET de contas (muitos componentes precisam)
 def accounts():
     accounts_collection = current_app.config['ACCOUNTS']
     transactions_collection = current_app.config['TRANSACTIONS']
@@ -23,14 +25,43 @@ def accounts():
     service = AccountService(repo, transactions_collection)
 
     if request.method == 'GET':
-        return jsonify(service.list_accounts(request.user_id))
+        accounts = service.list_accounts(request.user_id)
+        # Garante que todas as contas pertencem ao usuário
+        filtered_accounts = [acc for acc in accounts if acc.get('user_id') == request.user_id]
+        
+        # Calcula saldo previsto para cada conta e adiciona campos específicos
+        transactions_collection = current_app.config['TRANSACTIONS']
+        for acc in filtered_accounts:
+            if acc.get('id'):
+                projected = service.calculate_projected_balance(
+                    request.user_id, 
+                    acc['id'], 
+                    transactions_collection
+                )
+                acc['projected_balance'] = projected
+                
+                # Para cartões de crédito, adiciona o limite total (initial_balance)
+                if acc.get('type') == 'credit_card':
+                    acc['limit'] = acc.get('initial_balance', 0)
+        
+        return jsonify(filtered_accounts)
     
     try:
-        data = request.get_json()
-        account = service.create_account(request.user_id, data)
+        request_data = request.get_json()
+        if not request_data:
+            return jsonify({'error': 'Dados não fornecidos. Certifique-se de enviar JSON válido.'}), 400
+        
+        print(f"DEBUG: Criando conta - user_id={request.user_id}, data={request_data}")
+        account = service.create_account(request.user_id, request_data)
         return jsonify(account), 201
     except ValidationException as e:
+        print(f"DEBUG: ValidationException: {e.to_dict()}")
         return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        import traceback
+        print(f"DEBUG: Exception ao criar conta: {str(e)}")
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return jsonify({'error': f'Erro ao criar conta: {str(e)}'}), 500
 
 @bp.route('/<account_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth

@@ -21,6 +21,7 @@ export interface TransactionRecord {
   type: TransactionType;
   category_id: string;
   category?: TransactionCategory;
+  account_id?: string;
   date: string;
   status?: TransactionStatus;
   responsible_person?: string;
@@ -33,6 +34,7 @@ export interface TransactionSubmitPayload {
   amount: number;
   type: TransactionType;
   category_id: string;
+  account_id?: string;
   date: string;
   is_recurring: boolean;
   installments: number;

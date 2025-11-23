@@ -14,10 +14,45 @@ def hash_password(password: str) -> bytes:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 
-def check_password(password: str, hashed: bytes) -> bool:
+def check_password(password: str, hashed) -> bool:
+    """
+    Verifica se a senha corresponde ao hash.
+    Aceita tanto bytes quanto string (MongoDB pode retornar como string ou Binary).
+    """
     if not hashed:
         return False
-    return bcrypt.checkpw(password.encode('utf-8'), hashed)
+    
+    # Se for Binary do MongoDB, extrai os bytes
+    try:
+        from bson import Binary
+        if isinstance(hashed, Binary):
+            hashed = hashed.as_bytes()
+    except ImportError:
+        pass
+    
+    # Se for string, converte para bytes
+    if isinstance(hashed, str):
+        hashed = hashed.encode('utf-8')
+    elif not isinstance(hashed, bytes):
+        # Tenta converter para bytes se for outro tipo
+        try:
+            hashed = bytes(hashed)
+        except (TypeError, ValueError):
+            # Se não conseguir converter, tenta como string primeiro
+            if hasattr(hashed, '__str__'):
+                hashed = str(hashed).encode('utf-8')
+            else:
+                import logging
+                logging.error(f"Erro ao verificar senha: tipo do hash não suportado: {type(hashed)}")
+                return False
+    
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed)
+    except (TypeError, ValueError) as e:
+        # Log do erro para debug
+        import logging
+        logging.error(f"Erro ao verificar senha: {e}, tipo do hash: {type(hashed)}")
+        return False
 
 
 import uuid

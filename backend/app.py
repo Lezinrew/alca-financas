@@ -39,8 +39,10 @@ if cors_origins == '*':
 CORS(app,
      origins=cors_origins.split(','),
      supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+     expose_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+     max_age=3600)
 
 oauth = OAuth(app)
 app.config['OAUTH'] = oauth

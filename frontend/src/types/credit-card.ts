@@ -8,6 +8,7 @@ export interface CreditCard {
   icon?: string;
   is_active?: boolean;
   used?: number;
+  available?: number; // Limite disponível (pode ser negativo)
   account_id?: string;
   card_type?: string;
 }

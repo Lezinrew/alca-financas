@@ -12,7 +12,7 @@ import AppShell from './components/layout/AppShell';
 import { ChatWidget } from './components/chat/ChatWidget';
 
 // Lazy loading para melhor performance
-import { lazy, Suspense } from 'react';
+import { lazy } from 'react';
 
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 const Transactions = lazy(() => import('./components/transactions/Transactions'));

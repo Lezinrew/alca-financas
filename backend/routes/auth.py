@@ -24,9 +24,26 @@ bp = Blueprint('auth', __name__)
 @limiter.limit("3 per hour")
 def register():
     try:
-        data = UserRegisterSchema(**request.get_json())
+        request_data = request.get_json()
+        if not request_data:
+            return jsonify({'error': 'Dados não fornecidos. Certifique-se de enviar JSON válido.'}), 400
+        
+        data = UserRegisterSchema(**request_data)
     except ValidationError as e:
-        return jsonify({'error': e.errors()}), 400
+        # Formata erros do Pydantic em mensagens mais amigáveis
+        error_messages = []
+        for error in e.errors():
+            field = error.get('loc', [''])[-1] if error.get('loc') else 'campo'
+            msg = error.get('msg', 'Erro de validação')
+            if field:
+                error_messages.append(f"{field}: {msg}")
+            else:
+                error_messages.append(msg)
+        
+        error_message = '; '.join(error_messages) if error_messages else 'Erro de validação nos dados fornecidos'
+        return jsonify({'error': error_message}), 400
+    except Exception as e:
+        return jsonify({'error': f'Erro ao processar registro: {str(e)}'}), 400
 
     users_collection = current_app.config['USERS']
     categories_collection = current_app.config['CATEGORIES']
@@ -34,37 +51,71 @@ def register():
     if users_collection.find_one({'email': data.email}):
         return jsonify({'error': 'Email já cadastrado'}), 400
 
-    user_data = data.model_dump()
-    user = create_user(users_collection, user_data, hash_password)
-    create_default_categories(categories_collection, user['_id'])
+    try:
+        user_data = data.model_dump()
+        user = create_user(users_collection, user_data, hash_password)
+        create_default_categories(categories_collection, user['_id'])
 
-    tokens = generate_jwt(user['_id'])
-    return jsonify({
-        'message': 'Usuário criado com sucesso',
-        'access_token': tokens['access_token'],
-        'refresh_token': tokens['refresh_token'],
-        'user': get_user_public(user)
-    }), 201
+        tokens = generate_jwt(user['_id'])
+        return jsonify({
+            'message': 'Usuário criado com sucesso',
+            'access_token': tokens['access_token'],
+            'refresh_token': tokens['refresh_token'],
+            'user': get_user_public(user)
+        }), 201
+    except Exception as e:
+        import traceback
+        print(f"Erro ao criar usuário: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Erro ao criar usuário: {str(e)}'}), 500
 
 
 @bp.route('/auth/login', methods=['POST'])
 @limiter.limit("5 per minute")
 def login():
     try:
-        data = UserLoginSchema(**request.get_json())
+        request_data = request.get_json()
+        if not request_data:
+            return jsonify({'error': 'Dados não fornecidos. Certifique-se de enviar JSON válido.'}), 400
+        
+        data = UserLoginSchema(**request_data)
     except ValidationError as e:
-        return jsonify({'error': e.errors()}), 400
+        # Formata erros do Pydantic em mensagens mais amigáveis
+        error_messages = []
+        for error in e.errors():
+            field = error.get('loc', [''])[-1] if error.get('loc') else 'campo'
+            msg = error.get('msg', 'Erro de validação')
+            if field:
+                error_messages.append(f"{field}: {msg}")
+            else:
+                error_messages.append(msg)
+        
+        error_message = '; '.join(error_messages) if error_messages else 'Erro de validação nos dados fornecidos'
+        return jsonify({'error': error_message}), 400
+    except Exception as e:
+        return jsonify({'error': f'Erro ao processar login: {str(e)}'}), 400
 
     users_collection = current_app.config['USERS']
-    user = users_collection.find_one({'email': data.email})
+    # Busca usuário com email case-insensitive e sem espaços
+    email = data.email.strip().lower()
+    user = users_collection.find_one({'email': {'$regex': f'^{email}$', '$options': 'i'}})
     
     if not user:
+        current_app.logger.warning(f"Login falhou: usuário não encontrado para email: {email}")
         return jsonify({'error': 'Email ou senha incorretos'}), 401
 
     if user.get('password') is None:
         return jsonify({'error': 'Este email está vinculado ao Google. Por favor, faça login via Google.'}), 400
     
-    if not check_password(data.password, user['password']):
+    # Debug: log do tipo da senha (sem mostrar o valor)
+    password_type = type(user['password']).__name__
+    current_app.logger.debug(f"Tentativa de login para {email}: tipo da senha no banco: {password_type}")
+    
+    password_check_result = check_password(data.password, user['password'])
+    current_app.logger.debug(f"Resultado da verificação de senha: {password_check_result}")
+    
+    if not password_check_result:
+        current_app.logger.warning(f"Login falhou: senha incorreta para email: {email}")
         return jsonify({'error': 'Email ou senha incorretos'}), 401
         
     tokens = generate_jwt(user['_id'])

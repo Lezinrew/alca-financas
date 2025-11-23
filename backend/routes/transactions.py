@@ -23,15 +23,37 @@ def transactions():
 
     if request.method == 'GET':
         page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('limit', 20))
+        # Aumenta o limite padrão para mostrar mais transações
+        per_page = int(request.args.get('limit', 100))
         
-        filters = {
-            'month': request.args.get('month'),
-            'year': request.args.get('year'),
-            'category_id': request.args.get('category_id'),
-            'type': request.args.get('type'),
-            'account_id': request.args.get('account_id')
-        }
+        # Coleta filtros, removendo valores vazios
+        filters = {}
+        
+        month = request.args.get('month')
+        if month and month.strip():
+            try:
+                filters['month'] = int(month)
+            except ValueError:
+                pass
+        
+        year = request.args.get('year')
+        if year and year.strip():
+            try:
+                filters['year'] = int(year)
+            except ValueError:
+                pass
+        
+        category_id = request.args.get('category_id')
+        if category_id and category_id.strip():
+            filters['category_id'] = category_id
+        
+        transaction_type = request.args.get('type')
+        if transaction_type and transaction_type.strip():
+            filters['type'] = transaction_type
+        
+        account_id = request.args.get('account_id')
+        if account_id and account_id.strip():
+            filters['account_id'] = account_id
         
         return jsonify(service.list_transactions(request.user_id, filters, page, per_page))
 
@@ -138,6 +160,8 @@ def import_transactions():
                     created_account_name = account.get('name') if account else None
         except Exception as e:
             # Se falhar na detecção, continua sem account_id
+            # Mas registra o erro para informar ao usuário
+            current_app.logger.warning(f'Falha ao detectar/criar conta automaticamente: {str(e)}')
             pass
     
     # Se account_id foi fornecido, valida se existe
@@ -267,16 +291,20 @@ def import_transactions():
             service.create_many_transactions(imported_transactions)
             
             # Atualiza o saldo da conta se account_id foi fornecido
+            # Apenas transações com status 'paid' afetam o saldo atual
             if account_id:
-                # Calcula o saldo a ser atualizado
+                # Calcula o saldo a ser atualizado (apenas transações pagas)
                 total_change = 0
                 for tx in imported_transactions:
-                    amount = tx['amount']
-                    if tx['type'] == 'expense':
-                        amount = -amount
-                    total_change += amount
+                    # Só atualiza saldo se a transação estiver paga
+                    if tx.get('status') == 'paid':
+                        amount = tx['amount']
+                        if tx['type'] == 'expense':
+                            amount = -amount
+                        total_change += amount
                 
-                account_service.update_balance(account_id, total_change)
+                if total_change != 0:
+                    account_service.update_balance(account_id, total_change)
         
         result = {
             'message': f'{len(imported_transactions)} transações importadas com sucesso',
@@ -286,8 +314,14 @@ def import_transactions():
             'categories_created': len(created_categories),
             'categories_created_list': list(set(created_categories)),  # Remove duplicatas
             'account_created': account_created,
-            'account_name': created_account_name
+            'account_name': created_account_name,
+            'account_id': account_id if account_id else None,
+            'warning': None
         }
+        
+        # Adiciona aviso se não conseguiu associar a uma conta
+        if not account_id and imported_transactions:
+            result['warning'] = 'As transações foram importadas sem associação a uma conta. Crie uma conta e associe as transações manualmente se necessário.'
         if errors:
             result['errors'] = errors
         return jsonify(result), 201 if imported_transactions else 400
