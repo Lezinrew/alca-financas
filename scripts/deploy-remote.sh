@@ -144,6 +144,7 @@ echo -e "${BLUE}🎨 Configurando frontend...${NC}"
 execute_remote "
     cd ${PROJECT_DIR}/frontend
     npm install --silent
+    npm install --save-dev terser --silent
 "
 
 # Criar arquivo .env.production do frontend
