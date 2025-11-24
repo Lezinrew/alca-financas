@@ -214,11 +214,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user_data');
-    setUser(null);
-    setIsAuthenticated(false);
+    try {
+      // Limpar todos os dados de autenticação
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_data');
+      
+      // Limpar estado
+      setUser(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      // Mesmo com erro, tentar limpar o que for possível
+      localStorage.clear();
+      setUser(null);
+      setIsAuthenticated(false);
+    }
   };
 
   const updateUser = (userData: User) => {
