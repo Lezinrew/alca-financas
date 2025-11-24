@@ -41,6 +41,8 @@ fi
 # Função para executar comandos remotos
 execute_remote() {
     sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+        -o IdentitiesOnly=yes -o NumberOfPasswordPrompts=1 \
         "${SERVER_USER}@${SERVER_HOST}" "$1"
 }
 
@@ -89,7 +91,8 @@ echo -e "${BLUE}📥 Clonando/atualizando repositório...${NC}"
 execute_remote "
     cd ${PROJECT_DIR}
     if [ -d '.git' ]; then
-        git pull origin main || git pull origin master
+        git fetch origin
+        git reset --hard origin/main || git reset --hard origin/master
     else
         git clone https://github.com/Lezinrew/alca-financas.git .
     fi
@@ -144,7 +147,6 @@ echo -e "${BLUE}🎨 Configurando frontend...${NC}"
 execute_remote "
     cd ${PROJECT_DIR}/frontend
     npm install --silent
-    npm install --save-dev terser --silent
 "
 
 # Criar arquivo .env.production do frontend
