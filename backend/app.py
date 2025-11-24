@@ -28,9 +28,11 @@ from extensions import limiter
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
 
 # Configuração de sessão para OAuth
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'  # True em produção (HTTPS)
+# Em produção, usa HTTPS então pode usar SameSite=None para OAuth cross-site
+is_production = os.getenv('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_SECURE'] = is_production  # True em produção (HTTPS)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Permite cross-site para OAuth
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None necessário para OAuth cross-site
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
 
 # Rate Limiting
