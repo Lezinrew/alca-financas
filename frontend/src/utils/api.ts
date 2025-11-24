@@ -97,6 +97,24 @@ export const categoriesAPI = {
   },
 };
 
+// Funções de contas
+export const accountsAPI = {
+  getAll: () => api.get('/accounts'),
+  getById: (id: string) => api.get(`/accounts/${id}`),
+  create: (accountData: any) => api.post('/accounts', accountData),
+  update: (id: string, accountData: any) => api.put(`/accounts/${id}`, accountData),
+  delete: (id: string) => api.delete(`/accounts/${id}`),
+  import: (cardId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/accounts/${cardId}/import`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+};
+
 // Transaction types
 export interface Transaction {
   id: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency } from '../../utils/api';
+import { formatCurrency, accountsAPI } from '../../utils/api';
 import { Account, AccountPayload } from '../../types/account';
 import AccountForm from './AccountForm';
 import AccountCard from './AccountCard';
@@ -25,29 +25,15 @@ const Accounts: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/api/accounts`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Muitas requisições. Aguarde alguns instantes e tente novamente.');
-        }
-        throw new Error('Erro ao carregar contas');
-      }
-
-      const data = await response.json();
-      setAccounts(data);
+      const response = await accountsAPI.getAll();
+      setAccounts(response.data);
     } catch (err: any) {
-      const errorMessage = err?.message || 'Erro ao carregar contas';
+      const errorMessage = err?.response?.data?.error || err?.message || 'Erro ao carregar contas';
       setError(errorMessage);
       console.error('Load accounts error:', err);
       
-      // Se for rate limit, não mostra erro crítico, apenas aviso
-      if (errorMessage.includes('Muitas requisições')) {
+      // Se for rate limit (429), não mostra erro crítico, apenas aviso
+      if (err?.response?.status === 429 || errorMessage.includes('Muitas requisições')) {
         // Tenta novamente após 5 segundos
         setTimeout(() => {
           if (isAuthenticated && !authLoading) {
@@ -74,22 +60,11 @@ const Accounts: React.FC = () => {
     if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/api/accounts/${accountId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao deletar conta');
-      }
-
+      await accountsAPI.delete(accountId);
       await loadAccounts();
     } catch (err: any) {
-      setError(err.message || 'Erro ao deletar conta');
+      const errorMessage = err?.response?.data?.error || err?.message || 'Erro ao deletar conta';
+      setError(errorMessage);
       console.error('Delete account error:', err);
     }
   };
@@ -98,47 +73,20 @@ const Accounts: React.FC = () => {
     try {
       console.log('Accounts: handleFormSubmit chamado com dados:', formData);
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const url = editingAccount
-        ? `${API_URL}/api/accounts/${editingAccount.id}`
-        : `${API_URL}/api/accounts`;
-
-      console.log('Accounts: Enviando requisição para:', url);
-      console.log('Accounts: Método:', editingAccount ? 'PUT' : 'POST');
-      console.log('Accounts: Dados:', JSON.stringify(formData));
-
-      const response = await fetch(url, {
-        method: editingAccount ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      console.log('Accounts: Resposta recebida - Status:', response.status);
-      console.log('Accounts: Resposta recebida - OK:', response.ok);
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.error('Accounts: Erro do servidor:', errorData);
-        } catch (e) {
-          errorData = { error: `Erro HTTP ${response.status}: ${response.statusText}` };
-        }
-        throw new Error(errorData.error || errorData.message || 'Erro ao salvar conta');
+      if (editingAccount) {
+        await accountsAPI.update(editingAccount.id, formData);
+      } else {
+        await accountsAPI.create(formData);
       }
 
-      const responseData = await response.json();
-      console.log('Accounts: Conta criada/editada com sucesso:', responseData);
-
+      console.log('Accounts: Conta salva com sucesso');
+      await loadAccounts();
       setShowForm(false);
       setEditingAccount(null);
-      await loadAccounts();
     } catch (err: any) {
       console.error('Accounts: Erro ao salvar conta:', err);
-      console.error('Accounts: Erro message:', err?.message);
+      const errorMessage = err?.response?.data?.error || err?.message || 'Erro ao salvar conta';
+      setError(errorMessage);
       throw err;
     }
   };
