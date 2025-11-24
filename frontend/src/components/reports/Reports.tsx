@@ -70,28 +70,16 @@ const Reports = () => {
     try {
       const response = await accountsAPI.getAll();
       const accountsArray = Array.isArray(response.data) ? response.data : [];
-        // Filtra apenas contas ativas
-        const activeAccounts = accountsArray
-          .filter((acc: any) => acc.is_active !== false)
-          .map((acc: any) => ({
-            ...acc,
-            id: acc.id || acc._id || '',
-            name: acc.name || 'Sem nome'
-          }))
-          .filter((acc: any) => acc.id);
-        setAccounts(activeAccounts);
-      } else {
-        if (response.status === 429) {
-          console.warn('Reports: Rate limit atingido. Aguardando antes de tentar novamente...');
-          // Tenta novamente após 5 segundos
-          setTimeout(() => {
-            if (isAuthenticated && !authLoading) {
-              loadAccounts();
-            }
-          }, 5000);
-          return;
-        }
-        console.error('Reports: Erro ao carregar contas - resposta não OK:', response.status);
+      // Filtra apenas contas ativas
+      const activeAccounts = accountsArray
+        .filter((acc: any) => acc.is_active !== false)
+        .map((acc: any) => ({
+          ...acc,
+          id: acc.id || acc._id || '',
+          name: acc.name || 'Sem nome'
+        }))
+        .filter((acc: any) => acc.id);
+      setAccounts(activeAccounts);
       }
     } catch (err) {
       console.error('Reports: Erro ao carregar contas:', err);
