@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency, formatDate, categoriesAPI } from '../../utils/api';
+import { formatCurrency, formatDate, categoriesAPI, accountsAPI, transactionsAPI } from '../../utils/api';
 import CreditCardExpenseForm from './CreditCardExpenseForm';
 import CreditCardImportModal from './CreditCardImportModal';
 import { CreditCard } from '../../types/credit-card';
@@ -47,20 +47,9 @@ const CreditCardDetail: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-
       // Carrega o cartão
-      const cardResponse = await fetch(`${API_URL}/api/accounts/${cardId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (!cardResponse.ok) {
-        throw new Error('Cartão não encontrado');
-      }
-
-      const accountData = await cardResponse.json();
+      const cardResponse = await accountsAPI.getById(cardId);
+      const accountData = cardResponse.data;
 
       // Converte para formato CreditCard
       const limit = accountData.limit ?? accountData.initial_balance ?? 0; // Limite total
@@ -93,31 +82,20 @@ const CreditCardDetail: React.FC = () => {
       setCard(creditCard);
 
       // Carrega despesas do cartão (transações associadas)
-      const expensesResponse = await fetch(
-        `${API_URL}/api/transactions?account_id=${cardId}&month=${selectedMonth}&year=${selectedYear}&type=expense`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        }
-      );
-
-      if (expensesResponse.ok) {
-        try {
-          const expensesData = await expensesResponse.json();
-          // Garante que expenses seja sempre um array
-          const expensesArray = Array.isArray(expensesData)
-            ? expensesData
-            : (expensesData?.data && Array.isArray(expensesData.data))
-              ? expensesData.data
-              : [];
-          setExpenses(expensesArray);
-        } catch (parseError) {
-          console.error('Erro ao processar despesas:', parseError);
-          setExpenses([]);
-        }
-      } else {
-        // Se a resposta não for OK, define expenses como array vazio
+      try {
+        const expensesResponse = await transactionsAPI.getAll({
+          account_id: cardId,
+          month: selectedMonth,
+          year: selectedYear,
+          type: 'expense'
+        });
+        const expensesData = expensesResponse.data || [];
+        // Garante que expenses seja sempre um array
+        const expensesArray = Array.isArray(expensesData) ? expensesData : [];
+        setExpenses(expensesArray);
+      } catch (expensesErr) {
+        // Se falhar ao carregar despesas, define como array vazio
+        console.warn('Erro ao carregar despesas:', expensesErr);
         setExpenses([]);
       }
     } catch (err: any) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency, reportsAPI, ReportOverviewResponse } from '../../utils/api';
+import { formatCurrency, reportsAPI, ReportOverviewResponse, accountsAPI } from '../../utils/api';
 import ReportChart, { ChartDisplayType } from './ReportChart';
 import ReportFilters from './ReportFilters';
 
@@ -68,15 +68,8 @@ const Reports = () => {
 
   const loadAccounts = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/api/accounts`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const accountsArray = Array.isArray(data) ? data : [];
+      const response = await accountsAPI.getAll();
+      const accountsArray = Array.isArray(response.data) ? response.data : [];
         // Filtra apenas contas ativas
         const activeAccounts = accountsArray
           .filter((acc: any) => acc.is_active !== false)

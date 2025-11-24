@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CurrencyInput from '../ui/CurrencyInput';
 import { parseCurrencyString } from '../../lib/utils';
 import { CreditCard, CreditCardPayload } from '../../types/credit-card';
+import { accountsAPI } from '../../utils/api';
 
 interface CreditCardFormData {
   name: string;
@@ -57,16 +58,10 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
 
   const loadAccounts = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/api/accounts`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const response = await accountsAPI.getAll();
+      if (response.data) {
         // Filtra apenas contas que não são cartões de crédito
-        const filteredAccounts = data.filter((acc: any) =>
+        const filteredAccounts = response.data.filter((acc: any) =>
           acc.type !== 'credit_card' && acc.is_active
         );
         setAccounts(filteredAccounts);

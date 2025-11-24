@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency, categoriesAPI } from '../../utils/api';
+import { formatCurrency, categoriesAPI, accountsAPI } from '../../utils/api';
 import CreditCardExpenseForm from './CreditCardExpenseForm';
 import CreditCardForm from './CreditCardForm';
 import { CreditCard, CreditCardPayload } from '../../types/credit-card';
@@ -67,15 +67,9 @@ const CreditCards: React.FC = () => {
       setCategories(categoriesArray);
 
       // Carrega contas do tipo credit_card
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/api/accounts`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const accounts = await response.json();
+      const response = await accountsAPI.getAll();
+      if (response.data) {
+        const accounts = response.data;
         // Filtra apenas contas do tipo credit_card e converte para o formato de CreditCard
         const creditCards = accounts
           .filter((acc: any) => acc.type === 'credit_card' && acc.is_active)
@@ -149,11 +143,6 @@ const CreditCards: React.FC = () => {
 
   const handleCardFormSubmit = async (cardData: CreditCardPayload) => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const url = editingCard
-        ? `${API_URL}/api/accounts/${editingCard.id}`
-        : `${API_URL}/api/accounts`;
-
       const accountData = {
         name: cardData.name,
         type: 'credit_card',
@@ -168,18 +157,10 @@ const CreditCards: React.FC = () => {
         account_id: cardData.account_id
       };
 
-      const response = await fetch(url, {
-        method: editingCard ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify(accountData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar cartão');
+      if (editingCard) {
+        await accountsAPI.update(editingCard.id, accountData);
+      } else {
+        await accountsAPI.create(accountData);
       }
 
       setShowCardForm(false);

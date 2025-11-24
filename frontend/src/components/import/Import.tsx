@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { transactionsAPI } from '../../utils/api';
+import { transactionsAPI, accountsAPI } from '../../utils/api';
 
 interface AccountOption {
   id: string;
@@ -45,14 +45,9 @@ const Import = () => {
 
   const loadAccounts = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/api/accounts`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const response = await accountsAPI.getAll();
+      if (response.data) {
+        const data = response.data;
         const activeAccounts = data.filter((acc: any) => acc.is_active);
         
         // Separa contas normais e cartões de crédito
@@ -132,25 +127,11 @@ const Import = () => {
       
       if (activeTab === 'credit_card' && selectedCreditCardId) {
         // Importação de cartão de crédito
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
         const formData = new FormData();
         formData.append('file', selectedFile);
 
-        const fetchResponse = await fetch(`${API_URL}/api/accounts/${selectedCreditCardId}/import`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          },
-          body: formData
-        });
-
-        if (!fetchResponse.ok) {
-          const errorData = await fetchResponse.json();
-          throw new Error(errorData.error || 'Erro ao importar fatura');
-        }
-
-        const result = (await fetchResponse.json()) as ImportResult;
-        response = { data: result };
+        const fetchResponse = await accountsAPI.import(selectedCreditCardId, selectedFile);
+        response = { data: fetchResponse.data as ImportResult };
       } else {
         // Importação geral (débito)
         const apiResponse = await transactionsAPI.import(selectedFile, selectedAccountId || undefined);

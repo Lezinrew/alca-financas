@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { transactionsAPI, categoriesAPI } from '../../utils/api';
+import { transactionsAPI, categoriesAPI, accountsAPI } from '../../utils/api';
 import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
 import {
@@ -81,13 +81,9 @@ const Transactions = () => {
       // Carrega contas separadamente (não crítico - se falhar, não quebra a página)
       let accountsRes: any[] = [];
       try {
-        const accountsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001'}/api/accounts`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        });
-        if (accountsResponse.ok) {
-          accountsRes = await accountsResponse.json();
+        const accountsResponse = await accountsAPI.getAll();
+        if (accountsResponse.data) {
+          accountsRes = Array.isArray(accountsResponse.data) ? accountsResponse.data : [];
         }
       } catch (accountsErr) {
         console.warn('Erro ao carregar contas (não crítico):', accountsErr);
