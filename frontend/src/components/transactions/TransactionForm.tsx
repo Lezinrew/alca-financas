@@ -9,6 +9,7 @@ import {
   TransactionType,
 } from '../../types/transaction';
 import { parseCurrencyString } from '../../lib/utils';
+import { accountsAPI } from '../../utils/api';
 
 interface TransactionFormData {
   description: string;
@@ -61,14 +62,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-        const response = await fetch(`${API_URL}/api/accounts`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const response = await accountsAPI.getAll();
+        if (response.data) {
+          const data = response.data;
           console.log('TransactionForm: Dados brutos da API:', data);
           
           // Garante que data seja um array

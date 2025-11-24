@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { accountsAPI } from '../../utils/api';
 
 interface CreditCardImportModalProps {
   show: boolean;
@@ -48,25 +49,12 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
     setSuccess('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('card_id', cardId);
 
-      const response = await fetch(`${API_URL}/api/accounts/${cardId}/import`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao importar fatura');
-      }
-
-      const result = await response.json();
+      const response = await accountsAPI.import(cardId, selectedFile);
+      const result = response.data;
       let successMessage = `Fatura importada com sucesso! ${result.imported_count || 0} transações adicionadas.`;
       
       if (result.categories_created && result.categories_created > 0) {

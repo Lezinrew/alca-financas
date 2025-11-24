@@ -21,7 +21,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCurrency, dashboardAPI } from '../../utils/api';
+import { formatCurrency, dashboardAPI, accountsAPI } from '../../utils/api';
 
 // Custom tooltip for line chart
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -119,11 +119,7 @@ const Dashboard: React.FC = () => {
       // Busca dados do dashboard avançado (inclui evolução mensal)
       const [dashboardRes, accountsRes] = await Promise.all([
         dashboardAPI.getAdvanced(month.toString(), year.toString(), true),
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001'}/api/accounts`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        }).then(res => res.ok ? res.json() : [])
+        accountsAPI.getAll().then(res => res.data).catch(() => [])
       ]);
 
       const dashboardData = dashboardRes.data;
