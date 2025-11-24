@@ -38,10 +38,17 @@ const AppShell = () => {
     navItems.push({ path: '/admin/dashboard', icon: Settings, label: 'Admin' });
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (window.confirm('Deseja sair?')) {
-      logout();
-      navigate('/login');
+      try {
+        logout();
+        // Usar window.location para garantir redirecionamento completo
+        window.location.href = '/login';
+      } catch (error) {
+        console.error('Erro ao fazer logout:', error);
+        // Fallback: tentar navegação normal
+        navigate('/login', { replace: true });
+      }
     }
   };
 
