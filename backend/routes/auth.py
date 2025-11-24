@@ -2,6 +2,7 @@
 
 from flask import Blueprint, request, jsonify, current_app, session
 from authlib.integrations.flask_client import OAuth
+from authlib.integrations.base_client.errors import MismatchingStateError
 from datetime import datetime
 import uuid
 import os
@@ -338,22 +339,42 @@ def google_callback():
 </body>
 </html>"""
         return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
+    except MismatchingStateError as e:
+        # Erro específico de state mismatch (sessão expirada ou múltiplas tentativas)
+        error_msg = str(e)
+        print(f"Erro MismatchingStateError no callback OAuth: {error_msg}")
+        
+        user_message = "A sessão expirou. Por favor, tente fazer login novamente."
+        error_code = "session_expired"
+        
+        error_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Erro de Autenticação</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
+        {user_message}
+    </p>
+    <script>
+        setTimeout(function() {{
+            window.location.href = {json.dumps(frontend_url + '/login?error=' + error_code)};
+        }}, 3000);
+    </script>
+</body>
+</html>"""
+        return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
     except Exception as e:
         import traceback
-        from authlib.integrations.base_client.errors import MismatchingStateError
         
         error_msg = str(e)
         error_trace = traceback.format_exc()
         print(f"Erro no callback OAuth: {error_msg}")
         print(error_trace)
         
-        # Tratamento específico para erro de state mismatch
-        if isinstance(e, MismatchingStateError):
-            user_message = "A sessão expirou. Por favor, tente fazer login novamente."
-            error_code = "session_expired"
-        else:
-            user_message = f"Erro no login com Google: {error_msg}"
-            error_code = "oauth_failed"
+        user_message = f"Erro no login com Google: {error_msg}"
+        error_code = "oauth_failed"
         
         error_html = f"""<!DOCTYPE html>
 <html>
