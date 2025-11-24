@@ -340,10 +340,20 @@ def google_callback():
         return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
     except Exception as e:
         import traceback
+        from authlib.integrations.base_client.errors import MismatchingStateError
+        
         error_msg = str(e)
         error_trace = traceback.format_exc()
         print(f"Erro no callback OAuth: {error_msg}")
         print(error_trace)
+        
+        # Tratamento específico para erro de state mismatch
+        if isinstance(e, MismatchingStateError):
+            user_message = "A sessão expirou. Por favor, tente fazer login novamente."
+            error_code = "session_expired"
+        else:
+            user_message = f"Erro no login com Google: {error_msg}"
+            error_code = "oauth_failed"
         
         error_html = f"""<!DOCTYPE html>
 <html>
@@ -353,11 +363,11 @@ def google_callback():
 </head>
 <body>
     <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
-        Erro no login com Google: {error_msg}
+        {user_message}
     </p>
     <script>
         setTimeout(function() {{
-            window.location.href = {json.dumps(frontend_url + '/login?error=oauth_failed')};
+            window.location.href = {json.dumps(frontend_url + '/login?error=' + error_code)};
         }}, 3000);
     </script>
 </body>
