@@ -80,7 +80,6 @@ const Reports = () => {
         }))
         .filter((acc: any) => acc.id);
       setAccounts(activeAccounts);
-      }
     } catch (err) {
       console.error('Reports: Erro ao carregar contas:', err);
     }
