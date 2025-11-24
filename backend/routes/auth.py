@@ -206,6 +206,10 @@ def google_login():
     import secrets
     nonce = secrets.token_urlsafe(16)
     session["__google_oidc_nonce__"] = nonce
+    session.permanent = True  # Torna a sessão permanente
+    # Força o salvamento da sessão antes do redirect
+    from flask import session as flask_session
+    flask_session.modified = True
     return google.authorize_redirect(redirect_uri, nonce=nonce)
 
 
