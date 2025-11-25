@@ -100,19 +100,8 @@ run_e2e_tests() {
         npx playwright test --config=playwright.config.ts
     else
         export TEST_ENV=local
-        # Start dev server in background
-        npm run dev > /dev/null 2>&1 &
-        DEV_PID=$!
-
-        # Wait for server
-        echo "⏳ Aguardando servidor de desenvolvimento..."
-        sleep 5
-
-        # Run tests
+        # Playwright webServer config will handle starting the dev server
         npx playwright test --config=playwright.config.ts
-
-        # Kill dev server
-        kill $DEV_PID || true
     fi
 
     cd ..
