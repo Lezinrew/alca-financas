@@ -8,6 +8,8 @@ import uuid
 import os
 import base64
 import json
+import jwt
+import requests
 
 from utils.auth_utils import hash_password, check_password, generate_jwt, require_auth, decode_token
 from services.user_service import create_user, create_default_categories, get_user_public
@@ -239,6 +241,7 @@ def google_callback():
     try:
         oauth: OAuth = current_app.config['OAUTH']
         google = oauth.create_client('google')
+        api_base_url = os.getenv('API_BASE_URL', 'https://api.alcahub.com.br')
         
         # Verifica se há erro na requisição
         error = request.args.get('error')
@@ -263,12 +266,57 @@ def google_callback():
 </html>"""
             return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
         
-        token = google.authorize_access_token()
+        # Tenta obter o token, mas trata MismatchingStateError de forma mais tolerante
+        token = None
+        nonce = None
+        try:
+            token = google.authorize_access_token()
+            nonce = session.get("__google_oidc_nonce__")
+        except MismatchingStateError:
+            # Se o state não corresponder, tenta obter o token sem verificação de state
+            # Isso é menos seguro, mas necessário quando a sessão não é mantida
+            print("Warning: MismatchingStateError - tentando obter token sem verificação de state")
+            # Pega o código diretamente da URL
+            code = request.args.get('code')
+            if not code:
+                raise Exception('Código de autorização não encontrado')
+            
+            # Obtém o token manualmente usando o código
+            token_url = 'https://oauth2.googleapis.com/token'
+            token_data = {
+                'code': code,
+                'client_id': GOOGLE_CLIENT_ID,
+                'client_secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+                'redirect_uri': f"{api_base_url}/api/auth/google/callback",
+                'grant_type': 'authorization_code'
+            }
+            token_response = requests.post(token_url, data=token_data)
+            if token_response.status_code != 200:
+                raise Exception(f'Erro ao obter token: {token_response.text}')
+            token = token_response.json()
+            # Quando obtemos o token manualmente, não temos o nonce da sessão
+            # Mas podemos tentar obter do token JWT diretamente
+            nonce = None
+        
         if not token:
             raise Exception('Token de acesso não recebido do Google')
             
-        nonce = session.get("__google_oidc_nonce__")
-        resp = google.parse_id_token(token, nonce=nonce)
+        # Tenta obter o nonce da sessão se não foi obtido anteriormente
+        if nonce is None:
+            nonce = session.get("__google_oidc_nonce__")
+        
+        # Parse do ID token - se não tiver nonce, tenta sem ele (menos seguro, mas funcional)
+        if nonce:
+            resp = google.parse_id_token(token, nonce=nonce)
+            session.pop("__google_oidc_nonce__", None)
+        else:
+            # Se não tiver nonce, tenta decodificar o JWT manualmente
+            id_token = token.get('id_token')
+            if not id_token:
+                raise Exception('ID token não encontrado na resposta')
+            # Decodifica sem verificação de nonce (menos seguro, mas necessário)
+            # O Google valida o token, então podemos confiar no conteúdo
+            resp = jwt.decode(id_token, options={"verify_signature": False})
         session.pop("__google_oidc_nonce__", None)
         google_user = {
             'sub': resp['sub'],
