@@ -34,7 +34,7 @@ const Reports = () => {
     chart_type: 'pie',
     account_id: ''
   });
-  
+
   const [accounts, setAccounts] = useState<any[]>([]);
 
   const reportTypes: Array<{ value: ReportTypeOption; label: string; icon: string }> = [
@@ -95,14 +95,14 @@ const Reports = () => {
         year: filters.year.toString(),
         type: filters.report_type
       };
-      
+
       // Adiciona account_id se selecionado
       if (filters.account_id) {
         params.account_id = filters.account_id;
       }
-      
+
       const response = await reportsAPI.getOverview(params);
-      
+
       // Garante que a resposta tenha a estrutura esperada
       if (response.data) {
         setReportData(response.data);
@@ -111,10 +111,10 @@ const Reports = () => {
       }
     } catch (err: any) {
       console.error('Report error:', err);
-      
+
       // Extrai mensagem de erro mais específica
       let errorMessage = 'Erro ao carregar dados do relatório';
-      
+
       if (err?.response?.data?.error) {
         errorMessage = err.response.data.error;
       } else if (err?.message) {
@@ -124,7 +124,7 @@ const Reports = () => {
       } else if (err?.response?.status === 500) {
         errorMessage = 'Erro no servidor. Tente novamente mais tarde.';
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -150,13 +150,13 @@ const Reports = () => {
   const handleItemClick = (item: any) => {
     // Determina o tipo de transação baseado no tipo de relatório
     const transactionType = filters.report_type.includes('income') ? 'income' : 'expense';
-    
+
     // Constrói os parâmetros de filtro
     const params = new URLSearchParams();
     params.append('month', filters.month.toString());
     params.append('year', filters.year.toString());
     params.append('type', transactionType);
-    
+
     // Adiciona filtro específico baseado no tipo de relatório
     if (filters.report_type.includes('_by_account')) {
       // Se for relatório por conta, filtra por account_id
@@ -171,7 +171,7 @@ const Reports = () => {
         params.append('category_id', item.category_id);
       }
     }
-    
+
     // Navega para a página de transações com os filtros
     navigate(`/transactions?${params.toString()}`);
   };
@@ -239,11 +239,10 @@ const Reports = () => {
                   <button
                     key={type.value}
                     type="button"
-                    className={`p-2.5 rounded-md transition-all duration-200 ${
-                      filters.chart_type === type.value
+                    className={`p-2.5 rounded-md transition-all duration-200 ${filters.chart_type === type.value
                         ? 'bg-blue-600 text-white shadow-md scale-105'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-105'
-                    }`}
+                      }`}
                     onClick={() => handleFilterChange('chart_type', type.value)}
                     title={type.label}
                   >
@@ -319,10 +318,10 @@ const Reports = () => {
                       const value = item.total ?? item.current_balance ?? 0;
                       const color = item.category_color || item.account_color || '#6b7280';
                       const name = item.category_name || item.account_name || 'Sem nome';
-                      
+
                       return (
-                        <div 
-                          key={index} 
+                        <div
+                          key={index}
                           onClick={() => handleItemClick(item)}
                           className="flex items-start justify-between gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
                           title="Clique para ver as transações"
@@ -343,7 +342,7 @@ const Reports = () => {
                                 <div className="mt-2 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                   <div
                                     className="h-full rounded-full transition-all duration-500"
-                                    style={{ 
+                                    style={{
                                       width: `${Math.min(parseFloat(percentage), 100)}%`,
                                       backgroundColor: color
                                     }}
@@ -411,11 +410,10 @@ const Reports = () => {
                 {reportTypes.map((type) => (
                   <button
                     key={type.value}
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 group ${
-                      filters.report_type === type.value
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 group ${filters.report_type === type.value
                         ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-md scale-[1.02]'
                         : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:scale-[1.01]'
-                    }`}
+                      }`}
                     onClick={() => handleFilterChange('report_type', type.value)}
                   >
                     <i className={`bi ${type.icon} text-lg ${filters.report_type === type.value ? 'text-white' : 'text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400'}`}></i>
@@ -464,7 +462,7 @@ const Reports = () => {
                       {reportData.data ? reportData.data.length : 0}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      {reportData.data && reportData.data.length > 0 
+                      {reportData.data && reportData.data.length > 0
                         ? `${reportData.data.reduce((sum, item) => sum + (item.count || 0), 0)} transações`
                         : 'Nenhuma transação'}
                     </div>

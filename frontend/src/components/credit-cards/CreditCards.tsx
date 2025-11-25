@@ -77,16 +77,16 @@ const CreditCards: React.FC = () => {
             // Limite total: usa 'limit' se disponível, senão 'initial_balance'
             const limit = acc.limit ?? acc.initial_balance ?? 0;
             const currentBalance = acc.current_balance ?? 0;
-            
+
             // Para cartões de crédito:
             // - Se current_balance é negativo, representa gasto (ex: -1252.13 = gasto de R$ 1.252,13)
             // - Se current_balance é positivo, também representa gasto (dependendo da implementação)
             // O valor usado é sempre o valor absoluto
             const used = Math.abs(currentBalance);
-            
+
             // Limite disponível = limite total - valor usado
             const available = limit - used;
-            
+
             // Debug log para verificar valores
             console.log(`Cartão ${acc.name}:`, {
               limit,
@@ -95,7 +95,7 @@ const CreditCards: React.FC = () => {
               available,
               initial_balance: acc.initial_balance
             });
-            
+
             return {
               id: acc.id,
               name: acc.name,
@@ -255,8 +255,8 @@ const CreditCards: React.FC = () => {
           <button
             onClick={() => setActiveTab('open')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'open'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
           >
             Faturas abertas
@@ -264,8 +264,8 @@ const CreditCards: React.FC = () => {
           <button
             onClick={() => setActiveTab('closed')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'closed'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
           >
             Faturas fechadas
@@ -319,7 +319,7 @@ const CreditCards: React.FC = () => {
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between mb-4">
-                  <div 
+                  <div
                     className="flex items-center gap-3 flex-1 cursor-pointer"
                     onClick={() => handleCardClick(card)}
                   >
@@ -337,7 +337,7 @@ const CreditCards: React.FC = () => {
                     </div>
                   </div>
                   <div className="relative card-menu">
-                    <button 
+                    <button
                       className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -385,17 +385,16 @@ const CreditCards: React.FC = () => {
                 </div>
 
                 {/* Limit Info */}
-                <div 
+                <div
                   className="space-y-4 cursor-pointer"
                   onClick={() => handleCardClick(card)}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-600 dark:text-slate-400">Limite Disponível</span>
-                    <span className={`text-lg font-bold ${
-                      available >= 0 
-                        ? 'text-emerald-600 dark:text-emerald-400' 
+                    <span className={`text-lg font-bold ${available >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-red-600 dark:text-red-400'
-                    }`}>
+                      }`}>
                       {formatCurrency(available)}
                     </span>
                   </div>
@@ -415,7 +414,7 @@ const CreditCards: React.FC = () => {
                 </div>
 
                 {/* Footer */}
-                <div 
+                <div
                   className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50 cursor-pointer"
                   onClick={() => handleCardClick(card)}
                 >

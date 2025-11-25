@@ -74,6 +74,7 @@ app.config['USERS'] = db.users
 app.config['CATEGORIES'] = db.categories
 app.config['TRANSACTIONS'] = db.transactions
 app.config['ACCOUNTS'] = db.accounts
+app.config['OAUTH_STATES'] = db.oauth_states  # Cache temporário para states do OAuth
 
 @app.get('/api/health')
 def health():

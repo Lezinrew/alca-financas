@@ -57,7 +57,7 @@ const CreditCardDetail: React.FC = () => {
       // Para cartões de crédito, current_balance geralmente é negativo (gasto)
       // O valor usado é o valor absoluto do current_balance
       const used = Math.abs(currentBalance);
-      
+
       // Debug para verificar valores do backend
       console.log('CreditCardDetail - Dados do backend:', {
         accountData,
@@ -66,7 +66,7 @@ const CreditCardDetail: React.FC = () => {
         used,
         initial_balance: accountData.initial_balance
       });
-      
+
       const creditCard: CreditCard = {
         id: accountData.id,
         name: accountData.name,
@@ -225,12 +225,12 @@ const CreditCardDetail: React.FC = () => {
 
   // Valor da fatura = total de despesas do mês selecionado (fatura atual)
   const totalExpenses = safeExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-  
+
   // Limite disponível = limite total - valor total gasto no cartão (não apenas do mês)
   // O card.used já representa o valor total gasto (sempre positivo)
   const totalUsed = card ? (card.used ?? 0) : 0;
   const availableLimit = card ? (card.limit ?? 0) - totalUsed : 0;
-  
+
   // Debug para verificar valores
   console.log('CreditCardDetail - Valores:', {
     cardName: card?.name,
@@ -462,11 +462,10 @@ const CreditCardDetail: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-secondary mb-1">Limite disponível</p>
-                <p className={`text-2xl font-bold ${
-                  availableLimit >= 0 
-                    ? 'text-emerald-600 dark:text-emerald-400' 
+                <p className={`text-2xl font-bold ${availableLimit >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
                     : 'text-red-600 dark:text-red-400'
-                }`}>
+                  }`}>
                   {formatCurrency(availableLimit)}
                 </p>
                 <p className="text-xs text-secondary mt-1">
@@ -479,11 +478,10 @@ const CreditCardDetail: React.FC = () => {
             </div>
             <div className="mt-4 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${
-                  availableLimit >= 0 
-                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500' 
+                className={`h-full rounded-full transition-all ${availableLimit >= 0
+                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500'
                     : 'bg-red-500'
-                }`}
+                  }`}
                 style={{
                   width: `${Math.min(
                     card.limit > 0 ? Math.max(0, (totalUsed / card.limit) * 100) : 0,
