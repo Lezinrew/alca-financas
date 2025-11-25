@@ -79,7 +79,7 @@ export default defineConfig({
 
   // Web server for local testing
   webServer: !isProduction ? {
-    command: 'npm run dev || true',
+    command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
