@@ -64,7 +64,7 @@ fi
 echo -e "${GREEN}✅ Verificações de git passaram${NC}\n"
 
 # Run tests first (antes de configurar rollback remoto)
-echo -e "${BLUE}🧪 Executando testes antes do deploy...${NC}"
+echo -e "${BLUE}🧪 Executando testes locais...${NC}"
 ./scripts/run-tests.sh all local
 
 if [ $? -ne 0 ]; then
