@@ -14,8 +14,13 @@ interface Message {
   suggestions?: string[];
 }
 
-const CHATBOT_API_URL = 'https://chat.alcahub.com.br/api/chat';
-const CHATBOT_WS_URL = 'wss://chat.alcahub.com.br/api/chat/ws';
+const isDevelopment = import.meta.env.DEV;
+const CHATBOT_API_URL = isDevelopment
+  ? 'http://127.0.0.1:8100/api/chat'
+  : 'https://chat.alcahub.com.br/api/chat';
+const CHATBOT_WS_URL = isDevelopment
+  ? 'ws://127.0.0.1:8100/api/chat/ws'
+  : 'wss://chat.alcahub.com.br/api/chat/ws';
 
 export const ChatWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -297,8 +302,8 @@ export const ChatWidget: React.FC = () => {
               >
                 <div
                   className={`max-w-[80%] rounded-lg p-3 ${message.isUser
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border'
                     }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.text}</p>

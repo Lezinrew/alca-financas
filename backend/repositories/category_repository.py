@@ -1,7 +1,12 @@
 from typing import List, Dict, Any, Optional
 from .base_repository import BaseRepository
+from database import get_db
 
 class CategoryRepository(BaseRepository):
+    def __init__(self):
+        db = get_db()
+        super().__init__(db.categories)
+
     def find_by_user(self, user_id: str) -> List[Dict[str, Any]]:
         return self.find_all({'user_id': user_id})
 

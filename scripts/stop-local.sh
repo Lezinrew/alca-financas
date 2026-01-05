@@ -34,7 +34,18 @@ if [ -f "logs/frontend.pid" ]; then
     fi
 fi
 
+# Stop Chatbot
+if [ -f "logs/chatbot.pid" ]; then
+    CHATBOT_PID=$(cat logs/chatbot.pid)
+    if ps -p $CHATBOT_PID > /dev/null; then
+        echo "🛑 Parando Chatbot (PID: $CHATBOT_PID)..."
+        kill $CHATBOT_PID
+        rm logs/chatbot.pid
+    fi
+fi
+
 # Stop Docker containers (if Docker is running)
+
 if docker info > /dev/null 2>&1; then
     echo "🛑 Parando containers Docker..."
     docker-compose down || true

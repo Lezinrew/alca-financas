@@ -1,14 +1,19 @@
+"""
+Account Repository para Supabase
+"""
 from typing import List, Dict, Any, Optional
-from .base_repository import BaseRepository
-from database import get_db
+from .base_repository_supabase import BaseRepository
+
 
 class AccountRepository(BaseRepository):
     def __init__(self):
-        db = get_db()
-        super().__init__(db.accounts)
-
+        super().__init__("accounts")
+    
     def find_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Busca contas por usuário"""
         return self.find_all({'user_id': user_id})
     
     def find_by_name(self, user_id: str, name: str) -> Optional[Dict[str, Any]]:
-        return self.collection.find_one({'user_id': user_id, 'name': name})
+        """Busca conta por nome"""
+        return self.find_one({'user_id': user_id, 'name': name})
+

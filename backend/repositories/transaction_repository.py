@@ -1,8 +1,13 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from .base_repository import BaseRepository
+from database import get_db
 
 class TransactionRepository(BaseRepository):
+    def __init__(self):
+        db = get_db()
+        super().__init__(db.transactions)
+
     def find_by_filter(self, user_id: str, filters: Dict[str, Any], page: int = 1, per_page: int = 20) -> Dict[str, Any]:
         query = {'user_id': user_id}
         

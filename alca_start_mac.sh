@@ -69,29 +69,49 @@ command -v pip3 >/dev/null 2>&1 || { echo "Erro: pip3 não encontrado"; exit 1; 
 command -v node >/dev/null 2>&1 || { echo "Erro: node não encontrado"; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "Erro: npm não encontrado"; exit 1; }
 
-echo "==> Garantindo que o MongoDB esteja em execução (localhost:27017)"
-MONGO_STARTED_BY_SCRIPT=""
+# Verificar se está usando Supabase ou MongoDB
+USE_SUPABASE="${USE_SUPABASE:-false}"
+if [ "$USE_SUPABASE" = "true" ] || [ -n "${SUPABASE_URL:-}" ]; then
+  echo -e "${BLUE}==> Usando Supabase como banco de dados${NC}"
+  USE_SUPABASE="true"
+  
+  # Verificar variáveis do Supabase
+  if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_KEY:-}" ]; then
+    echo -e "${YELLOW}⚠️  SUPABASE_URL ou SUPABASE_KEY não configurados${NC}"
+    echo -e "${YELLOW}💡 Configure no arquivo backend/.env:${NC}"
+    echo -e "   ${BLUE}SUPABASE_URL=https://seu-projeto.supabase.co${NC}"
+    echo -e "   ${BLUE}SUPABASE_KEY=sua-service-role-key${NC}"
+    echo ""
+    echo -e "${YELLOW}Ou defina USE_SUPABASE=false para usar MongoDB local${NC}"
+    exit 1
+  fi
+  
+  echo -e "${GREEN}✅ Configuração do Supabase encontrada${NC}"
+else
+  echo "==> Garantindo que o MongoDB esteja em execução (localhost:27017)"
+  USE_SUPABASE="false"
+  MONGO_STARTED_BY_SCRIPT=""
 
-# Função para verificar se Docker daemon está rodando
-check_docker_daemon() {
-  if command -v docker >/dev/null 2>&1; then
-    if docker info >/dev/null 2>&1; then
-      return 0
+  # Função para verificar se Docker daemon está rodando
+  check_docker_daemon() {
+    if command -v docker >/dev/null 2>&1; then
+      if docker info >/dev/null 2>&1; then
+        return 0
+      else
+        return 1
+      fi
     else
       return 1
     fi
-  else
-    return 1
-  fi
-}
+  }
 
-if command -v brew >/dev/null 2>&1 && brew list --formula | grep -q "^mongodb-community$"; then
-  echo "  📦 Iniciando MongoDB via Homebrew..."
-  brew services start mongodb-community || true
-  MONGO_STARTED_BY_SCRIPT="brew"
-else
-  echo "  📦 Homebrew MongoDB não encontrado. Tentando via Docker..."
-  if check_docker_daemon; then
+  if command -v brew >/dev/null 2>&1 && brew list --formula | grep -q "^mongodb-community$"; then
+    echo "  📦 Iniciando MongoDB via Homebrew..."
+    brew services start mongodb-community || true
+    MONGO_STARTED_BY_SCRIPT="brew"
+  else
+    echo "  📦 Homebrew MongoDB não encontrado. Tentando via Docker..."
+    if check_docker_daemon; then
     echo "  ✅ Docker daemon está rodando"
     if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^alca_mongo$'; then
       if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^alca_mongo$'; then
@@ -130,31 +150,33 @@ else
       exit 1
     fi
   fi
-fi
 
-# Aguardar MongoDB responder na porta 27017
-if [ "$MONGO_STARTED_BY_SCRIPT" != "externo" ]; then
-  echo -n "  ⏳ Aguardando MongoDB em localhost:27017"
-for i in {1..60}; do
-  if nc -z localhost 27017 >/dev/null 2>&1; then
-      echo -e " ${GREEN}- ok${NC}"
-    break
+  # Aguardar MongoDB responder na porta 27017
+  if [ "$MONGO_STARTED_BY_SCRIPT" != "externo" ]; then
+    echo -n "  ⏳ Aguardando MongoDB em localhost:27017"
+    for i in {1..60}; do
+      if nc -z localhost 27017 >/dev/null 2>&1; then
+        echo -e " ${GREEN}- ok${NC}"
+        break
+      fi
+      echo -n "."
+      sleep 1
+    done
+    echo
   fi
-  echo -n "."
-  sleep 1
-done
-echo
 fi
 
-# Verificação final do MongoDB
-if ! nc -z localhost 27017 >/dev/null 2>&1; then
-  echo -e "${RED}❌ Erro: MongoDB não está acessível em localhost:27017${NC}"
-  echo -e "${YELLOW}💡 Dicas:${NC}"
-  echo -e "   • Inicie o Docker Desktop e execute o script novamente"
-  echo -e "   • OU instale/start o mongodb-community via Homebrew: ${BLUE}brew install mongodb-community && brew services start mongodb-community${NC}"
-  echo -e "   • OU inicie MongoDB manualmente e execute o script novamente"
-  exit 1
+  # Verificação final do MongoDB
+  if ! nc -z localhost 27017 >/dev/null 2>&1; then
+    echo -e "${RED}❌ Erro: MongoDB não está acessível em localhost:27017${NC}"
+    echo -e "${YELLOW}💡 Dicas:${NC}"
+    echo -e "   • Inicie o Docker Desktop e execute o script novamente"
+    echo -e "   • OU instale/start o mongodb-community via Homebrew: ${BLUE}brew install mongodb-community && brew services start mongodb-community${NC}"
+    echo -e "   • OU inicie MongoDB manualmente e execute o script novamente"
+    exit 1
+  fi
 fi
+
 
 echo "==> Preparando backend (virtualenv + dependências)"
 cd "$BACKEND_DIR"
@@ -180,8 +202,16 @@ echo -e "  ${GREEN}✅ Todas as dependências instaladas${NC}"
 
 # Variáveis de ambiente padrão
 export SECRET_KEY="${SECRET_KEY:-dev-secret-key}"
-export MONGO_URI="${MONGO_URI:-mongodb://localhost:27017/alca_financas}"
-export MONGO_DB="${MONGO_DB:-alca_financas}"
+
+# Configuração do banco de dados
+if [ "$USE_SUPABASE" = "true" ]; then
+  # Supabase - variáveis já devem estar no .env
+  echo -e "${GREEN}✅ Usando Supabase como banco de dados${NC}"
+else
+  # MongoDB local
+  export MONGO_URI="${MONGO_URI:-mongodb://localhost:27017/alca_financas}"
+  export MONGO_DB="${MONGO_DB:-alca_financas}"
+fi
 
 # CORS - Sempre inclui localhost em portas comuns
 CORS_BASE="http://localhost:3000,http://localhost:5173,http://localhost:3001,http://127.0.0.1:3000"

@@ -12,7 +12,7 @@ def categories():
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
     
-    repo = CategoryRepository(categories_collection)
+    repo = CategoryRepository()
     service = CategoryService(repo, transactions_collection)
 
     if request.method == 'GET':
@@ -57,7 +57,7 @@ def category_detail(category_id: str):
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
     
-    repo = CategoryRepository(categories_collection)
+    repo = CategoryRepository()
     service = CategoryService(repo, transactions_collection)
 
     try:

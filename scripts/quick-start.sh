@@ -52,6 +52,9 @@ echo -e "${GREEN}✅ Backend rodando (PID: $BACKEND_PID)${NC}"
 
 cd ..
 
+# Chatbot setup
+./scripts/start-chatbot.sh
+
 # Frontend setup
 echo -e "\n${BLUE}🎨 Frontend${NC}"
 cd frontend

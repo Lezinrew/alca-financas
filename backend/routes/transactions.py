@@ -18,7 +18,7 @@ def transactions():
     transactions_collection = current_app.config['TRANSACTIONS']
     accounts_collection = current_app.config['ACCOUNTS']
     
-    repo = TransactionRepository(transactions_collection)
+    repo = TransactionRepository()
     service = TransactionService(repo, categories_collection, accounts_collection)
 
     if request.method == 'GET':
@@ -72,7 +72,7 @@ def transaction_detail(transaction_id: str):
     transactions_collection = current_app.config['TRANSACTIONS']
     accounts_collection = current_app.config['ACCOUNTS']
     
-    repo = TransactionRepository(transactions_collection)
+    repo = TransactionRepository()
     service = TransactionService(repo, categories_collection, accounts_collection)
 
     try:
@@ -107,10 +107,10 @@ def import_transactions():
     repo = TransactionRepository(transactions_collection)
     service = TransactionService(repo, categories_collection, accounts_collection)
     
-    account_repo = AccountRepository(accounts_collection)
+    account_repo = AccountRepository()
     account_service = AccountService(account_repo, transactions_collection)
     
-    category_repo = CategoryRepository(categories_collection)
+    category_repo = CategoryRepository()
     category_service = CategoryService(category_repo, transactions_collection)
     
     if 'file' not in request.files:
