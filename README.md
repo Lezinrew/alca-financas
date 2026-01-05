@@ -119,7 +119,7 @@ cd alca-financas/frontend
 npm install
 
 # Execute o servidor de desenvolvimento
-npm run dev
+npm install
 
 # Acesse http://localhost:3000
 # Use "Login com IA" para acesso demo instantâneo!

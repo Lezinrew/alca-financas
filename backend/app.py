@@ -3,11 +3,23 @@ API Backend - Flask + MongoDB, modular via Blueprints
 """
 
 import os
-from flask import Flask
+import logging
+from flask import Flask, jsonify
 from flask_cors import CORS
-from pymongo import MongoClient
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
+from database import init_db, get_db
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    from routes.auth_supabase import bp as auth_supabase_bp
+    SUPABASE_AUTH_AVAILABLE = True
+except ImportError:
+    SUPABASE_AUTH_AVAILABLE = False
+    logger.warning("Supabase Auth routes não disponíveis (opcional)")
 
 from routes.auth import bp as auth_bp
 from routes.categories import bp as categories_bp
@@ -63,25 +75,72 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-# Configuração segura do MongoDB com defaults locais
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/alca_financas')
-MONGO_DB = os.getenv('MONGO_DB', 'alca_financas')
+# Configuração do Supabase (PostgreSQL)
+# Variáveis de ambiente necessárias:
+# - SUPABASE_URL: URL do projeto Supabase
+# - SUPABASE_KEY: Service Role Key (para operações server-side)
+# - SUPABASE_DB_URL (opcional): URL PostgreSQL direta para queries SQL complexas
 
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[MONGO_DB]
-app.config['DB'] = db
-app.config['USERS'] = db.users
-app.config['CATEGORIES'] = db.categories
-app.config['TRANSACTIONS'] = db.transactions
-app.config['ACCOUNTS'] = db.accounts
-app.config['OAUTH_STATES'] = db.oauth_states  # Cache temporário para states do OAuth
+try:
+    init_db()
+    from database import get_db_type
+    db_type = get_db_type()
+    db_client = get_db()
+    
+    app.config['DB'] = db_client
+    app.config['DB_TYPE'] = db_type
+    
+    if db_type == "supabase":
+        logger.info("📡 Usando Repositórios Supabase")
+        from repositories.user_repository_supabase import UserRepository
+        from repositories.category_repository_supabase import CategoryRepository
+        from repositories.transaction_repository_supabase import TransactionRepository
+        from repositories.account_repository_supabase import AccountRepository
+        
+        app.config['SUPABASE'] = db_client
+        app.config['OAUTH_STATES'] = db_client.table('oauth_states')
+    else:
+        logger.info("🍃 Usando Repositórios MongoDB")
+        from repositories.user_repository import UserRepository
+        from repositories.category_repository import CategoryRepository
+        from repositories.transaction_repository import TransactionRepository
+        from repositories.account_repository import AccountRepository
+    
+    app.config['USER_REPO'] = UserRepository()
+    app.config['CATEGORY_REPO'] = CategoryRepository()
+    app.config['TRANSACTION_REPO'] = TransactionRepository()
+    app.config['ACCOUNT_REPO'] = AccountRepository()
+    
+    # Aliases para compatibilidade (deprecated)
+    app.config['USERS'] = app.config['USER_REPO']
+    app.config['CATEGORIES'] = app.config['CATEGORY_REPO']
+    app.config['TRANSACTIONS'] = app.config['TRANSACTION_REPO']
+    app.config['ACCOUNTS'] = app.config['ACCOUNT_REPO']
+    
+except Exception as e:
+    import logging
+    logging.error(f"Erro ao inicializar banco de dados: {e}")
+    raise
+
 
 @app.get('/api/health')
 def health():
     """Simple health check endpoint."""
     return {'status': 'ok'}, 200
 
-app.register_blueprint(auth_bp, url_prefix='/api')
+# Registrar blueprints de autenticação
+# Use auth_supabase_bp para Supabase Auth ou auth_bp para autenticação customizada
+USE_SUPABASE_AUTH = os.getenv('USE_SUPABASE_AUTH', 'false').lower() == 'true'
+
+if USE_SUPABASE_AUTH and SUPABASE_AUTH_AVAILABLE:
+    app.register_blueprint(auth_supabase_bp, url_prefix='/api')
+    logger.info("✅ Usando Supabase Auth para autenticação")
+else:
+    app.register_blueprint(auth_bp, url_prefix='/api')
+    if USE_SUPABASE_AUTH:
+        logger.warning("⚠️  USE_SUPABASE_AUTH=true mas módulo não disponível. Usando autenticação customizada.")
+    else:
+        logger.info("✅ Usando autenticação customizada")
 app.register_blueprint(categories_bp)
 app.register_blueprint(transactions_bp)
 app.register_blueprint(accounts_bp)
@@ -95,11 +154,12 @@ from utils.exceptions import AppException
 def handle_app_exception(e):
     return jsonify(e.to_dict()), e.status_code
 
-def create_indices(db):
-    db.transactions.create_index([('user_id', 1), ('date', -1)])
-    db.transactions.create_index([('user_id', 1), ('category_id', 1)])
-    db.users.create_index('email', unique=True)
+def create_indices():
+    """Índices são criados no schema SQL do Supabase"""
+    # Índices já estão definidos no schema.sql
+    # Esta função é mantida para compatibilidade, mas não faz nada
+    pass
 
 if __name__ == '__main__':
-    create_indices(db)
+    create_indices()
     app.run(host='0.0.0.0', port=8001, debug=True)

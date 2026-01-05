@@ -21,7 +21,7 @@ def accounts():
     accounts_collection = current_app.config['ACCOUNTS']
     transactions_collection = current_app.config['TRANSACTIONS']
     
-    repo = AccountRepository(accounts_collection)
+    repo = AccountRepository()
     service = AccountService(repo, transactions_collection)
 
     if request.method == 'GET':
@@ -101,13 +101,13 @@ def import_credit_card_statement(account_id: str):
     categories_collection = current_app.config['CATEGORIES']
     transactions_collection = current_app.config['TRANSACTIONS']
     
-    account_repo = AccountRepository(accounts_collection)
+    account_repo = AccountRepository()
     account_service = AccountService(account_repo, transactions_collection)
     
-    category_repo = CategoryRepository(categories_collection)
+    category_repo = CategoryRepository()
     category_service = CategoryService(category_repo, transactions_collection)
     
-    transaction_repo = TransactionRepository(transactions_collection)
+    transaction_repo = TransactionRepository()
     transaction_service = TransactionService(transaction_repo, categories_collection, accounts_collection)
     
     # Verifica se a conta existe e é um cartão de crédito

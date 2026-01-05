@@ -7,7 +7,33 @@ class BaseRepository:
     def __init__(self, collection: Collection):
         self.collection = collection
 
+    def find_one(self, *args, **kwargs):
+        """Proxy para o método find_one da coleção MongoDB"""
+        return self.collection.find_one(*args, **kwargs)
+
+    def find(self, *args, **kwargs):
+        """Proxy para o método find da coleção MongoDB"""
+        return self.collection.find(*args, **kwargs)
+
+    def count_documents(self, *args, **kwargs):
+        """Proxy para o método count_documents da coleção MongoDB"""
+        return self.collection.count_documents(*args, **kwargs)
+
+    def aggregate(self, *args, **kwargs):
+        """Proxy para o método aggregate da coleção MongoDB"""
+        return self.collection.aggregate(*args, **kwargs)
+
+    def update_one(self, *args, **kwargs):
+        """Proxy para o método update_one da coleção MongoDB"""
+        return self.collection.update_one(*args, **kwargs)
+
+    def insert_one(self, *args, **kwargs):
+        """Proxy para o método insert_one da coleção MongoDB"""
+        return self.collection.insert_one(*args, **kwargs)
+
     def find_all(self, filter_query: Dict[str, Any] = None, sort_by: str = None, ascending: bool = True) -> List[Dict[str, Any]]:
+
+
         query = filter_query or {}
         cursor = self.collection.find(query)
         if sort_by:

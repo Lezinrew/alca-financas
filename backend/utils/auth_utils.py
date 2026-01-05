@@ -6,7 +6,7 @@ import jwt
 import os
 
 
-JWT_SECRET = os.getenv('SECRET_KEY', 'dev-secret-key')
+JWT_SECRET = os.getenv('JWT_SECRET', os.getenv('SECRET_KEY', 'dev-secret-key'))
 JWT_EXPIRES_HOURS = int(os.getenv('JWT_EXPIRES_HOURS', 24))
 
 
@@ -61,7 +61,7 @@ def generate_jwt(user_id: str) -> dict:
     access_payload = {
         'user_id': str(user_id),
         'type': 'access',
-        'exp': datetime.utcnow() + timedelta(minutes=15),
+        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRES_HOURS),
         'jti': str(uuid.uuid4())
     }
     refresh_payload = {
