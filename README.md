@@ -1,51 +1,44 @@
-# Alca Finanças - Aplicação de Controle Financeiro Inteligente
+# Alca Finanças
 
-Aplicação web full-stack de controle financeiro pessoal com funcionalidades modernas e interface intuitiva. Desenvolvida com foco em usabilidade, design moderno e gestão financeira completa com recursos de IA.
+Aplicação web full-stack de controle financeiro pessoal. Stack moderno com React/TypeScript no frontend e Flask/Python no backend, utilizando Supabase (PostgreSQL) como database.
 
-## 🚀 Características Principais
+## Características Principais
 
-### 🤖 **Novidades - Login com IA**
-- **Login Inteligente** - Acesso demo instantâneo com credenciais simuladas
-- **Interface Moderna** - UI redesenhada com Tailwind CSS e componentes shadcn/ui
-- **Dashboard Modernizado** - KPIs visuais e gráficos interativos
-- **Experiência Aprimorada** - Animações, loading states e feedback visual
+### Autenticação
+- Supabase Auth nativo (migração completa de MongoDB)
+- Sistema de recuperação de senha via email
+- Token management com storage seguro e renovação automática
+- Login demo para testes (credenciais: demo@alca.fin)
+- Session management com localStorage
 
-### Backend (Flask API)
-- **Flask 3.0** com **Supabase (PostgreSQL)** para armazenamento de dados
-- **Autenticação JWT** com tokens seguros HS256
-- **OAuth 2.0** para login social (Google, Microsoft, Apple)
-- **API RESTful** completa com endpoints para todas as funcionalidades
-- **Importação CSV** para transações em massa
-- **Categorização** inteligente de receitas e despesas
-- **Criptografia bcrypt** para senhas
-- **CORS configurável** para segurança
-- **Row Level Security (RLS)** via Supabase para isolamento de dados
+### Backend
+- Flask 3.0 + Supabase (PostgreSQL)
+- Supabase Auth com Row Level Security (RLS)
+- Email service para notificações e password reset
+- API RESTful com endpoints para transações, contas e categorias
+- Importação CSV em batch
+- Auto-detecção de contas em transações
+- CORS configurável
 
-### Frontend (React SPA)
-- **React 18** com Vite e TypeScript para desenvolvimento moderno
-- **Tailwind CSS** + **shadcn/ui** para design system consistente
-- **Recharts** para gráficos interativos profissionais
-- **React Router DOM** para navegação SPA
-- **Context API** para gerenciamento de estado global
-- **Lucide React** para ícones modernos
-- **Responsividade** completa para desktop, tablet e mobile
-- **PWA Ready** para instalação em dispositivos
+### Frontend
+- React 18 + Vite + TypeScript
+- Tailwind CSS + shadcn/ui
+- Recharts para visualizações
+- React Router DOM para navegação
+- Context API para state management
+- Lucide React para ícones
+- Responsive design (mobile-first)
+- PWA ready
 
-### 📊 Dashboard Moderno
-- **4 KPIs Principais**: Saldo Atual, Receitas, Despesas, Tickets Abertos
-- **Gráfico de Área**: Receitas vs. Despesas (últimos 12 meses)
-- **Gráfico Pizza**: Distribuição de gastos por categoria
-- **Transações Recentes**: Lista das últimas movimentações
-- **Dados Mock**: Sistema de dados simulados para demonstração
+### Dashboard
+- KPIs principais: saldo atual, receitas, despesas, tickets abertos
+- Gráfico de área: receitas vs despesas (12 meses)
+- Gráfico pizza: distribuição por categoria
+- Lista de transações recentes
+- Mock data para demo
 
-### 🔐 Autenticação Avançada
-- **Login Tradicional**: E-mail e senha com validação
-- **Login com IA**: Acesso demo instantâneo (credenciais: demo@alca.fin)
-- **Persistência Local**: Sessão mantida com localStorage
-- **Proteção de Rotas**: Guards para páginas autenticadas
-- **Token Expiration**: Tratamento inteligente de tokens expirados
 
-## 🛠️ Tecnologias Utilizadas
+## Stack
 
 ### Frontend
 - **React 18** - Biblioteca principal
@@ -60,57 +53,53 @@ Aplicação web full-stack de controle financeiro pessoal com funcionalidades mo
 - **date-fns** - Manipulação de datas
 - **Chart.js** - Gráficos complementares
 
-### Ferramentas de Desenvolvimento
-- **Vitest** - Framework de testes
-- **Testing Library** - Testes de componentes
-- **ESLint** - Linter JavaScript/TypeScript
-- **PostCSS** - Processamento CSS
-- **Autoprefixer** - Compatibilidade CSS
+### Dev Tools
+- Vitest + Testing Library
+- ESLint
+- PostCSS + Autoprefixer
 
 ### Backend
-- **Python 3.9+** com Flask 3.0
-- **Supabase** (PostgreSQL) para banco de dados
-- **JWT** para autenticação
-- **bcrypt** para criptografia
-- **Flask-CORS** para CORS
-- **Pydantic** para validação de dados
+- Python 3.9+ + Flask 3.0
+- Supabase (PostgreSQL)
+- JWT + bcrypt
+- Flask-CORS
+- Pydantic
 
-## 🎯 Funcionalidades
+## Funcionalidades
 
-### ✨ Principais
-- [x] **Login Moderno** com UI redesenhada
-- [x] **Login com IA** para acesso demo
-- [x] **Dashboard Interativo** com KPIs e gráficos
-- [x] **Gestão de Transações** (CRUD completo)
-- [x] **Categorização** de receitas e despesas
-- [x] **Gestão de Contas** bancárias
-- [x] **Relatórios Visuais** com gráficos
-- [x] **Importação CSV** de transações
-- [x] **Configurações** personalizáveis
-- [x] **Multi-idioma** (PT-BR, EN)
+### Core
+- [x] Supabase Auth com password recovery
+- [x] Email service integrado
+- [x] Dashboard com KPIs e gráficos (Recharts)
+- [x] CRUD completo de transações
+- [x] Categorização de receitas/despesas
+- [x] Gestão de contas bancárias
+- [x] Importação CSV
+- [x] Auto-detecção de contas
+- [x] Relatórios visuais
 
-### 🔒 Segurança
-- [x] Autenticação JWT segura
-- [x] Proteção de rotas frontend
-- [x] Validação de formulários
-- [x] Sanitização de dados
-- [x] Headers de segurança
+### Segurança
+- [x] Row Level Security (RLS)
+- [x] JWT com token rotation
+- [x] Route guards (frontend/backend)
+- [x] Input validation e sanitization
+- [x] Security headers
+- [x] Data isolation per user
 
-### 📱 UX/UI
-- [x] Design responsivo (mobile-first)
-- [x] Modo claro profissional
-- [x] Animações e transições suaves
-- [x] Loading states e feedback visual
-- [x] Acessibilidade (ARIA, navegação por teclado)
+### UI/UX
+- [x] Responsive design (mobile-first)
+- [x] Loading states
+- [x] Error handling
+- [x] Accessibility (ARIA)
 
-## 🚦 Como Executar
+## Setup
 
 ### Pré-requisitos
-- **Node.js** 18+ e npm
-- **Python** 3.9+ e pip
-- **Supabase Account** (https://supabase.com) - Database as a Service
+- Node.js 18+
+- Python 3.9+
+- Supabase account (https://supabase.com)
 
-### 🎮 Início Rápido - Desenvolvimento
+### Quick Start
 
 ```bash
 # Clone o repositório
@@ -134,13 +123,12 @@ cp .env.example .env
 # 5. Acesse
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:8001
-# Use "Login com IA" para acesso demo instantâneo!
 
-# 6. Para parar os serviços
+# 6. Para parar
 ./scripts/dev/down.sh
 ```
 
-### ⚙️ Scripts de Desenvolvimento
+### Scripts de Dev
 
 ```bash
 # Setup e Gerenciamento
@@ -156,7 +144,7 @@ cp .env.example .env
 ./alca_stop_mac.sh         # Para aplicação (método antigo)
 ```
 
-### 🏭 Produção
+### Produção
 
 ```bash
 # 1. Configure ambiente de produção
@@ -174,7 +162,7 @@ cp .env.example .env.production
 ./scripts/prod/migrate.sh
 ```
 
-### ⚙️ Scripts do Frontend
+### Frontend Scripts
 
 ```bash
 cd frontend/
@@ -193,7 +181,7 @@ npm run test:ui      # Interface visual dos testes
 npm run lint         # Executa ESLint
 ```
 
-### 🗄️ Backend Manual
+### Backend Manual
 
 ```bash
 cd backend/
@@ -215,7 +203,7 @@ python app.py
 # API disponível em http://localhost:8001
 ```
 
-### 📦 Docker
+### Docker
 
 ```bash
 # Desenvolvimento
@@ -229,9 +217,9 @@ docker-compose up backend    # Apenas backend
 docker-compose up frontend   # Apenas frontend
 ```
 
-## ⚙️ Configuração de Ambiente
+## Configuração
 
-### Variáveis de Ambiente Obrigatórias
+### Environment Variables
 
 ```bash
 # Supabase (obtenha em: https://app.supabase.com/project/_/settings/api)
@@ -258,6 +246,8 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 - **Guia Completo de Ambiente**: `docs/ENVIRONMENTS.md`
 - **Guia de Migrações**: `scripts/db/README.md`
 - **Supabase Setup**: `docs/SUPABASE-CHAVES.md`
+- **Recuperação de Senha**: `docs/RECUPERACAO-SENHA-SUPABASE.md`
+- **Migração Completa**: `SUPABASE_MIGRATION_COMPLETE.md`
 - **Template de Variáveis**: `.env.example`
 
 ### Gerando Secrets Fortes
@@ -270,22 +260,11 @@ openssl rand -hex 32
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-## 🎨 Demonstração
+## Demo
 
-### 🔐 Acesso Demo
-1. Acesse a aplicação
-2. Clique em **"Login com IA"**
-3. Explore o dashboard moderno com dados simulados
+Acesse a aplicação e use o login demo (credenciais: demo@alca.fin) para testar com dados simulados.
 
-### 📊 Funcionalidades Demo
-- **Dashboard**: 4 KPIs + 2 gráficos interativos
-- **Transações**: Lista das movimentações recentes
-- **Dados Realistas**: Valores simulados consistentes
-- **Responsive**: Teste em diferentes tamanhos de tela
-
-## 🧪 Testes
-
-O projeto inclui testes unitários para funcionalidades críticas:
+## Testes
 
 ```bash
 # Executar todos os testes
@@ -298,13 +277,13 @@ npm run test
 npm run test -- --coverage
 ```
 
-### Cobertura Atual
-- ✅ AuthContext (login, logout, persistência)
-- ✅ Token expiration handling
-- ✅ LocalStorage integration
-- ✅ Loading states
+### Coverage
+- AuthContext (login, logout, persistência)
+- Token expiration handling
+- LocalStorage integration
+- Loading states
 
-## 📁 Estrutura do Projeto
+## Estrutura
 
 ```
 alca-financas/
@@ -312,24 +291,47 @@ alca-financas/
 │   ├── src/
 │   │   ├── components/      # Componentes React
 │   │   │   ├── ui/         # Componentes UI base (shadcn/ui)
+│   │   │   │   └── gradient-button.tsx  # Botão com gradiente
 │   │   │   ├── auth/       # Componentes de autenticação
+│   │   │   │   ├── Login.tsx
+│   │   │   │   ├── Register.tsx
+│   │   │   │   ├── ForgotPassword.tsx   # NEW
+│   │   │   │   └── ResetPassword.tsx    # NEW
 │   │   │   └── dashboard/  # Componentes do dashboard
 │   │   ├── contexts/       # Context API (Auth, Theme)
 │   │   ├── lib/            # Utilitários
 │   │   ├── mocks/          # Dados simulados
 │   │   ├── utils/          # Funções auxiliares
+│   │   │   ├── api.ts
+│   │   │   └── tokenStorage.ts  # NEW - Token management
 │   │   └── __tests__/      # Testes unitários
 │   ├── package.json
 │   └── tailwind.config.js
 ├── backend/                 # API Flask + Supabase
 │   ├── routes/             # Endpoints da API
+│   │   ├── auth.py         # Autenticação (Supabase)
+│   │   ├── transactions.py
+│   │   ├── accounts.py
+│   │   ├── categories.py
+│   │   └── dashboard.py
 │   ├── repositories/       # Repositórios Supabase
+│   │   └── transaction_repository_supabase.py
 │   ├── services/           # Lógica de negócio
+│   │   ├── supabase_auth_service.py  # NEW
+│   │   ├── email_service.py          # NEW
+│   │   ├── account_detector.py
+│   │   ├── account_service.py
+│   │   ├── category_service.py
+│   │   ├── transaction_service.py
+│   │   └── report_service.py
 │   ├── utils/              # Utilitários Python
+│   │   ├── auth_utils.py
+│   │   └── auth_utils_supabase.py    # NEW
+│   ├── scripts/
+│   │   └── set_user_password.py      # NEW
+│   ├── database/           # Conexão Supabase
 │   ├── app.py              # Aplicação principal
 │   └── requirements.txt    # Dependências Python
-├── mobile/                  # App React Native (Expo)
-│   └── package.json
 ├── scripts/                 # Scripts de automação
 │   ├── dev/                # Scripts de desenvolvimento
 │   │   ├── setup.sh        # Instala dependências
@@ -340,18 +342,27 @@ alca-financas/
 │   │   ├── build.sh        # Build para produção
 │   │   ├── run.sh          # Executa em produção
 │   │   └── migrate.sh      # Migra banco de dados
-│   └── db/                 # Migrações SQL
-│       └── README.md       # Guia de migrações
+│   ├── db/                 # Migrações SQL e scripts DB
+│   │   └── README.md       # Guia de migrações
+│   └── legacy/             # Scripts antigos
+│       └── mongo/          # Scripts MongoDB (deprecated)
 ├── docs/                    # Documentação
-│   └── ENVIRONMENTS.md     # Guia de env vars
+│   ├── INDEX.md            # Índice da documentação
+│   ├── ENVIRONMENTS.md     # Guia de env vars
+│   ├── SUPABASE-CHAVES.md  # Configuração Supabase
+│   ├── RECUPERACAO-SENHA-SUPABASE.md  # Guia de recuperação
+│   ├── CONTEXTO-TELA-LOGIN.md
+│   └── legacy/             # Docs antigas
+│       └── mongo/          # Documentação MongoDB (deprecated)
 ├── .env.example            # Template de variáveis de ambiente
 ├── docker-compose.yml      # Docker para desenvolvimento
-├── docker-compose.prod.yml # Docker para produção
+├── docker-compose.prod.yml # Docker para produção (com nginx)
 ├── nginx.conf              # Configuração nginx (prod)
+├── SUPABASE_MIGRATION_COMPLETE.md  # Relatório de migração
 └── README.md              # Este arquivo
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Backend não inicia
 
@@ -411,49 +422,66 @@ cd backend && pip install -r requirements.txt
 cd frontend && npm ci
 ```
 
-## 🤝 Contribuição
+## Contribuição
 
-1. **Fork** o projeto
-2. **Clone** sua fork
-3. **Crie** uma branch para sua feature
-4. **Commit** suas mudanças
-5. **Push** para sua branch
-6. **Abra** um Pull Request
+1. Fork o projeto
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para sua branch
+5. Abra um Pull Request
 
-### 📋 Guidelines
+### Guidelines
 - Use TypeScript para novo código
 - Mantenha cobertura de testes
 - Siga o padrão de código existente
-- Documente mudanças no README
 - Execute `./scripts/dev/doctor.sh` antes de commit
 
-## 📄 Licença
+## Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para detalhes.
+MIT License
 
-## 🎯 Roadmap
+## Roadmap
 
-### 📈 Próximas Funcionalidades
-- [ ] **Modo Escuro** completo
-- [ ] **PWA** com install prompt
-- [ ] **Notificações** push
-- [ ] **Backup** automático
-- [ ] **Relatórios** PDF
-- [ ] **Multi-contas** bancárias
-- [ ] **Metas** financeiras
-- [ ] **Lembretes** de pagamento
+### Implementado
+- [x] Migração MongoDB → Supabase
+- [x] Password recovery via email
+- [x] Email service
+- [x] Token management com rotation
+- [x] Auto-detecção de contas
+- [x] Scripts organizados (dev/, prod/, db/)
+- [x] Docker para produção
 
-### 🔧 Melhorias Técnicas
-- [ ] **Storybook** para componentes
-- [ ] **E2E Tests** com Playwright
-- [ ] **CI/CD** com GitHub Actions
-- [ ] **Performance** otimizations
-- [ ] **Bundle** analysis
-- [ ] **SEO** improvements
+### Próximas Features
+- [ ] Dark mode
+- [ ] PWA install prompt
+- [ ] Push notifications
+- [ ] Backup automático
+- [ ] Relatórios PDF
+- [ ] Metas financeiras
+- [ ] 2FA
+- [ ] OAuth (Google, Microsoft, Apple)
+
+### Melhorias Técnicas
+- [x] CI/CD com GitHub Actions (parcial)
+- [ ] Storybook
+- [ ] E2E tests completo (Playwright)
+- [ ] Performance optimization
+- [ ] Bundle analysis
+- [ ] Monitoring (Sentry)
+- [ ] Analytics (PostHog)
 
 ---
 
-### 🚀 **Dica de Uso**
-Para uma experiência completa, use o **"Login com IA"** que te dá acesso instantâneo ao dashboard com dados realistas. Perfeito para demonstrações e testes!
+## Documentação
 
-**Desenvolvido com ❤️ para simplificar seu controle financeiro**
+### Principais Docs
+- [SUPABASE_MIGRATION_COMPLETE.md](SUPABASE_MIGRATION_COMPLETE.md) - Relatório da migração
+- [QUICKSTART.md](QUICKSTART.md) - Guia rápido
+- [docs/INDEX.md](docs/INDEX.md) - Índice completo
+- [docs/RECUPERACAO-SENHA-SUPABASE.md](docs/RECUPERACAO-SENHA-SUPABASE.md) - Setup de password recovery
+
+### Setup Guides
+1. Setup inicial: Siga "Quick Start" acima
+2. Configurar Supabase: `docs/SUPABASE-CHAVES.md`
+3. Password recovery: `docs/RECUPERACAO-SENHA-SUPABASE.md`
+4. Deploy produção: Scripts em `scripts/prod/`

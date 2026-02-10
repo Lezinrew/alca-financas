@@ -40,7 +40,25 @@ from extensions import limiter
 
 # ... imports ...
 
-app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
+# Validar SECRET_KEY (não permitir defaults inseguros)
+SECRET_KEY = os.getenv('SECRET_KEY', '').strip()
+if not SECRET_KEY or SECRET_KEY == 'dev-secret-key' or len(SECRET_KEY) < 32:
+    raise RuntimeError(
+        "\n" + "="*60 + "\n"
+        "❌ ERRO CRÍTICO: SECRET_KEY não configurado ou inseguro!\n"
+        + "="*60 + "\n"
+        "SECRET_KEY deve ter pelo menos 32 caracteres.\n"
+        "\n"
+        "Para gerar um secret seguro, execute:\n"
+        "  openssl rand -hex 32\n"
+        "\n"
+        "Depois configure no .env:\n"
+        "  SECRET_KEY=<valor_gerado>\n"
+        "\n"
+        "NUNCA use 'dev-secret-key' em produção!\n"
+        + "="*60
+    )
+app.secret_key = SECRET_KEY
 
 # Configuração de sessão para OAuth
 # Em produção, usa HTTPS então pode usar SameSite=None para OAuth cross-site
