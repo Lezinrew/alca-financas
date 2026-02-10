@@ -14,38 +14,49 @@ def hash_password(password: str) -> bytes:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 
-def check_password(password: str, hashed) -> bool:
-    """
-    Verifica se a senha corresponde ao hash.
-    Aceita tanto bytes quanto string (MongoDB pode retornar como string ou Binary).
-    """
+def _normalize_password_hash(hashed):
+    """Converte hash de senha para bytes (MongoDB Binary, Supabase BYTEA hex, ou bytes)."""
     if not hashed:
-        return False
-    
-    # Se for Binary do MongoDB, extrai os bytes
+        return None
+    # MongoDB Binary
     try:
         from bson import Binary
         if isinstance(hashed, Binary):
-            hashed = hashed.as_bytes()
+            return hashed.as_bytes()
     except ImportError:
         pass
-    
-    # Se for string, converte para bytes
+    if isinstance(hashed, bytes):
+        return hashed
     if isinstance(hashed, str):
-        hashed = hashed.encode('utf-8')
-    elif not isinstance(hashed, bytes):
-        # Tenta converter para bytes se for outro tipo
+        # Supabase/PostgREST retorna BYTEA como string hex com prefixo \x (ex: "\\x24326224...")
+        s = hashed.strip()
+        if s.startswith('\\x') or (len(s) > 2 and s[0] == '\\' and s[1] == 'x'):
+            s = s[2:]
         try:
-            hashed = bytes(hashed)
-        except (TypeError, ValueError):
-            # Se não conseguir converter, tenta como string primeiro
-            if hasattr(hashed, '__str__'):
-                hashed = str(hashed).encode('utf-8')
-            else:
-                import logging
-                logging.error(f"Erro ao verificar senha: tipo do hash não suportado: {type(hashed)}")
-                return False
-    
+            return bytes.fromhex(s)
+        except (ValueError, TypeError):
+            pass
+        # Fallback: tratar como UTF-8 (ex.: MongoDB que gravou como string)
+        return hashed.encode('utf-8')
+    if hasattr(hashed, 'tobytes'):
+        return bytes(hashed)
+    # memoryview ou outro buffer (Supabase/PostgreSQL BYTEA)
+    try:
+        if hasattr(hashed, '__iter__') and not isinstance(hashed, (str, dict)):
+            return bytes(hashed)
+    except Exception:
+        pass
+    return None
+
+
+def check_password(password: str, hashed) -> bool:
+    """
+    Verifica se a senha corresponde ao hash.
+    Aceita bytes (MongoDB), string hex BYTEA (Supabase/PostgREST) ou Binary.
+    """
+    hashed = _normalize_password_hash(hashed)
+    if not hashed:
+        return False
     try:
         return bcrypt.checkpw(password.encode('utf-8'), hashed)
     except (TypeError, ValueError) as e:
@@ -87,6 +98,25 @@ def decode_token(token: str, type_required: str = 'access'):
         return None
 
 
+RESET_TOKEN_EXPIRES_HOURS = 1
+
+
+def generate_reset_token(user_id: str) -> str:
+    payload = {
+        'user_id': str(user_id),
+        'type': 'reset',
+        'exp': datetime.utcnow() + timedelta(hours=RESET_TOKEN_EXPIRES_HOURS),
+        'jti': str(uuid.uuid4()),
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+    return token.decode('utf-8') if isinstance(token, bytes) else token
+
+
+def decode_reset_token(token: str):
+    """Returns user_id if token is valid, else None."""
+    return decode_token(token, 'reset')
+
+
 def verify_jwt(token: str):
     return decode_token(token, 'access')
 
@@ -107,7 +137,6 @@ def require_auth(f):
 
         request.user_id = user_id
         return f(*args, **kwargs)
-    return decorated
     return decorated
 
 

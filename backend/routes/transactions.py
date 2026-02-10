@@ -5,7 +5,6 @@ import uuid
 from datetime import datetime
 
 from utils.auth_utils import require_auth
-from repositories.transaction_repository import TransactionRepository
 from services.transaction_service import TransactionService
 from utils.exceptions import ValidationException, NotFoundException
 
@@ -14,12 +13,10 @@ bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 def transactions():
-    categories_collection = current_app.config['CATEGORIES']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    accounts_collection = current_app.config['ACCOUNTS']
-    
-    repo = TransactionRepository()
-    service = TransactionService(repo, categories_collection, accounts_collection)
+    transaction_repo = current_app.config['TRANSACTIONS']
+    categories_repo = current_app.config['CATEGORIES']
+    accounts_repo = current_app.config['ACCOUNTS']
+    service = TransactionService(transaction_repo, categories_repo, accounts_repo)
 
     if request.method == 'GET':
         page = int(request.args.get('page', 1))
@@ -68,12 +65,10 @@ def transactions():
 @bp.route('/<transaction_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
 def transaction_detail(transaction_id: str):
-    categories_collection = current_app.config['CATEGORIES']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    accounts_collection = current_app.config['ACCOUNTS']
-    
-    repo = TransactionRepository()
-    service = TransactionService(repo, categories_collection, accounts_collection)
+    transaction_repo = current_app.config['TRANSACTIONS']
+    categories_repo = current_app.config['CATEGORIES']
+    accounts_repo = current_app.config['ACCOUNTS']
+    service = TransactionService(transaction_repo, categories_repo, accounts_repo)
 
     try:
         if request.method == 'GET':
@@ -95,23 +90,15 @@ def transaction_detail(transaction_id: str):
 @require_auth
 def import_transactions():
     from services.import_service import parse_import_file
-    from repositories.account_repository import AccountRepository
-    from repositories.category_repository import CategoryRepository
     from services.account_service import AccountService
     from services.category_service import CategoryService
-    
-    categories_collection = current_app.config['CATEGORIES']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    accounts_collection = current_app.config['ACCOUNTS']
-    
-    repo = TransactionRepository(transactions_collection)
-    service = TransactionService(repo, categories_collection, accounts_collection)
-    
-    account_repo = AccountRepository()
-    account_service = AccountService(account_repo, transactions_collection)
-    
-    category_repo = CategoryRepository()
-    category_service = CategoryService(category_repo, transactions_collection)
+
+    transaction_repo = current_app.config['TRANSACTIONS']
+    categories_repo = current_app.config['CATEGORIES']
+    accounts_repo = current_app.config['ACCOUNTS']
+    service = TransactionService(transaction_repo, categories_repo, accounts_repo)
+    account_service = AccountService(accounts_repo, transaction_repo)
+    category_service = CategoryService(categories_repo, transaction_repo)
     
     if 'file' not in request.files:
         return jsonify({'error': 'Arquivo é obrigatório'}), 400
@@ -150,13 +137,14 @@ def import_transactions():
             
             if account_info:
                 account_id, account_created = find_or_create_account(
-                    accounts_collection,
+                    accounts_repo,
                     request.user_id,
                     account_info,
-                    file.filename
+                    file.filename,
+                    account_service=account_service
                 )
                 if account_created and account_id:
-                    account = accounts_collection.find_one({'_id': account_id})
+                    account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
                     created_account_name = account.get('name') if account else None
         except Exception as e:
             # Se falhar na detecção, continua sem account_id
@@ -164,10 +152,9 @@ def import_transactions():
             current_app.logger.warning(f'Falha ao detectar/criar conta automaticamente: {str(e)}')
             pass
     
-    # Se account_id foi fornecido, valida se existe
     if account_id:
-        account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
-        if not account:
+        account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
+        if not account or account.get('user_id') != request.user_id:
             return jsonify({'error': 'Conta não encontrada'}), 404
     
     try:
@@ -184,12 +171,12 @@ def import_transactions():
         # Importa serviço de detecção de categorias
         from services.category_detector import detect_category_from_description, get_or_create_category
         
-        # Busca categorias do usuário
-        user_categories = {cat['name']: cat['_id'] for cat in categories_collection.find({'user_id': request.user_id})}
-        
-        # Busca categorias padrão
-        default_income_category = categories_collection.find_one({'user_id': request.user_id, 'type': 'income'})
-        default_expense_category = categories_collection.find_one({'user_id': request.user_id, 'type': 'expense'})
+        user_cats = categories_repo.find_by_user(request.user_id)
+        user_categories = {cat['name']: (cat.get('id') or cat.get('_id')) for cat in user_cats}
+        income_cats = categories_repo.find_by_type(request.user_id, 'income') if hasattr(categories_repo, 'find_by_type') else (categories_repo.find_all({'user_id': request.user_id, 'type': 'income'}) or [])
+        expense_cats = categories_repo.find_by_type(request.user_id, 'expense') if hasattr(categories_repo, 'find_by_type') else (categories_repo.find_all({'user_id': request.user_id, 'type': 'expense'}) or [])
+        default_income_category = income_cats[0] if income_cats else None
+        default_expense_category = expense_cats[0] if expense_cats else None
         
         imported_transactions = []
         errors = []
@@ -240,9 +227,9 @@ def import_transactions():
                             errors.append(f'Transação {idx + 1}: Erro ao criar categoria "{category_name}": {str(e)}')
                             # Usa categoria padrão como fallback
                             if tx['type'] == 'income' and default_income_category:
-                                category_id = default_income_category['_id']
+                                category_id = default_income_category.get('id') or default_income_category.get('_id')
                             elif tx['type'] == 'expense' and default_expense_category:
-                                category_id = default_expense_category['_id']
+                                category_id = default_expense_category.get('id') or default_expense_category.get('_id')
                             else:
                                 errors.append(f'Transação {idx + 1}: Não foi possível determinar a categoria')
                                 continue
@@ -250,9 +237,9 @@ def import_transactions():
                     # Se não conseguiu detectar, usa categoria padrão
                     if not category_id:
                         if tx['type'] == 'income' and default_income_category:
-                            category_id = default_income_category['_id']
+                            category_id = default_income_category.get('id') or default_income_category.get('_id')
                         elif tx['type'] == 'expense' and default_expense_category:
-                            category_id = default_expense_category['_id']
+                            category_id = default_expense_category.get('id') or default_expense_category.get('_id')
                         else:
                             errors.append(f'Transação {idx + 1}: Nenhuma categoria padrão encontrada para tipo {tx["type"]}')
                             continue
@@ -262,21 +249,21 @@ def import_transactions():
                     errors.append(f'Transação {idx + 1}: Valor deve ser positivo')
                     continue
                 
+                date_val = tx['date']
+                if hasattr(date_val, 'strftime'):
+                    date_val = date_val.strftime('%Y-%m-%d')
                 transaction_data = {
-                    '_id': str(uuid.uuid4()),
+                    'id': str(uuid.uuid4()),
                     'user_id': request.user_id,
                     'description': tx['description'],
                     'amount': tx['amount'],
                     'type': tx['type'],
                     'category_id': category_id,
-                    'date': tx['date'],
+                    'date': date_val,
                     'is_recurring': False,
-                    'status': 'paid',  # Transações importadas geralmente são pagas
+                    'status': 'paid',
                     'responsible_person': 'Leandro',
                     'installment_info': None,
-                    'imported': True,
-                    'import_source': file_format,
-                    'created_at': datetime.utcnow()
                 }
                 
                 # Associa a conta se fornecida

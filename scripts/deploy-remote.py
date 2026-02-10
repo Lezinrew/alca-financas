@@ -2,6 +2,24 @@
 """
 Deploy Remoto - Alça Finanças para Hostinger
 Script Python para fazer deploy completo via SSH
+
+⚠️  AVISO IMPORTANTE - REQUER ATUALIZAÇÃO:
+    Este script foi criado para MongoDB mas o projeto agora usa Supabase.
+
+    ANTES DE USAR:
+    1. Linhas 116-117: Substitua MONGO_URI/MONGO_DB por:
+       SUPABASE_URL=https://seu-projeto.supabase.co
+       SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+    2. Linha 223: Remova dependência "mongod.service" (não necessário)
+
+    3. Linha 133, 269: Atualize instruções para mencionar Supabase
+
+    ALTERNATIVA: Use scripts modernos em scripts/prod/:
+    - scripts/prod/build.sh
+    - scripts/prod/run.sh
+
+    Esses scripts já estão configurados para Supabase.
 """
 
 import subprocess

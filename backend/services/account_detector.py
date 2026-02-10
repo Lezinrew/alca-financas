@@ -235,10 +235,11 @@ def extract_account_info_from_csv(filename: str, content: bytes) -> Optional[Dic
 
 
 def find_or_create_account(
-    accounts_collection,
+    accounts_collection_or_repo,
     user_id: str,
     account_info: Dict[str, Any],
-    filename: str = None
+    filename: str = None,
+    account_service=None
 ) -> Tuple[Optional[str], bool]:
     """
     Busca uma conta existente ou cria uma nova baseado nas informações extraídas.
@@ -246,19 +247,19 @@ def find_or_create_account(
     """
     if not account_info:
         return None, False
-    
+
+    accounts = accounts_collection_or_repo
     institution = account_info.get('institution', 'Banco Desconhecido')
     account_number = account_info.get('account_number')
     account_type = account_info.get('account_type', 'wallet')
-    
-    # Normaliza o nome da instituição para busca
+
     institution_lower = institution.lower()
-    
-    # Busca contas existentes do usuário
-    existing_accounts = list(accounts_collection.find({
-        'user_id': user_id,
-        'is_active': True
-    }))
+
+    if hasattr(accounts, 'find') and callable(accounts.find):
+        existing_accounts = list(accounts.find({'user_id': user_id, 'is_active': True}))
+    else:
+        raw = (accounts.find_all({'user_id': user_id}) or []) if hasattr(accounts, 'find_all') else []
+        existing_accounts = [a for a in raw if a.get('is_active', a.get('active', True))]
     
     # Tenta encontrar conta existente por:
     # 1. Número da conta e instituição (mais preciso)
@@ -295,22 +296,14 @@ def find_or_create_account(
         if account_type_match:
             score += 2
         
-        # Se tem número da conta e instituição, é muito provável que seja a mesma
-        if account_number and score >= 13:  # Número + instituição + tipo
-            return account['_id'], False
-        
-        # Mantém o melhor match
+        if account_number and score >= 13:
+            return (account.get('id') or account.get('_id')), False
         if score > best_match_score:
             best_match_score = score
             best_match = account
-    
-    # Se encontrou um match razoável (score >= 5), usa ele
+
     if best_match and best_match_score >= 5:
-        return best_match['_id'], False
-    
-    # Se não encontrou, cria nova conta
-    from repositories.account_repository import AccountRepository
-    from services.account_service import AccountService
+        return (best_match.get('id') or best_match.get('_id')), False
     
     # Gera nome da conta
     account_name = f"{institution}"
@@ -347,16 +340,15 @@ def find_or_create_account(
         account_data['due_day'] = 15  # Padrão
     
     try:
-        import uuid
+        if account_service is not None:
+            new_account = account_service.create_account(user_id, account_data)
+            return new_account.get('id'), True
         from repositories.account_repository import AccountRepository
         from services.account_service import AccountService
-        
-        account_repo = AccountRepository(accounts_collection)
-        # Cria service com transactions_collection como None (não é necessário para criar conta)
-        account_service = AccountService(account_repo, None)
-        new_account = account_service.create_account(user_id, account_data)
+        account_repo = AccountRepository(accounts)
+        account_svc = AccountService(account_repo, None)
+        new_account = account_svc.create_account(user_id, account_data)
         return new_account.get('id'), True
-    except Exception as e:
-        # Se falhar ao criar, retorna None mas não quebra a importação
+    except Exception:
         return None, False
 

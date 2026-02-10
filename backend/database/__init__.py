@@ -1,5 +1,5 @@
 """
-Database module - Database connections (Supabase or MongoDB)
+Database module - Conexão Supabase (PostgreSQL)
 """
 from .connection import get_db, init_db, get_db_type
 

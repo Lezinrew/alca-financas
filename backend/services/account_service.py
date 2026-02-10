@@ -1,13 +1,27 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
-from repositories.account_repository import AccountRepository
 from utils.exceptions import ValidationException, NotFoundException
 
+
+def _parse_date(d):
+    """Parse date from record (string or datetime)."""
+    if d is None:
+        return None
+    if isinstance(d, datetime):
+        return d
+    if isinstance(d, str):
+        try:
+            return datetime.fromisoformat(d.replace('Z', '+00:00'))
+        except Exception:
+            return None
+    return None
+
+
 class AccountService:
-    def __init__(self, account_repo: AccountRepository, transactions_collection):
+    def __init__(self, account_repo, transactions_repo):
         self.account_repo = account_repo
-        self.transactions_collection = transactions_collection
+        self.transactions_repo = transactions_repo
 
     def list_accounts(self, user_id: str) -> List[Dict[str, Any]]:
         accounts = self.account_repo.find_by_user(user_id)
@@ -73,9 +87,9 @@ class AccountService:
         # Para cartões de crédito, current_balance começa em 0 (sem gastos)
         # Para outras contas, current_balance = initial_balance
         starting_balance = 0.0 if account_type == 'credit_card' else initial_balance
-        
+        new_id = str(uuid.uuid4())
         account_data = {
-            '_id': str(uuid.uuid4()),
+            'id': new_id,
             'user_id': user_id,
             'name': name,
             'type': account_type,
@@ -104,10 +118,9 @@ class AccountService:
             if 'account_id' in data:
                 account_data['account_id'] = data['account_id']
         
-        self.account_repo.create(account_data)
-        
-        account_data['id'] = account_data['_id']
-        account_data.pop('_id', None)
+        created_id = self.account_repo.create(account_data)
+        if created_id:
+            account_data['id'] = created_id
         return account_data
 
     def update_account(self, user_id: str, account_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -141,17 +154,23 @@ class AccountService:
             
         # Return updated account
         updated_account = self.account_repo.find_by_id(account_id)
-        updated_account['id'] = updated_account['_id']
+        updated_account['id'] = updated_account.get('id') or updated_account.get('_id')
         updated_account.pop('_id', None)
         return updated_account
 
     def update_balance(self, account_id: str, amount: float):
-        self.account_repo.collection.update_one(
-            {'_id': account_id}, 
-            {'$inc': {'current_balance': amount}}
-        )
+        if getattr(self.account_repo, 'collection', None) is not None:
+            self.account_repo.collection.update_one(
+                {'_id': account_id}, {'$inc': {'current_balance': amount}}
+            )
+        else:
+            account = self.account_repo.find_by_id(account_id)
+            if not account:
+                return
+            new_balance = (account.get('current_balance') or 0) + amount
+            self.account_repo.update(account_id, {'current_balance': new_balance})
 
-    def calculate_projected_balance(self, user_id: str, account_id: str, transactions_collection) -> float:
+    def calculate_projected_balance(self, user_id: str, account_id: str, transactions_repo) -> float:
         """
         Calcula o saldo previsto considerando:
         - Saldo atual da conta (já inclui transações pagas)
@@ -165,30 +184,31 @@ class AccountService:
         current_balance = account.get('current_balance', 0) or 0
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Busca transações que ainda não foram aplicadas ao saldo:
-        # 1. Transações pendentes (status = 'pending') - independente da data
-        # 2. Transações futuras (data > hoje) - independente do status (exceto se já pagas no futuro)
-        pending_query = {
-            'user_id': user_id,
-            'account_id': account_id,
-            '$or': [
-                {'status': 'pending'},  # Transações pendentes
-                {
-                    'date': {'$gt': today},
-                    'status': {'$ne': 'paid'}  # Transações futuras que ainda não foram pagas
-                }
-            ]
-        }
+        if getattr(transactions_repo, 'find', None) is not None:
+            pending_query = {
+                'user_id': user_id,
+                'account_id': account_id,
+                '$or': [
+                    {'status': 'pending'},
+                    {'date': {'$gt': today}, 'status': {'$ne': 'paid'}}
+                ]
+            }
+            pending_transactions = list(transactions_repo.find(pending_query))
+        else:
+            all_txs = transactions_repo.find_all({'user_id': user_id, 'account_id': account_id})
+            pending_transactions = []
+            for tx in all_txs:
+                status = tx.get('status') or 'paid'
+                dt = _parse_date(tx.get('date'))
+                if status == 'pending':
+                    pending_transactions.append(tx)
+                elif dt and dt.replace(tzinfo=None) > today and status != 'paid':
+                    pending_transactions.append(tx)
         
-        pending_transactions = list(transactions_collection.find(pending_query))
-        
-        # Calcula o impacto das transações pendentes/futuras
-        # Essas transações ainda não foram aplicadas ao current_balance
         projected_adjustment = 0.0
         for tx in pending_transactions:
             amount = tx.get('amount', 0)
             tx_type = tx.get('type', 'expense')
-            
             if tx_type == 'income':
                 projected_adjustment += amount
             elif tx_type == 'expense':
@@ -198,11 +218,13 @@ class AccountService:
 
     def delete_account(self, user_id: str, account_id: str) -> bool:
         account = self.account_repo.find_by_id(account_id)
-        if not account or account['user_id'] != user_id:
+        if not account or account.get('user_id') != user_id:
             raise NotFoundException('Conta não encontrada')
 
-        # Check for transactions
-        count = self.transactions_collection.count_documents({'account_id': account_id})
+        if getattr(self.transactions_repo, 'count_documents', None) is not None:
+            count = self.transactions_repo.count_documents({'account_id': account_id})
+        else:
+            count = len(self.transactions_repo.find_all({'account_id': account_id}))
         if count > 0:
             raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta conta')
 

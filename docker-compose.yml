@@ -1,39 +1,53 @@
+version: '3.8'
+
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      MONGO_URI: mongodb://mongo:27017/alca_financas
-      MONGO_DB: alca_financas
-      SECRET_KEY: dev-secret-key
-      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002
-    depends_on:
-      - mongo
+      # Supabase (required)
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      # Backend config
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      BACKEND_PORT: ${BACKEND_PORT:-8001}
+      HOST: 0.0.0.0
     ports:
-      - "8001:8001"   # host:container - updated to match new port
+      - "${BACKEND_PORT:-8001}:${BACKEND_PORT:-8001}"
     volumes:
-      - ./backend:/app/backend
+      - ./backend:/app
     command: python app.py
+    restart: unless-stopped
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     environment:
-      REACT_APP_BACKEND_URL: http://localhost:8001
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
-      - ./frontend:/app/frontend
+      - ./frontend:/app
+      - /app/node_modules
     command: npm run dev
+    depends_on:
+      - backend
+    restart: unless-stopped
 
-  mongo:
-    image: mongo:6
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
+# Note: Supabase is a managed service, so no database container is needed.
+# Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file.
+#
+# For local Supabase development (optional):
+# 1. Install Supabase CLI: npm install -g supabase
+# 2. Initialize: supabase init
+# 3. Start: supabase start
+# 4. This will start a local Supabase instance with PostgreSQL
+# 5. Update .env with local Supabase credentials
 
-volumes:
-  mongo_data:
+networks:
+  default:
+    name: alca-financas-network

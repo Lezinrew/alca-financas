@@ -3,6 +3,13 @@ backend/.env
 backend/.env.local
 .env
 .env.local
+.env.production
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+mobile/.env
+mobile/.env.local
+mobile/.env.production
 
 # Virtual environments
 venv/
@@ -24,6 +31,9 @@ mongo_data/
 *.pid
 .backend.pid
 .frontend.pid
+.backend.prod.pid
+.frontend.prod.pid
+.mobile.pid
 .mongo_logs.pid
 
 # Node modules
@@ -40,6 +50,8 @@ dist/
 build/
 *.pyc
 __pycache__/
+*.tar.gz
+alca-financas-*.tar.gz
 
 # macOS
 .DS_Store

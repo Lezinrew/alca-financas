@@ -11,8 +11,17 @@ import json
 import jwt
 import requests
 
-from utils.auth_utils import hash_password, check_password, generate_jwt, require_auth, decode_token
+from utils.auth_utils import (
+    hash_password,
+    check_password,
+    generate_jwt,
+    require_auth,
+    decode_token,
+    generate_reset_token,
+    decode_reset_token,
+)
 from services.user_service import create_user, create_default_categories, get_user_public
+from services.email_service import send_reset_link
 from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
 from extensions import limiter
 from pydantic import ValidationError
@@ -20,6 +29,18 @@ from pydantic import ValidationError
 
 # Remova o 'url_prefix' daqui. Ele será definido em app.py
 bp = Blueprint('auth', __name__)
+
+
+def _user_id(user):
+    """ID do usuário (Supabase usa 'id', MongoDB usa '_id')."""
+    return user.get('_id') or user.get('id')
+
+
+def _user_id_filter(user_id):
+    """Filtro para buscar usuário por ID (Supabase: id, MongoDB: _id)."""
+    if current_app.config.get('DB_TYPE') == 'supabase':
+        return {'id': user_id}
+    return {'_id': user_id}
 
 
 # Adicione '/auth' a todas as rotas de autenticação para agrupar logicamente os endpoints.
@@ -51,15 +72,17 @@ def register():
     users_collection = current_app.config['USERS']
     categories_collection = current_app.config['CATEGORIES']
 
-    if users_collection.find_one({'email': data.email}):
+    email_norm = data.email.strip().lower()
+    if users_collection.find_by_email(email_norm):
         return jsonify({'error': 'Email já cadastrado'}), 400
 
     try:
         user_data = data.model_dump()
+        user_data['email'] = email_norm
         user = create_user(users_collection, user_data, hash_password)
-        create_default_categories(categories_collection, user['_id'])
+        create_default_categories(categories_collection, _user_id(user))
 
-        tokens = generate_jwt(user['_id'])
+        tokens = generate_jwt(_user_id(user))
         return jsonify({
             'message': 'Usuário criado com sucesso',
             'access_token': tokens['access_token'],
@@ -99,9 +122,11 @@ def login():
         return jsonify({'error': f'Erro ao processar login: {str(e)}'}), 400
 
     users_collection = current_app.config['USERS']
-    # Busca usuário com email case-insensitive e sem espaços
     email = data.email.strip().lower()
-    user = users_collection.find_one({'email': {'$regex': f'^{email}$', '$options': 'i'}})
+    if current_app.config.get('DB_TYPE') == 'supabase':
+        user = users_collection.find_by_email(email)
+    else:
+        user = users_collection.find_one({'email': {'$regex': f'^{email}$', '$options': 'i'}})
     
     if not user:
         current_app.logger.warning(f"Login falhou: usuário não encontrado para email: {email}")
@@ -121,7 +146,7 @@ def login():
         current_app.logger.warning(f"Login falhou: senha incorreta para email: {email}")
         return jsonify({'error': 'Email ou senha incorretos'}), 401
         
-    tokens = generate_jwt(user['_id'])
+    tokens = generate_jwt(_user_id(user))
     return jsonify({
         'message': 'Login realizado com sucesso',
         'access_token': tokens['access_token'],
@@ -142,9 +167,8 @@ def refresh():
     if not user_id:
         return jsonify({'error': 'Refresh token inválido ou expirado'}), 401
         
-    # Opcional: Verificar se o usuário ainda existe / está ativo
     users_collection = current_app.config['USERS']
-    user = users_collection.find_one({'_id': user_id})
+    user = users_collection.find_one(_user_id_filter(user_id))
     if not user:
         return jsonify({'error': 'Usuário não encontrado'}), 401
         
@@ -157,21 +181,59 @@ def refresh():
 
 @bp.route('/auth/forgot-password', methods=['POST'])
 def forgot_password():
-    data = request.get_json()
-    if not data.get('email'):
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    if not email:
         return jsonify({'error': 'Email é obrigatório'}), 400
-    return jsonify({'message': 'Se o email existir, um link de reset será enviado'})
+
+    users_collection = current_app.config['USERS']
+    if current_app.config.get('DB_TYPE') == 'supabase':
+        user = users_collection.find_by_email(email)
+    else:
+        user = users_collection.find_one({'email': {'$regex': f'^{email}$', '$options': 'i'}})
+    if user and user.get('password') is not None:
+        reset_token = generate_reset_token(_user_id(user))
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+        reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+        send_reset_link(user['email'], reset_url)
+
+    return jsonify({'message': 'Se existir uma conta com esse e-mail, você receberá um link para redefinir sua senha.'}), 200
+
+
+@bp.route('/auth/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json() or {}
+    token = data.get('token') or ''
+    new_password = data.get('new_password') or ''
+    if not token:
+        return jsonify({'error': 'Token é obrigatório'}), 400
+    if len(new_password) < 6:
+        return jsonify({'error': 'A senha deve ter pelo menos 6 caracteres'}), 400
+
+    user_id = decode_reset_token(token)
+    if not user_id:
+        return jsonify({'error': 'Link inválido ou expirado. Solicite um novo.'}), 400
+
+    users_collection = current_app.config['USERS']
+    user = users_collection.find_one(_user_id_filter(user_id))
+    if not user:
+        return jsonify({'error': 'Usuário não encontrado'}), 400
+
+    hashed = hash_password(new_password)
+    users_collection.update(user_id, {'password': hashed})
+
+    return jsonify({'message': 'Senha redefinida com sucesso. Faça login com a nova senha.'}), 200
 
 
 @bp.route('/auth/me', methods=['GET'])
 @require_auth
 def get_user():
     users_collection = current_app.config['USERS']
-    user = users_collection.find_one({'_id': request.user_id})
+    user = users_collection.find_one(_user_id_filter(request.user_id))
     if not user:
         return jsonify({'error': 'Usuário não encontrado'}), 404
     return jsonify({
-        'id': user['_id'],
+        'id': _user_id(user),
         'name': user['name'],
         'email': user['email'],
         'settings': user.get('settings', {}),
@@ -184,13 +246,16 @@ def get_user():
 def user_settings():
     users_collection = current_app.config['USERS']
     if request.method == 'GET':
-        user = users_collection.find_one({'_id': request.user_id})
-        return jsonify(user.get('settings', {}))
-    data = request.get_json()
+        user = users_collection.find_one(_user_id_filter(request.user_id))
+        return jsonify(user.get('settings', {}) if user else {})
+    data = request.get_json() or {}
     allowed_settings = ['currency', 'theme', 'language']
-    update_data = {f'settings.{k}': data[k] for k in allowed_settings if k in data}
+    update_data = {k: data[k] for k in allowed_settings if k in data}
     if update_data:
-        users_collection.update_one({'_id': request.user_id}, {'$set': update_data})
+        if hasattr(users_collection, 'update_settings'):
+            users_collection.update_settings(request.user_id, update_data)
+        else:
+            users_collection.update_one({'_id': request.user_id}, {'$set': {f'settings.{k}': v for k, v in update_data.items()}})
     return jsonify({'message': 'Configurações atualizadas com sucesso'})
 
 

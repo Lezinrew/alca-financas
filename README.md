@@ -11,7 +11,7 @@ Aplicação web full-stack de controle financeiro pessoal com funcionalidades mo
 - **Experiência Aprimorada** - Animações, loading states e feedback visual
 
 ### Backend (Flask API)
-- **Flask 3.0** com MongoDB para armazenamento de dados
+- **Flask 3.0** com **Supabase (PostgreSQL)** para armazenamento de dados
 - **Autenticação JWT** com tokens seguros HS256
 - **OAuth 2.0** para login social (Google, Microsoft, Apple)
 - **API RESTful** completa com endpoints para todas as funcionalidades
@@ -19,6 +19,7 @@ Aplicação web full-stack de controle financeiro pessoal com funcionalidades mo
 - **Categorização** inteligente de receitas e despesas
 - **Criptografia bcrypt** para senhas
 - **CORS configurável** para segurança
+- **Row Level Security (RLS)** via Supabase para isolamento de dados
 
 ### Frontend (React SPA)
 - **React 18** com Vite e TypeScript para desenvolvimento moderno
@@ -66,12 +67,13 @@ Aplicação web full-stack de controle financeiro pessoal com funcionalidades mo
 - **PostCSS** - Processamento CSS
 - **Autoprefixer** - Compatibilidade CSS
 
-### Backend (Original)
-- **Python 3.9+** com Flask
-- **MongoDB** para banco de dados
+### Backend
+- **Python 3.9+** com Flask 3.0
+- **Supabase** (PostgreSQL) para banco de dados
 - **JWT** para autenticação
 - **bcrypt** para criptografia
 - **Flask-CORS** para CORS
+- **Pydantic** para validação de dados
 
 ## 🎯 Funcionalidades
 
@@ -106,28 +108,77 @@ Aplicação web full-stack de controle financeiro pessoal com funcionalidades mo
 ### Pré-requisitos
 - **Node.js** 18+ e npm
 - **Python** 3.9+ e pip
-- **MongoDB** (local ou Atlas)
+- **Supabase Account** (https://supabase.com) - Database as a Service
 
-### 🎮 Início Rápido - Frontend
+### 🎮 Início Rápido - Desenvolvimento
 
 ```bash
 # Clone o repositório
 git clone [repositório]
-cd alca-financas/frontend
+cd alca-financas
 
-# Instale as dependências
-npm install
+# 1. Configure o ambiente
+cp .env.example .env
+# Edite .env com suas credenciais do Supabase
+# (Obtenha em: https://app.supabase.com/project/_/settings/api)
 
-# Execute o servidor de desenvolvimento
-npm install
+# 2. Execute o setup (instala dependências)
+./scripts/dev/setup.sh
 
-# Acesse http://localhost:3000
+# 3. Inicie a aplicação
+./scripts/dev/up.sh
+
+# 4. Verifique a saúde do ambiente
+./scripts/dev/doctor.sh
+
+# 5. Acesse
+# Frontend: http://localhost:3000
+# Backend:  http://localhost:8001
 # Use "Login com IA" para acesso demo instantâneo!
+
+# 6. Para parar os serviços
+./scripts/dev/down.sh
 ```
 
-### ⚙️ Scripts Disponíveis
+### ⚙️ Scripts de Desenvolvimento
 
 ```bash
+# Setup e Gerenciamento
+./scripts/dev/setup.sh     # Instala dependências (backend + frontend)
+./scripts/dev/up.sh         # Inicia backend + frontend
+./scripts/dev/up.sh --backend-only   # Apenas backend
+./scripts/dev/up.sh --frontend-only  # Apenas frontend
+./scripts/dev/down.sh       # Para todos os serviços
+./scripts/dev/doctor.sh     # Valida saúde do ambiente
+
+# Scripts Legados (ainda funcionam)
+./alca_start_mac.sh        # Inicia aplicação (método antigo)
+./alca_stop_mac.sh         # Para aplicação (método antigo)
+```
+
+### 🏭 Produção
+
+```bash
+# 1. Configure ambiente de produção
+cp .env.example .env.production
+# Edite .env.production com valores de produção
+# IMPORTANTE: Use secrets fortes!
+
+# 2. Build para produção
+./scripts/prod/build.sh
+
+# 3. Execute em produção
+./scripts/prod/run.sh
+
+# 4. Migre o banco de dados (se necessário)
+./scripts/prod/migrate.sh
+```
+
+### ⚙️ Scripts do Frontend
+
+```bash
+cd frontend/
+
 # Desenvolvimento
 npm run dev          # Inicia servidor de desenvolvimento
 npm run build        # Build para produção
@@ -142,34 +193,81 @@ npm run test:ui      # Interface visual dos testes
 npm run lint         # Executa ESLint
 ```
 
-### 🗄️ Backend (Original)
+### 🗄️ Backend Manual
 
 ```bash
 cd backend/
 
-# Instale dependências Python
+# Criar ambiente virtual
+python3 -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# ou: .venv\Scripts\activate  # Windows
+
+# Instalar dependências
 pip install -r requirements.txt
 
-# Configure variáveis de ambiente
-cp .env.example .env
-# Edite .env com suas configurações
+# Configurar .env (na raiz do projeto)
+# SUPABASE_URL=...
+# SUPABASE_SERVICE_ROLE_KEY=...
 
-# Execute a API
+# Executar
 python app.py
-# API disponível em http://localhost:5000
+# API disponível em http://localhost:8001
 ```
 
-### 📦 Docker (Opcional)
+### 📦 Docker
 
 ```bash
-# Execute todo o stack
+# Desenvolvimento
 docker-compose up -d
 
-# Apenas frontend
-docker-compose up frontend
+# Produção (com nginx)
+docker-compose -f docker-compose.prod.yml up -d
 
-# Apenas backend + MongoDB
-docker-compose up backend mongo
+# Apenas serviços específicos
+docker-compose up backend    # Apenas backend
+docker-compose up frontend   # Apenas frontend
+```
+
+## ⚙️ Configuração de Ambiente
+
+### Variáveis de Ambiente Obrigatórias
+
+```bash
+# Supabase (obtenha em: https://app.supabase.com/project/_/settings/api)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=eyJhbGc...         # Para frontend (seguro)
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # Para backend (NUNCA exponha)
+
+# Backend
+SECRET_KEY=your-secret-key-here       # Use openssl rand -hex 32
+JWT_SECRET=your-jwt-secret-here       # Use openssl rand -hex 32
+BACKEND_PORT=8001
+
+# Frontend
+FRONTEND_PORT=3000
+VITE_API_URL=http://localhost:8001
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+```
+
+### Guias de Configuração
+
+- **Índice de Documentação**: `docs/INDEX.md`
+- **Guia Completo de Ambiente**: `docs/ENVIRONMENTS.md`
+- **Guia de Migrações**: `scripts/db/README.md`
+- **Supabase Setup**: `docs/SUPABASE-CHAVES.md`
+- **Template de Variáveis**: `.env.example`
+
+### Gerando Secrets Fortes
+
+```bash
+# Gerar secret aleatória (32 bytes)
+openssl rand -hex 32
+
+# Ou com Python
+python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 ## 🎨 Demonstração
@@ -213,22 +311,104 @@ alca-financas/
 ├── frontend/                 # Aplicação React
 │   ├── src/
 │   │   ├── components/      # Componentes React
-│   │   │   ├── ui/         # Componentes UI base
+│   │   │   ├── ui/         # Componentes UI base (shadcn/ui)
 │   │   │   ├── auth/       # Componentes de autenticação
 │   │   │   └── dashboard/  # Componentes do dashboard
-│   │   ├── contexts/       # Context API
+│   │   ├── contexts/       # Context API (Auth, Theme)
 │   │   ├── lib/            # Utilitários
 │   │   ├── mocks/          # Dados simulados
 │   │   ├── utils/          # Funções auxiliares
 │   │   └── __tests__/      # Testes unitários
 │   ├── package.json
 │   └── tailwind.config.js
-├── backend/                 # API Flask
+├── backend/                 # API Flask + Supabase
 │   ├── routes/             # Endpoints da API
+│   ├── repositories/       # Repositórios Supabase
 │   ├── services/           # Lógica de negócio
-│   └── utils/              # Utilitários Python
-├── docker-compose.yml      # Orquestração Docker
+│   ├── utils/              # Utilitários Python
+│   ├── app.py              # Aplicação principal
+│   └── requirements.txt    # Dependências Python
+├── mobile/                  # App React Native (Expo)
+│   └── package.json
+├── scripts/                 # Scripts de automação
+│   ├── dev/                # Scripts de desenvolvimento
+│   │   ├── setup.sh        # Instala dependências
+│   │   ├── up.sh           # Inicia serviços
+│   │   ├── down.sh         # Para serviços
+│   │   └── doctor.sh       # Valida ambiente
+│   ├── prod/               # Scripts de produção
+│   │   ├── build.sh        # Build para produção
+│   │   ├── run.sh          # Executa em produção
+│   │   └── migrate.sh      # Migra banco de dados
+│   └── db/                 # Migrações SQL
+│       └── README.md       # Guia de migrações
+├── docs/                    # Documentação
+│   └── ENVIRONMENTS.md     # Guia de env vars
+├── .env.example            # Template de variáveis de ambiente
+├── docker-compose.yml      # Docker para desenvolvimento
+├── docker-compose.prod.yml # Docker para produção
+├── nginx.conf              # Configuração nginx (prod)
 └── README.md              # Este arquivo
+```
+
+## 🔧 Troubleshooting
+
+### Backend não inicia
+
+```bash
+# Verifique logs
+tail -f logs/backend-*.log
+
+# Valide ambiente
+./scripts/dev/doctor.sh
+
+# Verifique Supabase
+curl -H "apikey: YOUR_ANON_KEY" \
+     https://your-project.supabase.co/rest/v1/
+```
+
+### Frontend não conecta ao Backend
+
+```bash
+# Verifique se backend está rodando
+curl http://localhost:8001/api/health
+
+# Verifique VITE_API_URL no frontend/.env
+cat frontend/.env
+
+# Verifique CORS no backend
+# Deve incluir http://localhost:3000
+```
+
+### Erros CORS
+
+Adicione a origem ao `.env`:
+```bash
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000
+```
+
+Reinicie o backend após alterar CORS.
+
+### "Port already in use"
+
+```bash
+# Libere as portas
+./scripts/dev/down.sh
+
+# Ou manualmente
+lsof -ti:8001 | xargs kill -9  # Backend
+lsof -ti:3000 | xargs kill -9  # Frontend
+```
+
+### Dependências desatualizadas
+
+```bash
+# Re-executar setup
+./scripts/dev/setup.sh
+
+# Ou manualmente
+cd backend && pip install -r requirements.txt
+cd frontend && npm ci
 ```
 
 ## 🤝 Contribuição
@@ -245,6 +425,7 @@ alca-financas/
 - Mantenha cobertura de testes
 - Siga o padrão de código existente
 - Documente mudanças no README
+- Execute `./scripts/dev/doctor.sh` antes de commit
 
 ## 📄 Licença
 

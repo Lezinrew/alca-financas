@@ -1,3 +1,4 @@
+
 # 📋 Passo a Passo: Adicionar IP na Whitelist do MongoDB Atlas
 
 Este guia mostra como adicionar o IP do servidor (`77.37.43.126`) na whitelist do MongoDB Atlas para permitir conexões.
