@@ -1,0 +1,45 @@
+# =====================================================
+# RENDER.COM - Backend Environment Variables
+# =====================================================
+# Copie e cole estas variáveis no Render.com
+# Dashboard > Web Service > Environment
+# =====================================================
+
+# AMBIENTE
+FLASK_ENV=production
+NODE_ENV=production
+
+# SUPABASE - PRODUÇÃO
+# ⚠️  Substituir pelos valores reais do seu projeto
+SUPABASE_URL=https://SEU_PROJETO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_XXXXXXXXXXXXXXXXXXXXXXXX
+SUPABASE_KEY=sb_secret_XXXXXXXXXXXXXXXXXXXXXXXX
+
+# SECURITY - PRODUÇÃO (DIFERENTES DO DEV!)
+SECRET_KEY=GERAR_COM_openssl_rand_hex_32
+JWT_SECRET=GERAR_COM_openssl_rand_hex_32
+JWT_EXPIRES_HOURS=24
+
+# URLs - PRODUÇÃO
+FRONTEND_URL=https://alcahub.com.br
+API_BASE_URL=https://api.alcahub.com.br
+
+# CORS - PRODUÇÃO
+CORS_ORIGINS=https://alcahub.com.br,https://www.alcahub.com.br
+
+# SERVER CONFIG
+HOST=0.0.0.0
+PORT=10000
+
+# PERFORMANCE
+WEB_CONCURRENCY=2
+WORKER_TIMEOUT=120
+LOG_LEVEL=info
+
+# =====================================================
+# PRÓXIMOS PASSOS:
+# =====================================================
+# 1. Substituir SUPABASE_SERVICE_ROLE_KEY pelo valor real
+# 2. Atualizar FRONTEND_URL e CORS_ORIGINS após criar frontend
+# 3. Copiar todas as variáveis para o Render.com
+# =====================================================

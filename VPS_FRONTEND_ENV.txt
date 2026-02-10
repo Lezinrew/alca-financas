@@ -1,0 +1,19 @@
+# =====================================================
+# RENDER.COM - Frontend Environment Variables
+# =====================================================
+# Copie e cole estas variáveis no Render.com
+# Dashboard > Static Site > Environment
+# =====================================================
+
+# API Backend
+VITE_API_URL=https://api.alcahub.com.br
+
+# SUPABASE - Cliente (Public Keys)
+# ⚠️  Substituir pelos valores reais do seu projeto
+VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_XXXXXXXXXXXXXXXXXXXXXXXX
+
+# =====================================================
+# NOTA: Após criar o backend, verifique se a URL
+# está correta e corresponde ao seu Web Service
+# =====================================================
