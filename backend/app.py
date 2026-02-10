@@ -8,6 +8,11 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
+
+# CRITICAL: Carregar .env ANTES de importar módulos locais
+# (routes/utils precisam das env vars já carregadas)
+load_dotenv()
+
 from database import init_db, get_db
 
 # Configurar logging
@@ -28,8 +33,6 @@ from routes.accounts import bp as accounts_bp
 from routes.dashboard import bp as dashboard_bp
 from routes.reports import bp as reports_bp
 from routes.admin import bp as admin_bp
-
-load_dotenv()
 
 # Permite subir o app (CI/testes/smoke) sem tentar conectar no Supabase
 SKIP_DB_INIT = os.getenv("SKIP_DB_INIT", "false").strip().lower() == "true"
