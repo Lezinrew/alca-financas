@@ -331,58 +331,54 @@ def google_callback():
 </html>"""
             return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
         
-        # Tenta obter o token, mas trata MismatchingStateError de forma mais tolerante
+        # Tenta obter o token com verificação segura de state
         token = None
         nonce = None
         try:
             token = google.authorize_access_token()
             nonce = session.get("__google_oidc_nonce__")
-        except MismatchingStateError:
-            # Se o state não corresponder, tenta obter o token sem verificação de state
-            # Isso é menos seguro, mas necessário quando a sessão não é mantida
-            print("Warning: MismatchingStateError - tentando obter token sem verificação de state")
-            # Pega o código diretamente da URL
-            code = request.args.get('code')
-            if not code:
-                raise Exception('Código de autorização não encontrado')
-            
-            # Obtém o token manualmente usando o código
-            token_url = 'https://oauth2.googleapis.com/token'
-            token_data = {
-                'code': code,
-                'client_id': GOOGLE_CLIENT_ID,
-                'client_secret': os.getenv('GOOGLE_CLIENT_SECRET'),
-                'redirect_uri': f"{api_base_url}/api/auth/google/callback",
-                'grant_type': 'authorization_code'
-            }
-            token_response = requests.post(token_url, data=token_data)
-            if token_response.status_code != 200:
-                raise Exception(f'Erro ao obter token: {token_response.text}')
-            token = token_response.json()
-            # Quando obtemos o token manualmente, não temos o nonce da sessão
-            # Mas podemos tentar obter do token JWT diretamente
-            nonce = None
+        except MismatchingStateError as e:
+            # SEGURANÇA: NÃO fazer fallback - sessão OAuth expirou
+            error_msg = "Sessão OAuth expirou. Por favor, tente fazer login novamente."
+            current_app.logger.warning(f"OAuth state mismatch (security): {e}")
+
+            error_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Erro de Autenticação</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
+        {error_msg}
+    </p>
+    <script>
+        setTimeout(function() {{
+            window.location.href = {json.dumps(frontend_url + '/login?error=session_expired')};
+        }}, 3000);
+    </script>
+</body>
+</html>"""
+            return error_html, 401, {'Content-Type': 'text/html; charset=utf-8'}
         
         if not token:
             raise Exception('Token de acesso não recebido do Google')
-            
-        # Tenta obter o nonce da sessão se não foi obtido anteriormente
-        if nonce is None:
-            nonce = session.get("__google_oidc_nonce__")
-        
-        # Parse do ID token - se não tiver nonce, tenta sem ele (menos seguro, mas funcional)
-        if nonce:
-            resp = google.parse_id_token(token, nonce=nonce)
-            session.pop("__google_oidc_nonce__", None)
-        else:
-            # Se não tiver nonce, tenta decodificar o JWT manualmente
-            id_token = token.get('id_token')
-            if not id_token:
-                raise Exception('ID token não encontrado na resposta')
-            # Decodifica sem verificação de nonce (menos seguro, mas necessário)
-            # O Google valida o token, então podemos confiar no conteúdo
-            resp = jwt.decode(id_token, options={"verify_signature": False})
+
+        # SEGURANÇA: Sempre validar nonce e assinatura
+        if not nonce:
+            raise Exception('Nonce inválido - sessão OAuth expirada')
+
+        # Parse do ID token com verificação de assinatura (SEMPRE)
+        resp = google.parse_id_token(token, nonce=nonce)
         session.pop("__google_oidc_nonce__", None)
+
+        # Validações adicionais de segurança
+        if resp.get('iss') not in ['https://accounts.google.com', 'accounts.google.com']:
+            raise Exception('Token issuer inválido')
+
+        GOOGLE_CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
+        if resp.get('aud') != GOOGLE_CLIENT_ID:
+            raise Exception('Token audience inválido')
         google_user = {
             'sub': resp['sub'],
             'email': resp['email'],

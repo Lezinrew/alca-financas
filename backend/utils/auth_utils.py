@@ -6,7 +6,26 @@ import jwt
 import os
 
 
-JWT_SECRET = os.getenv('JWT_SECRET', os.getenv('SECRET_KEY', 'dev-secret-key'))
+# Validar JWT_SECRET (não permitir defaults inseguros)
+JWT_SECRET = os.getenv('JWT_SECRET', '').strip()
+if not JWT_SECRET or JWT_SECRET == 'dev-secret-key' or len(JWT_SECRET) < 32:
+    raise RuntimeError(
+        "\n" + "="*60 + "\n"
+        "❌ ERRO CRÍTICO: JWT_SECRET não configurado ou inseguro!\n"
+        + "="*60 + "\n"
+        "JWT_SECRET deve ter pelo menos 32 caracteres.\n"
+        "DEVE ser diferente de SECRET_KEY!\n"
+        "\n"
+        "Para gerar um secret seguro, execute:\n"
+        "  openssl rand -hex 32\n"
+        "\n"
+        "Depois configure no .env:\n"
+        "  JWT_SECRET=<valor_gerado>\n"
+        "\n"
+        "NUNCA use 'dev-secret-key' em produção!\n"
+        + "="*60
+    )
+
 JWT_EXPIRES_HOURS = int(os.getenv('JWT_EXPIRES_HOURS', 24))
 
 
