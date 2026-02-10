@@ -2,6 +2,127 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
 
+def _period_iso(month: int, year: int):
+    start = datetime(year, month, 1)
+    if month == 12:
+        end = datetime(year + 1, 1, 1)
+    else:
+        end = datetime(year, month + 1, 1)
+    return start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')
+
+
+def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str, month: int, year: int) -> Dict[str, Any]:
+    """Dashboard summary usando repositórios Supabase (find_all, find_by_id, etc.)."""
+    start_iso, end_iso = _period_iso(month, year)
+    transactions_list = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
+    total_income = sum(float(t.get('amount', 0)) for t in transactions_list if t.get('type') == 'income')
+    total_expense = sum(float(t.get('amount', 0)) for t in transactions_list if t.get('type') == 'expense')
+    balance = total_income - total_expense
+
+    recent_raw = transactions_repo.find_by_user_limit(user_id, 10)
+    recent_transactions = []
+    for t in recent_raw:
+        row = dict(t)
+        cat_id = row.get('category_id')
+        if cat_id:
+            category = categories_repo.find_by_id(cat_id)
+            if category:
+                row['category'] = {
+                    'name': category.get('name', ''),
+                    'color': category.get('color', '#6b7280'),
+                    'icon': category.get('icon', 'circle')
+                }
+        row['id'] = row.get('id') or row.get('_id')
+        row.pop('_id', None)
+        recent_transactions.append(row)
+
+    expense_by_category = []
+    income_by_category = []
+    by_cat_expense: Dict[str, Dict[str, Any]] = {}
+    by_cat_income: Dict[str, Dict[str, Any]] = {}
+    for t in transactions_list:
+        cat_id = t.get('category_id') or ''
+        amount = float(t.get('amount', 0))
+        typ = t.get('type', 'expense')
+        if typ == 'expense':
+            by_cat_expense.setdefault(cat_id, {'total': 0, 'count': 0})
+            by_cat_expense[cat_id]['total'] += amount
+            by_cat_expense[cat_id]['count'] += 1
+        else:
+            by_cat_income.setdefault(cat_id, {'total': 0, 'count': 0})
+            by_cat_income[cat_id]['total'] += amount
+            by_cat_income[cat_id]['count'] += 1
+
+    for cat_id, v in sorted(by_cat_expense.items(), key=lambda x: -x[1]['total']):
+        category = categories_repo.find_by_id(cat_id) if cat_id else None
+        expense_by_category.append({
+            'category_id': cat_id,
+            'category_name': category.get('name', 'Sem categoria') if category else 'Sem categoria',
+            'category_color': category.get('color', '#6b7280') if category else '#6b7280',
+            'category_icon': category.get('icon', 'circle') if category else 'circle',
+            'total': v['total'],
+            'count': v['count'],
+            'percentage': (v['total'] / total_expense * 100) if total_expense > 0 else 0
+        })
+    for cat_id, v in sorted(by_cat_income.items(), key=lambda x: -x[1]['total']):
+        category = categories_repo.find_by_id(cat_id) if cat_id else None
+        income_by_category.append({
+            'category_id': cat_id,
+            'category_name': category.get('name', 'Sem categoria') if category else 'Sem categoria',
+            'category_color': category.get('color', '#6b7280') if category else '#6b7280',
+            'category_icon': category.get('icon', 'circle') if category else 'circle',
+            'total': v['total'],
+            'count': v['count'],
+            'percentage': (v['total'] / total_income * 100) if total_income > 0 else 0
+        })
+
+    return {
+        'period': {
+            'month': month,
+            'year': year,
+            'start_date': datetime(year, month, 1).isoformat(),
+            'end_date': (datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)).isoformat()
+        },
+        'summary': {
+            'total_income': total_income,
+            'total_expense': total_expense,
+            'balance': balance,
+            'transactions_count': len(transactions_list)
+        },
+        'recent_transactions': recent_transactions,
+        'expense_by_category': expense_by_category,
+        'income_by_category': income_by_category
+    }
+
+
+def monthly_evolution_supabase(transactions_repo, user_id: str, months_back: int) -> List[Dict[str, Any]]:
+    """Evolução mensal usando repositório Supabase."""
+    evolution_data: List[Dict[str, Any]] = []
+    current_date = datetime.now()
+    for i in range(months_back - 1, -1, -1):
+        target_date = current_date - timedelta(days=30 * i)
+        month_start = target_date.replace(day=1)
+        if target_date.month == 12:
+            month_end = target_date.replace(year=target_date.year + 1, month=1, day=1)
+        else:
+            month_end = target_date.replace(month=target_date.month + 1, day=1)
+        start_iso = month_start.strftime('%Y-%m-%d')
+        end_iso = month_end.strftime('%Y-%m-%d')
+        month_transactions = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
+        month_income = sum(float(t.get('amount', 0)) for t in month_transactions if t.get('type') == 'income')
+        month_expense = sum(float(t.get('amount', 0)) for t in month_transactions if t.get('type') == 'expense')
+        evolution_data.append({
+            'period': target_date.strftime('%m/%Y'),
+            'month': target_date.month,
+            'year': target_date.year,
+            'income': month_income,
+            'expense': month_expense,
+            'balance': month_income - month_expense,
+            'transactions_count': len(month_transactions)
+        })
+    return evolution_data
+
+
 def dashboard_summary(transactions_collection, categories_collection, user_id: str, month: int, year: int) -> Dict[str, Any]:
     start_date = datetime(year, month, 1)
     end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)

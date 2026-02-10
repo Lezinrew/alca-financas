@@ -1,31 +1,51 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
-from repositories.transaction_repository import TransactionRepository
 from utils.exceptions import ValidationException, NotFoundException
 
+
+def _category_for(categories_repo, category_id):
+    if not category_id:
+        return None
+    if hasattr(categories_repo, 'find_by_id'):
+        return categories_repo.find_by_id(category_id)
+    if hasattr(categories_repo, 'find_one'):
+        return categories_repo.find_one({'_id': category_id})
+    return None
+
+
+def _account_for(accounts_repo, account_id, user_id):
+    if not account_id:
+        return None
+    acc = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
+    if not acc:
+        return None
+    if acc.get('user_id') != user_id:
+        return None
+    return acc
+
+
 class TransactionService:
-    def __init__(self, transaction_repo: TransactionRepository, categories_collection, accounts_collection):
+    def __init__(self, transaction_repo, categories_repo, accounts_repo):
         self.transaction_repo = transaction_repo
-        self.categories_collection = categories_collection
-        self.accounts_collection = accounts_collection
+        self.categories_repo = categories_repo
+        self.accounts_repo = accounts_repo
 
     def list_transactions(self, user_id: str, filters: Dict[str, Any], page: int = 1, per_page: int = 20) -> Dict[str, Any]:
         result = self.transaction_repo.find_by_filter(user_id, filters, page, per_page)
-        
-        # Enrich with category info
-        for transaction in result['data']:
-            category = self.categories_collection.find_one({'_id': transaction['category_id']})
+        data = result.get('data') or []
+        for transaction in data:
+            cat_id = transaction.get('category_id')
+            category = _category_for(self.categories_repo, cat_id)
             if category:
                 transaction['category'] = {
-                    'name': category['name'],
-                    'color': category['color'],
-                    'icon': category['icon']
+                    'name': category.get('name', ''),
+                    'color': category.get('color', '#6b7280'),
+                    'icon': category.get('icon', 'circle')
                 }
-            if '_id' in transaction:
-                transaction['id'] = transaction['_id']
-                transaction.pop('_id', None)
-                
+            transaction['id'] = transaction.get('id') or transaction.get('_id')
+            transaction.pop('_id', None)
+        result['data'] = data
         return result
 
     def create_transaction(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -42,31 +62,32 @@ class TransactionService:
 
         account_id = data.get('account_id')
         if account_id:
-            account = self.accounts_collection.find_one({'_id': account_id, 'user_id': user_id})
-            if not account:
+            if not _account_for(self.accounts_repo, account_id, user_id):
                 raise ValidationException('Conta não encontrada')
 
         # Handle installments
         if data.get('installments') and int(data['installments']) > 1:
             return self._create_installments(data, user_id, date, account_id)
 
+        new_id = str(uuid.uuid4())
+        date_val = date.strftime('%Y-%m-%d') if isinstance(date, datetime) else date
         transaction_data = {
-            '_id': str(uuid.uuid4()),
+            'id': new_id,
             'user_id': user_id,
             'description': data['description'],
             'amount': float(data['amount']),
             'type': data.get('type', 'expense'),
             'category_id': data.get('category_id'),
             'account_id': account_id,
-            'date': date,
+            'date': date_val,
             'is_recurring': data.get('is_recurring', False),
             'status': data.get('status', 'pending'),
             'responsible_person': data.get('responsible_person'),
             'installment_info': None,
-            'created_at': datetime.utcnow()
         }
-        
-        self.transaction_repo.create(transaction_data)
+        created_id = self.transaction_repo.create(transaction_data)
+        if created_id:
+            transaction_data['id'] = created_id
         
         if account_id and transaction_data['status'] == 'paid':
             self._update_account_balance(account_id, transaction_data['amount'], transaction_data['type'])
@@ -78,28 +99,23 @@ class TransactionService:
 
     def get_transaction(self, user_id: str, transaction_id: str) -> Dict[str, Any]:
         transaction = self.transaction_repo.find_by_id(transaction_id)
-        if not transaction or transaction['user_id'] != user_id:
+        if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
-        
-        # Enrich with category info
-        if 'category_id' in transaction:
-            category = self.categories_collection.find_one({'_id': transaction['category_id']})
-            if category:
-                transaction['category'] = {
-                    'name': category['name'],
-                    'color': category['color'],
-                    'icon': category['icon']
-                }
-        
-        if '_id' in transaction:
-            transaction['id'] = transaction['_id']
-            transaction.pop('_id', None)
-            
+        cat_id = transaction.get('category_id')
+        category = _category_for(self.categories_repo, cat_id)
+        if category:
+            transaction['category'] = {
+                'name': category.get('name', ''),
+                'color': category.get('color', '#6b7280'),
+                'icon': category.get('icon', 'circle')
+            }
+        transaction['id'] = transaction.get('id') or transaction.get('_id')
+        transaction.pop('_id', None)
         return transaction
 
     def update_transaction(self, user_id: str, transaction_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         transaction = self.transaction_repo.find_by_id(transaction_id)
-        if not transaction or transaction['user_id'] != user_id:
+        if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
 
         update_data = {}
@@ -109,12 +125,13 @@ class TransactionService:
             if field in data:
                 if field == 'date':
                     try:
-                        # Handle both string and datetime objects
                         if isinstance(data[field], str):
-                            update_data[field] = datetime.strptime(data[field], '%Y-%m-%d')
+                            update_data[field] = data[field]  # keep as YYYY-MM-DD for Supabase
+                        elif isinstance(data[field], datetime):
+                            update_data[field] = data[field].strftime('%Y-%m-%d')
                         else:
                             update_data[field] = data[field]
-                    except ValueError:
+                    except (ValueError, TypeError):
                         raise ValidationException('Data inválida')
                 elif field == 'amount':
                     update_data[field] = float(data[field])
@@ -134,20 +151,21 @@ class TransactionService:
 
     def delete_transaction(self, user_id: str, transaction_id: str) -> bool:
         transaction = self.transaction_repo.find_by_id(transaction_id)
-        if not transaction or transaction['user_id'] != user_id:
+        if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
 
-        # Revert balance if needed
         if transaction.get('account_id') and transaction.get('status') == 'paid':
-            # Reverse the amount
-            reverse_amount = -transaction['amount'] if transaction['type'] == 'income' else transaction['amount']
-            # We need to call account service or repo directly. 
-            # Since we passed collection, we can do it manually or inject AccountService.
-            # For now, manual update to avoid circular dependency or complex injection
-            self.accounts_collection.update_one(
-                {'_id': transaction['account_id']},
-                {'$inc': {'current_balance': reverse_amount}}
-            )
+            reverse_amount = -float(transaction['amount']) if transaction.get('type') == 'income' else float(transaction['amount'])
+            if getattr(self.accounts_repo, 'update_one', None) is not None:
+                self.accounts_repo.update_one(
+                    {'_id': transaction['account_id']},
+                    {'$inc': {'current_balance': reverse_amount}}
+                )
+            elif hasattr(self.accounts_repo, 'find_by_id') and hasattr(self.accounts_repo, 'update'):
+                acc = self.accounts_repo.find_by_id(transaction['account_id'])
+                if acc:
+                    new_balance = (acc.get('current_balance') or 0) + reverse_amount
+                    self.accounts_repo.update(transaction['account_id'], {'current_balance': new_balance})
 
         return self.transaction_repo.delete(transaction_id)
 
@@ -161,33 +179,28 @@ class TransactionService:
         import pandas as pd
         from dateutil.relativedelta import relativedelta
 
+        group_id = str(uuid.uuid4())
         for i in range(installments):
-            date = base_date + relativedelta(months=i)
-            
+            d = base_date + relativedelta(months=i)
+            date_str = d.strftime('%Y-%m-%d') if isinstance(d, datetime) else d
             tx = {
-                '_id': str(uuid.uuid4()),
+                'id': str(uuid.uuid4()),
                 'user_id': user_id,
                 'description': f"{data['description']} ({i+1}/{installments})",
                 'amount': installment_amount,
                 'type': data.get('type', 'expense'),
                 'category_id': data.get('category_id'),
                 'account_id': account_id,
-                'date': date,
+                'date': date_str,
                 'is_recurring': False,
                 'status': status,
                 'responsible_person': data.get('responsible_person'),
                 'installment_info': {
                     'current': i + 1,
                     'total': installments,
-                    'group_id': str(uuid.uuid4()) # Should be same for all? No, usually group_id is shared.
+                    'group_id': group_id
                 },
-                'created_at': datetime.utcnow()
             }
-            # Fix group_id to be shared
-            if i == 0:
-                group_id = str(uuid.uuid4())
-            tx['installment_info']['group_id'] = group_id
-            
             to_create.append(tx)
 
         self.transaction_repo.create_many(to_create)
@@ -205,7 +218,13 @@ class TransactionService:
 
     def _update_account_balance(self, account_id: str, amount: float, type: str):
         balance_change = amount if type == 'income' else -amount
-        self.accounts_collection.update_one(
-            {'_id': account_id},
-            {'$inc': {'current_balance': balance_change}}
-        )
+        if getattr(self.accounts_repo, 'update_one', None) is not None:
+            self.accounts_repo.update_one(
+                {'_id': account_id},
+                {'$inc': {'current_balance': balance_change}}
+            )
+        elif hasattr(self.accounts_repo, 'find_by_id') and hasattr(self.accounts_repo, 'update'):
+            acc = self.accounts_repo.find_by_id(account_id)
+            if acc:
+                new_balance = (acc.get('current_balance') or 0) + balance_change
+                self.accounts_repo.update(account_id, {'current_balance': new_balance})

@@ -1,19 +1,19 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
+import { getAuthToken, clearAuthStorage } from './tokenStorage';
 
 // Utilitário para remover barras duplicadas ao final
 const trimTrailingSlashes = (value?: string) => value?.replace(/\/+$/, '') ?? '';
 
-// Normaliza a URL base garantindo que não termina com /api
-const resolveApiHost = (value?: string) => {
-  const trimmed = trimTrailingSlashes(value);
-  if (!trimmed) {
-    return 'http://localhost:8001';
-  }
+const DEFAULT_API_HOST = 'http://localhost:8001';
 
-  if (trimmed.toLowerCase().endsWith('/api')) {
-    return trimmed.slice(0, -4);
-  }
-
+// Normaliza a URL base: deve ser absoluta (http/https). Evita ":8001" ou caminho relativo.
+const resolveApiHost = (value?: string): string => {
+  const trimmed = trimTrailingSlashes(value ?? '');
+  if (!trimmed) return DEFAULT_API_HOST;
+  // URL relativa ou só ":porta" → usar default
+  if (!/^https?:\/\//i.test(trimmed)) return DEFAULT_API_HOST;
+  if (trimmed.toLowerCase().endsWith('/api')) return trimmed.slice(0, -4);
   return trimmed;
 };
 
@@ -29,38 +29,31 @@ const api = axios.create({
   },
 });
 
-// Interceptor para adicionar token de autenticação automaticamente
+// Interceptor para adicionar token de autenticação (localStorage ou sessionStorage conforme Lembrar-me)
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor para tratar respostas e erros
+// Interceptor para tratar 401: sessão expirada → toast + limpar storage + redirect
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expirado ou inválido
-      // Só redireciona se não estiver já na página de login
       const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/register') {
-        // Verifica se há um token antes de remover (pode ser uma requisição antes do login)
-        const token = localStorage.getItem('auth_token');
+      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password' && !currentPath.startsWith('/reset-password')) {
+        const token = getAuthToken();
         if (token) {
-          // Token existe mas é inválido - limpa e redireciona
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user_data');
+          clearAuthStorage();
+          toast.error('Sua sessão expirou. Entre novamente.');
           window.location.href = '/login';
         }
-        // Se não há token, apenas rejeita o erro (pode ser uma requisição antes do login)
       }
     }
     return Promise.reject(error);
@@ -72,6 +65,8 @@ export const authAPI = {
   login: (credentials: { email: string; password: string }) => api.post('/auth/login', credentials),
   register: (userData: { name: string; email: string; password: string }) => api.post('/auth/register', userData),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token: string, newPassword: string) =>
+    api.post('/auth/reset-password', { token, new_password: newPassword }),
   getMe: () => api.get('/auth/me'),
   updateSettings: (settings: any) => api.put('/auth/settings', settings),
   getSettings: () => api.get('/auth/settings'),

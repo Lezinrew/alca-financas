@@ -1,0 +1,85 @@
+Crie um modelo de banco de dados MongoDB para um sistema de controle financeiro pessoal chamado "Alca Finanças".
+
+BANCO: alca_financas
+
+COLEÇÕES:
+
+1. users
+   - _id: String (UUID)
+   - name: String
+   - email: String (único)
+   - password: String (hash bcrypt)
+   - settings: {currency, theme, language}
+   - auth_providers: [{provider, sub, email_verified}]
+   - profile_picture: String (opcional)
+   - is_admin: Boolean
+   - created_at, updated_at: DateTime
+
+2. categories
+   - _id: String (UUID)
+   - user_id: String (ref users)
+   - name: String
+   - type: "income" | "expense"
+   - color: String (hex)
+   - icon: String
+   - description: String (opcional)
+   - active: Boolean
+   - essential: Boolean
+   - created_at, updated_at: DateTime
+
+3. accounts
+   - _id: String (UUID)
+   - user_id: String (ref users)
+   - name: String
+   - type: "bank" | "credit_card" | "savings" | "investment"
+   - color: String (hex)
+   - icon: String
+   - balance: Number
+   - initial_balance: Number (limite para cartão)
+   - current_balance: Number
+   - currency: String (default "BRL")
+   - active: Boolean
+   - created_at, updated_at: DateTime
+
+4. transactions
+   - _id: String (UUID)
+   - user_id: String (ref users)
+   - category_id: String (ref categories, opcional)
+   - account_id: String (ref accounts, opcional)
+   - description: String
+   - amount: Number (sempre positivo)
+   - type: "income" | "expense"
+   - date: Date
+   - status: "paid" | "pending" | "overdue" | "cancelled"
+   - responsible_person: String (opcional)
+   - is_recurring: Boolean
+   - installment_info: {current, total, parent_id} (opcional)
+   - tags: [String]
+   - notes: String (opcional)
+   - created_at, updated_at: DateTime
+
+5. oauth_states
+   - _id: String (UUID)
+   - state: String (único)
+   - provider: String
+   - created_at, expires_at: DateTime
+
+RELACIONAMENTOS:
+- users 1:N categories
+- users 1:N accounts
+- users 1:N transactions
+- categories 1:N transactions (opcional)
+- accounts 1:N transactions (opcional)
+
+ÍNDICES:
+- users.email (único)
+- categories: user_id, type, active
+- accounts: user_id, active
+- transactions: user_id, category_id, account_id, date, type, status, composto (user_id + date DESC)
+- oauth_states: state (único), expires_at
+
+Gere diagrama ER mostrando as 5 coleções, relacionamentos, campos principais e índices.
+
+
+
+

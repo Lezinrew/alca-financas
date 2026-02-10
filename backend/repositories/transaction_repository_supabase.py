@@ -84,6 +84,47 @@ class TransactionRepository(BaseRepository):
                 }
             }
     
+    def find_by_user_and_date_range(
+        self, user_id: str, start_date: str, end_date: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Busca transações do usuário em um intervalo de datas (ISO)."""
+        try:
+            query = (
+                get_supabase()
+                .table(self.table_name)
+                .select("*")
+                .eq("user_id", user_id)
+                .gte("date", start_date)
+                .lt("date", end_date)
+                .order("date", desc=True)
+            )
+            if limit:
+                query = query.limit(limit)
+            response = query.execute()
+            return response.data if response.data else []
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao buscar transações por período: {e}")
+            return []
+
+    def find_by_user_limit(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Busca últimas transações do usuário (para recent_transactions)."""
+        try:
+            response = (
+                get_supabase()
+                .table(self.table_name)
+                .select("*")
+                .eq("user_id", user_id)
+                .order("date", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return response.data if response.data else []
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao buscar transações recentes: {e}")
+            return []
+
     def create_many(self, transactions: List[Dict[str, Any]]) -> List[str]:
         """
         Cria múltiplas transações

@@ -3,9 +3,6 @@ import uuid
 import pandas as pd
 from datetime import datetime
 from utils.auth_utils import require_auth
-from repositories.account_repository import AccountRepository
-from repositories.transaction_repository import TransactionRepository
-from repositories.category_repository import CategoryRepository
 from services.account_service import AccountService
 from services.transaction_service import TransactionService
 from services.category_service import CategoryService
@@ -14,36 +11,32 @@ from extensions import limiter
 
 bp = Blueprint('accounts', __name__, url_prefix='/api/accounts')
 
+
+def _account_id(acc):
+    """ID da conta (Supabase: id, MongoDB: _id)."""
+    return acc.get('id') or acc.get('_id')
+
+
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 @limiter.limit("200 per hour")  # Aumenta limite para GET de contas (muitos componentes precisam)
 def accounts():
-    accounts_collection = current_app.config['ACCOUNTS']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    
-    repo = AccountRepository()
-    service = AccountService(repo, transactions_collection)
+    account_repo = current_app.config['ACCOUNTS']
+    transactions_repo = current_app.config['TRANSACTIONS']
+    service = AccountService(account_repo, transactions_repo)
 
     if request.method == 'GET':
         accounts = service.list_accounts(request.user_id)
-        # Garante que todas as contas pertencem ao usuário
         filtered_accounts = [acc for acc in accounts if acc.get('user_id') == request.user_id]
-        
-        # Calcula saldo previsto para cada conta e adiciona campos específicos
-        transactions_collection = current_app.config['TRANSACTIONS']
         for acc in filtered_accounts:
-            if acc.get('id'):
+            aid = _account_id(acc)
+            if aid:
                 projected = service.calculate_projected_balance(
-                    request.user_id, 
-                    acc['id'], 
-                    transactions_collection
+                    request.user_id, aid, transactions_repo
                 )
                 acc['projected_balance'] = projected
-                
-                # Para cartões de crédito, adiciona o limite total (initial_balance)
-                if acc.get('type') == 'credit_card':
-                    acc['limit'] = acc.get('initial_balance', 0)
-        
+            if acc.get('type') == 'credit_card':
+                acc['limit'] = acc.get('initial_balance', 0)
         return jsonify(filtered_accounts)
     
     try:
@@ -66,19 +59,18 @@ def accounts():
 @bp.route('/<account_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
 def account_detail(account_id: str):
-    accounts_collection = current_app.config['ACCOUNTS']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    
-    repo = AccountRepository(accounts_collection)
-    service = AccountService(repo, transactions_collection)
+    account_repo = current_app.config['ACCOUNTS']
+    transactions_repo = current_app.config['TRANSACTIONS']
+    service = AccountService(account_repo, transactions_repo)
 
     try:
         if request.method == 'GET':
-            account = repo.find_by_id(account_id)
-            if not account or account['user_id'] != request.user_id:
+            account = account_repo.find_by_id(account_id)
+            if not account or account.get('user_id') != request.user_id:
                 return jsonify({'error': 'Conta não encontrada'}), 404
-            account['id'] = account['_id']
-            account.pop('_id', None)
+            if '_id' in account and 'id' not in account:
+                account['id'] = account['_id']
+                account.pop('_id', None)
             return jsonify(account)
         
         if request.method == 'DELETE':
@@ -97,20 +89,14 @@ def import_credit_card_statement(account_id: str):
     """Importa fatura de cartão de crédito via PDF, OFX ou CSV"""
     from services.import_service import parse_import_file
     
-    accounts_collection = current_app.config['ACCOUNTS']
-    categories_collection = current_app.config['CATEGORIES']
-    transactions_collection = current_app.config['TRANSACTIONS']
+    account_repo = current_app.config['ACCOUNTS']
+    categories_repo = current_app.config['CATEGORIES']
+    transactions_repo = current_app.config['TRANSACTIONS']
     
-    account_repo = AccountRepository()
-    account_service = AccountService(account_repo, transactions_collection)
+    account_service = AccountService(account_repo, transactions_repo)
+    category_service = CategoryService(categories_repo, transactions_repo)
+    transaction_service = TransactionService(transactions_repo, categories_repo, account_repo)
     
-    category_repo = CategoryRepository()
-    category_service = CategoryService(category_repo, transactions_collection)
-    
-    transaction_repo = TransactionRepository()
-    transaction_service = TransactionService(transaction_repo, categories_collection, accounts_collection)
-    
-    # Verifica se a conta existe e é um cartão de crédito
     account = account_repo.find_by_id(account_id)
     if not account or account['user_id'] != request.user_id:
         return jsonify({'error': 'Conta não encontrada'}), 404

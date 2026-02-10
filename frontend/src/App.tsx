@@ -6,6 +6,8 @@ import { ThemeProvider } from './contexts/ThemeContext';
 // Componentes de Autenticação
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import ForgotPassword from './components/auth/ForgotPassword';
+import ResetPassword from './components/auth/ResetPassword';
 
 // Componentes Principais
 import AppShell from './components/layout/AppShell';
@@ -92,6 +94,22 @@ const AppRoutes: React.FC = () => {
           element={
             <PublicRoute>
               <Register />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoute>
+              <ForgotPassword />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <PublicRoute>
+              <ResetPassword />
             </PublicRoute>
           }
         />

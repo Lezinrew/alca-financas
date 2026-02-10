@@ -1,114 +1,61 @@
 #!/usr/bin/env python3
 """
-Script para criar usuário no servidor de produção
+DEPRECATED: Script para criar usuário no servidor de produção via SSH.
+
+IMPORTANTE: Este script está DEPRECATED pois assume MongoDB no servidor remoto.
+Para Supabase, use uma das alternativas abaixo.
+
+ALTERNATIVAS RECOMENDADAS:
+
+1. Via Supabase Dashboard (mais simples):
+   - Acesse: https://app.supabase.com/project/_/auth/users
+   - Clique em "Add user"
+   - Preencha email e senha
+
+2. Via SQL Editor do Supabase:
+   - Use: scripts/sql-ensure-user-lezinrew.sql
+
+3. Via Script Python Local (recomendado para automação):
+   - Use: backend/scripts/set_user_password.py
+   - Funciona local e remotamente se tiver acesso ao Supabase
+
+4. Via API do Supabase (para integração):
+   - Use Supabase Admin API
+   - Requer SUPABASE_SERVICE_ROLE_KEY
+
+Se você REALMENTE precisa criar usuários via SSH no servidor,
+adapte este script para usar o backend/scripts/set_user_password.py
+que já suporta Supabase.
 """
 
-import subprocess
 import sys
-import json
 
-# Configurações do servidor
-SERVER_HOST = "alcahub.com.br"
-SERVER_USER = "root"
-SERVER_PASS = "4203434@Mudar"
-PROJECT_DIR = "/var/www/alca-financas"
+print("=" * 70)
+print("⚠️  AVISO: Este script está DEPRECATED")
+print("=" * 70)
+print("")
+print("Este script assumia MongoDB no servidor remoto.")
+print("O projeto agora usa Supabase (PostgreSQL).")
+print("")
+print("📌 ALTERNATIVAS RECOMENDADAS:")
+print("")
+print("1️⃣  Via Supabase Dashboard (mais simples):")
+print("   https://app.supabase.com/project/_/auth/users")
+print("")
+print("2️⃣  Via SQL Editor do Supabase:")
+print("   Use: scripts/sql-ensure-user-lezinrew.sql")
+print("")
+print("3️⃣  Via Script Python (recomendado para automação):")
+print("   cd backend")
+print("   python scripts/set_user_password.py")
+print("")
+print("4️⃣  Via SSH no servidor + script Supabase:")
+print("   ssh user@servidor")
+print("   cd /var/www/alca-financas/backend")
+print("   source venv/bin/activate")
+print("   python scripts/set_user_password.py")
+print("")
+print("=" * 70)
+print("")
 
-def execute_ssh(command, check=True):
-    """Executa comando remoto via SSH usando sshpass"""
-    cmd = [
-        "sshpass", "-p", SERVER_PASS,
-        "ssh", "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        f"{SERVER_USER}@{SERVER_HOST}",
-        command
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=check)
-        return result.stdout, result.stderr, result.returncode
-    except subprocess.CalledProcessError as e:
-        if check:
-            print(f"❌ Erro ao executar comando: {command}")
-            print(f"Erro: {e.stderr}")
-            sys.exit(1)
-        return e.stdout, e.stderr, e.returncode
-
-def main():
-    print("🔵 Criando usuário no servidor...")
-    
-    # Dados do usuário
-    email = "lezinrew@gmail.com"
-    name = "Leandro X Pinho"
-    password = input("Digite a senha para o usuário (ou pressione Enter para usar 'senha123'): ").strip()
-    if not password:
-        password = "senha123"
-    
-    print(f"\n📝 Criando usuário:")
-    print(f"   Email: {email}")
-    print(f"   Nome: {name}")
-    print(f"   Senha: {'*' * len(password)}")
-    
-    # Script Python para criar o usuário
-    create_user_script = f"""
-import sys
-sys.path.insert(0, '{PROJECT_DIR}/backend')
-
-from pymongo import MongoClient
-from utils.auth_utils import hash_password
-from services.user_service import create_user, create_default_categories
-from datetime import datetime
-import uuid
-
-# Conectar ao MongoDB
-mongo_uri = "mongodb://localhost:27017/alca_financas"
-client = MongoClient(mongo_uri)
-db = client['alca_financas']
-users_collection = db.users
-categories_collection = db.categories
-
-# Verificar se usuário já existe
-existing_user = users_collection.find_one({{'email': '{email}'}})
-if existing_user:
-    print(f"⚠️  Usuário {{existing_user['email']}} já existe!")
-    sys.exit(1)
-
-# Criar usuário
-user_data = {{
-    'name': '{name}',
-    'email': '{email}',
-    'password': '{password}'
-}}
-
-user = create_user(users_collection, user_data, hash_password)
-create_default_categories(categories_collection, user['_id'])
-
-print(f"✅ Usuário criado com sucesso!")
-print(f"   ID: {{user['_id']}}")
-print(f"   Email: {{user['email']}}")
-print(f"   Nome: {{user['name']}}")
-"""
-    
-    # Executar script no servidor
-    print("\n🔵 Executando script no servidor...")
-    stdout, stderr, code = execute_ssh(f"""
-        cd {PROJECT_DIR}/backend && \
-        source venv/bin/activate && \
-        python3 << 'PYTHON_SCRIPT'
-{create_user_script}
-PYTHON_SCRIPT
-    """)
-    
-    if code == 0:
-        print(stdout)
-        print("\n✅ Usuário criado com sucesso no servidor!")
-        print(f"\n📝 Você pode fazer login com:")
-        print(f"   Email: {email}")
-        print(f"   Senha: {password}")
-        print(f"\n🌐 Acesse: http://alcahub.com.br")
-    else:
-        print("❌ Erro ao criar usuário:")
-        print(stderr)
-        sys.exit(1)
-
-if __name__ == "__main__":
-    main()
-
+sys.exit(1)

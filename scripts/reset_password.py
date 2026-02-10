@@ -1,38 +1,31 @@
-import os
+#!/usr/bin/env python3
+"""
+DEPRECATED: Este script foi substituído por backend/scripts/set_user_password.py
+que suporta tanto MongoDB quanto Supabase.
+
+Para redefinir a senha do usuário lezinrew@gmail.com:
+
+    cd backend
+    python scripts/set_user_password.py
+
+Ou use o script SQL direto no Supabase SQL Editor:
+    scripts/sql-set-password-lezinrew.sql
+"""
 import sys
-from pymongo import MongoClient
-import bcrypt
-from dotenv import load_dotenv
+import os
 
-# Adiciona o diretório backend ao path para importar utils se necessário
-sys.path.append(os.path.join(os.getcwd(), 'backend'))
+print("⚠️  AVISO: Este script está DEPRECATED")
+print("")
+print("📌 Use em vez disso:")
+print("")
+print("   Opção 1 (Python - funciona com MongoDB e Supabase):")
+print("   $ cd backend && python scripts/set_user_password.py")
+print("")
+print("   Opção 2 (SQL direto - apenas Supabase):")
+print("   Execute o arquivo: scripts/sql-set-password-lezinrew.sql")
+print("   no SQL Editor do Supabase Dashboard")
+print("")
+print("💡 Ambos os métodos redefinem a senha para '1234mudar'")
+print("")
 
-load_dotenv(os.path.join('backend', '.env'))
-
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/alca_financas')
-MONGO_DB = os.getenv('MONGO_DB', 'alca_financas')
-
-client = MongoClient(MONGO_URI)
-db = client[MONGO_DB]
-users_collection = db.users
-
-email = 'lezinrew@gmail.com'
-new_password = '1234@Mudar'
-
-# Gera hash compatível com o sistema (bcrypt)
-hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-
-# MongoDB armazena como Binary por padrão quando usamos bytes, o que é o correto
-result = users_collection.update_one(
-    {'email': email},
-    {'$set': {'password': hashed_password}}
-)
-
-if result.matched_count > 0:
-    print(f"✅ Senha resetada com sucesso para {email}")
-    if result.modified_count == 0:
-        print("ℹ️  A senha já era a mesma.")
-else:
-    print(f"❌ Usuário {email} não encontrado no banco {MONGO_DB}")
-
-client.close()
+sys.exit(1)

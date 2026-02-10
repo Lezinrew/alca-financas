@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils import require_auth
-from repositories.category_repository import CategoryRepository
 from services.category_service import CategoryService
 from utils.exceptions import ValidationException, NotFoundException
 
@@ -9,11 +8,9 @@ bp = Blueprint('categories', __name__, url_prefix='/api/categories')
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 def categories():
-    categories_collection = current_app.config['CATEGORIES']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    
-    repo = CategoryRepository()
-    service = CategoryService(repo, transactions_collection)
+    category_repo = current_app.config['CATEGORIES']
+    transactions_repo = current_app.config['TRANSACTIONS']
+    service = CategoryService(category_repo, transactions_repo)
 
     if request.method == 'GET':
         return jsonify(service.list_categories(request.user_id))
@@ -54,11 +51,9 @@ def categories():
 @bp.route('/<category_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
 def category_detail(category_id: str):
-    categories_collection = current_app.config['CATEGORIES']
-    transactions_collection = current_app.config['TRANSACTIONS']
-    
-    repo = CategoryRepository()
-    service = CategoryService(repo, transactions_collection)
+    category_repo = current_app.config['CATEGORIES']
+    transactions_repo = current_app.config['TRANSACTIONS']
+    service = CategoryService(category_repo, transactions_repo)
 
     try:
         if request.method == 'GET':
@@ -81,7 +76,7 @@ def import_categories():
     """Importa categorias de um arquivo JSON ou CSV"""
     try:
         user_id = request.user_id
-        categories_collection = current_app.config['CATEGORIES']
+        categories_repo = current_app.config['CATEGORIES']
         
         if 'file' not in request.files:
             return jsonify({'error': 'Arquivo é obrigatório'}), 400
@@ -106,17 +101,10 @@ def import_categories():
                             errors.append(f'Linha {idx + 1}: Nome e tipo são obrigatórios')
                             continue
                         
-                        # Verifica se já existe
-                        existing = categories_collection.find_one({
-                            'user_id': user_id,
-                            'name': cat['name'],
-                            'type': cat['type']
-                        })
-                        
+                        existing = categories_repo.find_one({'user_id': user_id, 'name': cat['name'], 'type': cat['type']}) if hasattr(categories_repo, 'find_one') else categories_repo.find_by_name_and_type(user_id, cat['name'], cat['type'])
                         if existing:
                             errors.append(f'Categoria "{cat["name"]}" já existe')
                             continue
-                        
                         category_data = {
                             'user_id': user_id,
                             'name': cat['name'],
@@ -125,8 +113,7 @@ def import_categories():
                             'icon': cat.get('icon', 'circle'),
                             'description': cat.get('description', '')
                         }
-                        
-                        categories_collection.insert_one(category_data)
+                        categories_repo.create(category_data)
                         imported_count += 1
                     except Exception as e:
                         errors.append(f'Linha {idx + 1}: {str(e)}')
@@ -148,16 +135,10 @@ def import_categories():
                             errors.append(f'Linha {idx + 2}: Nome e tipo são obrigatórios')
                             continue
                         
-                        existing = categories_collection.find_one({
-                            'user_id': user_id,
-                            'name': row['name'],
-                            'type': row['type']
-                        })
-                        
+                        existing = categories_repo.find_one({'user_id': user_id, 'name': row['name'], 'type': row['type']}) if hasattr(categories_repo, 'find_one') else categories_repo.find_by_name_and_type(user_id, row['name'], row['type'])
                         if existing:
                             errors.append(f'Categoria "{row["name"]}" já existe')
                             continue
-                        
                         category_data = {
                             'user_id': user_id,
                             'name': row['name'],
@@ -166,8 +147,7 @@ def import_categories():
                             'icon': row.get('icon', 'circle'),
                             'description': row.get('description', '')
                         }
-                        
-                        categories_collection.insert_one(category_data)
+                        categories_repo.create(category_data)
                         imported_count += 1
                     except Exception as e:
                         errors.append(f'Linha {idx + 2}: {str(e)}')

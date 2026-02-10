@@ -13,13 +13,19 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$REPO_DIR/backend"
 FRONTEND_DIR="$REPO_DIR/frontend"
 
+# Carregar .env do backend para SUPABASE_URL/SUPABASE_KEY
+if [ -f "$BACKEND_DIR/.env" ]; then
+  set -a
+  . "$BACKEND_DIR/.env"
+  set +a
+fi
+
 # Logs com data/hora
 TS="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="$REPO_DIR/logs"
 mkdir -p "$LOG_DIR"
 BACKEND_LOG="$LOG_DIR/backend-$TS.log"
 FRONTEND_LOG="$LOG_DIR/frontend-$TS.log"
-MONGO_LOG="$LOG_DIR/mongo-$TS.log"
 
 echo -e "${BLUE}🚀 Alça Finanças - Iniciando...${NC}"
 echo ""
@@ -69,113 +75,24 @@ command -v pip3 >/dev/null 2>&1 || { echo "Erro: pip3 não encontrado"; exit 1; 
 command -v node >/dev/null 2>&1 || { echo "Erro: node não encontrado"; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "Erro: npm não encontrado"; exit 1; }
 
-# Verificar se está usando Supabase ou MongoDB
-USE_SUPABASE="${USE_SUPABASE:-false}"
-if [ "$USE_SUPABASE" = "true" ] || [ -n "${SUPABASE_URL:-}" ]; then
-  echo -e "${BLUE}==> Usando Supabase como banco de dados${NC}"
-  USE_SUPABASE="true"
-  
-  # Verificar variáveis do Supabase
-  if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_KEY:-}" ]; then
-    echo -e "${YELLOW}⚠️  SUPABASE_URL ou SUPABASE_KEY não configurados${NC}"
-    echo -e "${YELLOW}💡 Configure no arquivo backend/.env:${NC}"
-    echo -e "   ${BLUE}SUPABASE_URL=https://seu-projeto.supabase.co${NC}"
-    echo -e "   ${BLUE}SUPABASE_KEY=sua-service-role-key${NC}"
-    echo ""
-    echo -e "${YELLOW}Ou defina USE_SUPABASE=false para usar MongoDB local${NC}"
-    exit 1
-  fi
-  
-  echo -e "${GREEN}✅ Configuração do Supabase encontrada${NC}"
-else
-  echo "==> Garantindo que o MongoDB esteja em execução (localhost:27017)"
-  USE_SUPABASE="false"
-  MONGO_STARTED_BY_SCRIPT=""
-
-  # Função para verificar se Docker daemon está rodando
-  check_docker_daemon() {
-    if command -v docker >/dev/null 2>&1; then
-      if docker info >/dev/null 2>&1; then
-        return 0
-      else
-        return 1
-      fi
-    else
-      return 1
-    fi
-  }
-
-  if command -v brew >/dev/null 2>&1 && brew list --formula | grep -q "^mongodb-community$"; then
-    echo "  📦 Iniciando MongoDB via Homebrew..."
-    brew services start mongodb-community || true
-    MONGO_STARTED_BY_SCRIPT="brew"
-  else
-    echo "  📦 Homebrew MongoDB não encontrado. Tentando via Docker..."
-    if check_docker_daemon; then
-    echo "  ✅ Docker daemon está rodando"
-    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^alca_mongo$'; then
-      if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^alca_mongo$'; then
-        echo "  🔄 Iniciando container MongoDB existente..."
-        docker start alca_mongo >/dev/null 2>&1 || {
-          echo -e "  ${RED}❌ Erro ao iniciar container alca_mongo${NC}"
-          exit 1
-        }
-      else
-        echo "  🆕 Criando novo container MongoDB..."
-        mkdir -p "$REPO_DIR/mongo_data"
-        docker run -d --name alca_mongo -p 27017:27017 -v "$REPO_DIR/mongo_data":/data/db mongo:6 >/dev/null 2>&1 || {
-          echo -e "  ${RED}❌ Erro ao criar container MongoDB${NC}"
-          exit 1
-        }
-      fi
-    else
-      echo "  ✅ Container MongoDB já está rodando"
-    fi
-    (docker logs -f alca_mongo > "$MONGO_LOG" 2>&1 & echo $! > "$REPO_DIR/.mongo_logs.pid") || true
-    MONGO_STARTED_BY_SCRIPT="docker"
-  else
-    echo -e "  ${RED}❌ Docker não está disponível ou o daemon não está rodando${NC}"
-    echo -e "  ${YELLOW}💡 Soluções:${NC}"
-    echo -e "     1. Inicie o Docker Desktop e execute o script novamente"
-    echo -e "     2. Instale MongoDB via Homebrew: ${BLUE}brew install mongodb-community${NC}"
-    echo -e "     3. Inicie MongoDB manualmente e execute o script novamente"
-    echo ""
-    echo -e "  ${YELLOW}Verificando se MongoDB já está rodando em localhost:27017...${NC}"
-    # Verifica se MongoDB já está rodando (pode ter sido iniciado manualmente)
-    if nc -z localhost 27017 >/dev/null 2>&1; then
-      echo -e "  ${GREEN}✅ MongoDB já está acessível em localhost:27017${NC}"
-      MONGO_STARTED_BY_SCRIPT="externo"
-    else
-      echo -e "  ${RED}❌ MongoDB não está acessível${NC}"
-      exit 1
-    fi
-  fi
-
-  # Aguardar MongoDB responder na porta 27017
-  if [ "$MONGO_STARTED_BY_SCRIPT" != "externo" ]; then
-    echo -n "  ⏳ Aguardando MongoDB em localhost:27017"
-    for i in {1..60}; do
-      if nc -z localhost 27017 >/dev/null 2>&1; then
-        echo -e " ${GREEN}- ok${NC}"
-        break
-      fi
-      echo -n "."
-      sleep 1
-    done
-    echo
-  fi
+# Banco de dados: apenas Supabase (obrigatório)
+echo -e "${BLUE}==> Verificando configuração Supabase${NC}"
+# Aceita ambos nomes: SUPABASE_SERVICE_ROLE_KEY (padrão) ou SUPABASE_KEY (legacy)
+SUPABASE_KEY_VALUE="${SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_KEY:-}}"
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "$SUPABASE_KEY_VALUE" ]; then
+  echo -e "${RED}❌ SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados${NC}"
+  echo -e "${YELLOW}💡 Configure no arquivo backend/.env ou .env:${NC}"
+  echo -e "   ${BLUE}SUPABASE_URL=https://seu-projeto.supabase.co${NC}"
+  echo -e "   ${BLUE}SUPABASE_SERVICE_ROLE_KEY=eyJ... (Project Settings > API > service_role)${NC}"
+  exit 1
 fi
-
-  # Verificação final do MongoDB
-  if ! nc -z localhost 27017 >/dev/null 2>&1; then
-    echo -e "${RED}❌ Erro: MongoDB não está acessível em localhost:27017${NC}"
-    echo -e "${YELLOW}💡 Dicas:${NC}"
-    echo -e "   • Inicie o Docker Desktop e execute o script novamente"
-    echo -e "   • OU instale/start o mongodb-community via Homebrew: ${BLUE}brew install mongodb-community && brew services start mongodb-community${NC}"
-    echo -e "   • OU inicie MongoDB manualmente e execute o script novamente"
-    exit 1
-  fi
+# Aceita chave nova (sb_secret_...) ou antiga (eyJ...)
+if ! echo "$SUPABASE_KEY_VALUE" | grep -qE '^(eyJ|sb_secret_)'; then
+  echo -e "${YELLOW}⚠️  SUPABASE_SERVICE_ROLE_KEY deve ser a service_role key (eyJ...) ou sb_secret_...${NC}"
+  echo -e "   Em Supabase: Project Settings > API > Project API keys > service_role."
+  exit 1
 fi
+echo -e "${GREEN}✅ Supabase configurado${NC}"
 
 
 echo "==> Preparando backend (virtualenv + dependências)"
@@ -193,8 +110,8 @@ python -c "import email_validator" 2>/dev/null || {
     echo -e "  ${YELLOW}⚠️  email-validator não encontrado. Reinstalando...${NC}"
     pip install email-validator==2.2.0
 }
-python -c "import flask, pymongo, pydantic" 2>/dev/null || {
-    echo -e "  ${RED}❌ Erro ao importar dependências básicas${NC}"
+python -c "import flask, supabase, pydantic" 2>/dev/null || {
+    echo -e "  ${RED}❌ Erro ao importar dependências básicas (flask, supabase, pydantic)${NC}"
     exit 1
 }
 echo -e "  ${GREEN}✅ Todas as dependências instaladas${NC}"
@@ -203,28 +120,11 @@ echo -e "  ${GREEN}✅ Todas as dependências instaladas${NC}"
 # Variáveis de ambiente padrão
 export SECRET_KEY="${SECRET_KEY:-dev-secret-key}"
 
-# Configuração do banco de dados
-if [ "$USE_SUPABASE" = "true" ]; then
-  # Supabase - variáveis já devem estar no .env
-  echo -e "${GREEN}✅ Usando Supabase como banco de dados${NC}"
-else
-  # MongoDB local
-  export MONGO_URI="${MONGO_URI:-mongodb://localhost:27017/alca_financas}"
-  export MONGO_DB="${MONGO_DB:-alca_financas}"
-fi
-
 # CORS - Sempre inclui localhost em portas comuns
 CORS_BASE="http://localhost:3000,http://localhost:5173,http://localhost:3001,http://127.0.0.1:3000"
 export CORS_ORIGINS="${CORS_ORIGINS:-$CORS_BASE}"
 
 echo "==> Iniciando backend"
-
-# Carregar variáveis do backend/.env se existir
-if [ -f "$BACKEND_DIR/.env" ]; then
-  set -a
-  . "$BACKEND_DIR/.env"
-  set +a
-fi
 
 # Detectar porta disponível (preferência: 8001, fallback: 5000)
 # Porta 5000 é frequentemente ocupada pelo AirPlay no macOS
@@ -247,8 +147,6 @@ export PORT="${PORT:-$BACKEND_PORT}"
 BACKEND_PORT_FINAL=$PORT
 
 echo -e "  ${GREEN}✅ Backend irá iniciar na porta $BACKEND_PORT_FINAL${NC}"
-export MONGO_URI="${MONGO_URI:-${MONGO_URL:-mongodb://localhost:27017/alca_financas}}"
-export MONGO_DB="${MONGO_DB:-alca_financas}"
 
 # Frontend sempre usa porta 3000 (conforme vite.config.js)
 FRONTEND_PORT=3000
@@ -301,7 +199,7 @@ if ! curl -sS http://localhost:"$BACKEND_PORT_FINAL"/api/health 2>/dev/null | gr
   echo ""
   echo -e "${YELLOW}💡 Dicas:${NC}"
   echo "   • Verifique se todas as dependências estão instaladas"
-  echo "   • Verifique se o MongoDB está acessível"
+  echo "   • Verifique SUPABASE_URL e SUPABASE_KEY no backend/.env (service_role JWT)"
   echo "   • Verifique se há erros de sintaxe no código"
   exit 1
 fi
@@ -399,15 +297,6 @@ cleanup() {
     kill "$(cat "$REPO_DIR/.backend.pid")" || true
     rm -f "$REPO_DIR/.backend.pid"
   fi
-  if [ "${MONGO_STARTED_BY_SCRIPT}" = "docker" ]; then
-    echo "Parando MongoDB (docker alca_mongo)"
-    docker stop alca_mongo >/dev/null 2>&1 || true
-    docker rm alca_mongo >/dev/null 2>&1 || true
-    if [ -f "$REPO_DIR/.mongo_logs.pid" ] && kill -0 "$(cat "$REPO_DIR/.mongo_logs.pid")" 2>/dev/null; then
-      kill "$(cat "$REPO_DIR/.mongo_logs.pid")" || true
-      rm -f "$REPO_DIR/.mongo_logs.pid"
-    fi
-  fi
 }
 
 trap cleanup EXIT INT TERM
@@ -420,7 +309,7 @@ echo ""
 echo -e "${BLUE}📍 URLs:${NC}"
 echo -e "   🌐 Frontend:  ${YELLOW}http://localhost:$FRONTEND_PORT${NC}"
 echo -e "   🔧 Backend:   ${YELLOW}http://localhost:$BACKEND_PORT_FINAL${NC}"
-echo -e "   🗄️  MongoDB:   ${YELLOW}mongodb://localhost:27017${NC} (${MONGO_STARTED_BY_SCRIPT:-externo})"
+echo -e "   🗄️  Banco:     ${YELLOW}Supabase${NC}"
 echo ""
 echo -e "${BLUE}📝 Logs:${NC}"
 echo -e "   Backend:  ${YELLOW}$BACKEND_LOG${NC}"

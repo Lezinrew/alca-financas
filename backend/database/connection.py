@@ -1,12 +1,10 @@
 """
-Conexão com Banco de Dados (Supabase/PostgreSQL ou MongoDB)
+Conexão com Banco de Dados (Supabase/PostgreSQL apenas)
 """
 import os
 import logging
 from typing import Optional, Any
-from pymongo import MongoClient
 
-# Opcional: Supabase
 try:
     from supabase import create_client, Client
     SUPABASE_AVAILABLE = True
@@ -15,46 +13,122 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Variáveis globais para conexões
 _supabase_client: Optional[Any] = None
 _db_pool: Optional[Any] = None
-_mongo_client: Optional[MongoClient] = None
-_mongo_db: Optional[Any] = None
-_db_type: str = "mongodb" # "mongodb" ou "supabase"
+
+
+def _resolve_supabase_key() -> str:
+    """
+    Resolve a chave Supabase seguindo prioridade padrão:
+    1. SUPABASE_SERVICE_ROLE_KEY (padrão oficial, backend apenas)
+    2. SUPABASE_ANON_KEY (fallback dev, frontend safe)
+    3. Legacy: SUPABASE_KEY, SUPABASE_LEGACY_JWT (compatibilidade)
+
+    IMPORTANTE:
+    - SUPABASE_SERVICE_ROLE_KEY: Backend apenas, bypassa RLS (admin)
+    - SUPABASE_ANON_KEY: Seguro para frontend, respeita RLS
+    """
+    # Padrão oficial (backend)
+    service_role = (os.getenv('SUPABASE_SERVICE_ROLE_KEY') or '').strip()
+    if service_role:
+        return service_role
+
+    # Fallback para dev (anon key é segura mas limitada)
+    anon_key = (os.getenv('SUPABASE_ANON_KEY') or '').strip()
+    if anon_key:
+        logger.warning(
+            "⚠️  Usando SUPABASE_ANON_KEY. Para operações admin, use SUPABASE_SERVICE_ROLE_KEY"
+        )
+        return anon_key
+
+    # Legacy: compatibilidade retroativa
+    legacy_jwt = (os.getenv('SUPABASE_LEGACY_JWT') or '').strip()
+    if legacy_jwt and legacy_jwt.startswith('eyJ'):
+        logger.warning(
+            "⚠️  SUPABASE_LEGACY_JWT está deprecated. Use SUPABASE_SERVICE_ROLE_KEY"
+        )
+        return legacy_jwt
+
+    # Fallback final: SUPABASE_KEY (ambíguo, deprecated)
+    supabase_key = (os.getenv('SUPABASE_KEY') or '').strip()
+    if supabase_key:
+        logger.warning(
+            "⚠️  SUPABASE_KEY está deprecated. Use SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_ANON_KEY"
+        )
+        return supabase_key
+
+    return ''
 
 
 def init_db():
-    """Inicializa conexões com o banco de dados"""
-    global _supabase_client, _db_pool, _mongo_client, _mongo_db, _db_type
-    
-    # Verifica qual banco usar (prioridade para Supabase se configurado)
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_KEY')
-    
-    if supabase_url and supabase_key and SUPABASE_AVAILABLE:
-        _db_type = "supabase"
-        _init_supabase(supabase_url, supabase_key)
-    else:
-        _db_type = "mongodb"
-        _init_mongodb()
-
-
-def _init_supabase(url, key):
-    """Inicializa Supabase"""
+    """Inicializa conexão com o Supabase."""
     global _supabase_client, _db_pool
-    logger.info("📡 Inicializando Supabase...")
-    
-    supabase_service_key = os.getenv('SUPABASE_SERVICE_KEY', key)
-    db_url = os.getenv('SUPABASE_DB_URL')
-    
-    try:
-        from supabase import create_client
-        _supabase_client = create_client(url, supabase_service_key)
-        logger.info("✅ Cliente Supabase inicializado com sucesso")
-    except Exception as e:
-        logger.error(f"❌ Erro ao inicializar cliente Supabase: {e}")
-        raise
 
+    supabase_url = (os.getenv('SUPABASE_URL') or '').strip()
+    supabase_key = _resolve_supabase_key()
+
+    if not SUPABASE_AVAILABLE:
+        raise RuntimeError(
+            "Pacote 'supabase' não instalado. Execute: pip install supabase"
+        )
+    if not supabase_url:
+        raise RuntimeError(
+            "SUPABASE_URL não configurado.\n"
+            "Defina no .env: SUPABASE_URL=https://your-project.supabase.co\n"
+            "Obtenha em: Project Settings > API no Supabase Dashboard"
+        )
+    if not supabase_key:
+        raise RuntimeError(
+            "Nenhuma chave Supabase configurada.\n"
+            "Para backend: SUPABASE_SERVICE_ROLE_KEY (Project Settings > API > service_role key)\n"
+            "Para dev/frontend: SUPABASE_ANON_KEY (Project Settings > API > anon key)\n"
+            "NUNCA exponha service_role_key ao frontend!"
+        )
+
+    # Validar formato da chave
+    if not (supabase_key.startswith('eyJ') or supabase_key.startswith('sb_secret_')):
+        raise RuntimeError(
+            f"Chave Supabase inválida.\n"
+            f"Deve começar com 'eyJ' (JWT) ou 'sb_secret_' (nova API key).\n"
+            f"Chave atual começa com: {supabase_key[:10]}...\n"
+            f"Obtenha a chave correta em: Project Settings > API"
+        )
+
+    logger.info("📡 Inicializando Supabase...")
+    _init_supabase(supabase_url, supabase_key)
+
+
+def _init_supabase(url: str, key: str):
+    """Inicializa cliente Supabase."""
+    global _supabase_client, _db_pool
+
+    db_url = os.getenv('SUPABASE_DB_URL')  # Opcional: conexão direta PostgreSQL
+
+    from supabase import create_client
+
+    # Nova API key format (sb_secret_*)
+    if key.startswith('sb_secret_'):
+        # supabase-py requer JWT, usar workaround
+        _FAKE_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwIn0.x"
+        try:
+            _supabase_client = create_client(url, _FAKE_JWT)
+            _supabase_client.supabase_key = key
+            _supabase_client.options.headers.update(_supabase_client._get_auth_headers())
+            _supabase_client._postgrest = None
+            logger.info("✅ Cliente Supabase inicializado (sb_secret_ key)")
+        except Exception as e:
+            logger.error(f"❌ Erro ao inicializar Supabase: {e}")
+            raise
+    else:
+        # JWT format (eyJ*): formato nativo
+        try:
+            _supabase_client = create_client(url, key)
+            logger.info("✅ Cliente Supabase inicializado com sucesso (JWT key)")
+        except Exception as e:
+            logger.error(f"❌ Erro ao inicializar Supabase: {e}")
+            raise
+
+    # Pool PostgreSQL direto (opcional, para queries SQL raw)
     if db_url:
         try:
             from psycopg2 import pool
@@ -65,96 +139,57 @@ def _init_supabase(url, key):
                 dsn=db_url,
                 cursor_factory=RealDictCursor
             )
-            logger.info("✅ Pool de conexões PostgreSQL inicializado")
+            logger.info("✅ Pool de conexões PostgreSQL inicializado (opcional)")
         except Exception as e:
-            logger.warning(f"⚠️  Pool PostgreSQL não inicializado (opcional): {e}")
-
-
-def _init_mongodb():
-    """Inicializa MongoDB"""
-    global _mongo_client, _mongo_db
-    logger.info("🍃 Inicializando MongoDB...")
-    
-    mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/alca_financas')
-    db_name = os.getenv('MONGO_DB', 'alca_financas')
-    
-    try:
-        _mongo_client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-        # Testa a conexão
-        _mongo_client.server_info()
-        _mongo_db = _mongo_client[db_name]
-        logger.info(f"✅ MongoDB inicializado com sucesso em {db_name}")
-    except Exception as e:
-        logger.error(f"❌ Erro ao conectar ao MongoDB: {e}")
-        raise
+            logger.warning(f"⚠️  Pool PostgreSQL não inicializado: {e}")
 
 
 def get_db():
-    """Retorna o cliente do banco de dados (Supabase Client ou Mongo Database)"""
-    global _db_type, _supabase_client, _mongo_db
-    
-    if _db_type == "supabase":
-        if _supabase_client is None:
-            init_db()
-        return _supabase_client
-    else:
-        if _mongo_db is None:
-            init_db()
-        return _mongo_db
+    """Retorna o cliente Supabase."""
+    if _supabase_client is None:
+        init_db()
+    return _supabase_client
 
 
 def get_db_type() -> str:
-    """Retorna o tipo de banco em uso"""
-    return _db_type
+    """Retorna o tipo de banco em uso (sempre 'supabase')."""
+    return "supabase"
 
 
 def get_supabase() -> Any:
-    """Retorna o cliente Supabase"""
-    if _db_type != "supabase":
-        raise ValueError("Aplicação configurada para usar MongoDB, não Supabase")
-    return get_db()
-
-
-def get_mongodb():
-    """Retorna o banco MongoDB"""
-    if _db_type != "mongodb":
-        raise ValueError("Aplicação configurada para usar Supabase, não MongoDB")
+    """Alias para get_db(). Retorna o cliente Supabase."""
     return get_db()
 
 
 def get_db_connection():
-    """Retorna uma conexão do pool PostgreSQL (apenas para Supabase)"""
-    if _db_type != "supabase":
-        raise ValueError("Conexão PostgreSQL direta disponível apenas com Supabase")
-    
+    """
+    Retorna uma conexão do pool PostgreSQL direto (opcional).
+    Requer SUPABASE_DB_URL configurado.
+    """
     if _db_pool is None:
         init_db()
-    
     if _db_pool is None:
-        raise RuntimeError("Pool de conexões PostgreSQL não inicializado")
-    
+        raise RuntimeError(
+            "Pool PostgreSQL não configurado.\n"
+            "Configure SUPABASE_DB_URL para conexão direta ao PostgreSQL.\n"
+            "Obtenha em: Project Settings > Database > Connection string (psycopg2)"
+        )
     return _db_pool.getconn()
 
 
 def return_db_connection(conn):
-    """Retorna uma conexão ao pool"""
+    """Devolve uma conexão ao pool PostgreSQL."""
     if _db_pool:
         _db_pool.putconn(conn)
 
 
 def close_db():
-    """Fecha todas as conexões"""
-    global _supabase_client, _db_pool, _mongo_client, _mongo_db
-    
+    """Fecha todas as conexões."""
+    global _supabase_client, _db_pool
     if _db_pool:
-        _db_pool.closeall()
+        try:
+            _db_pool.closeall()
+        except Exception:
+            pass
         _db_pool = None
-    
-    if _mongo_client:
-        _mongo_client.close()
-        _mongo_client = None
-        _mongo_db = None
-    
     _supabase_client = None
-
-
