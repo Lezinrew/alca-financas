@@ -53,6 +53,9 @@ __pycache__/
 *.tar.gz
 alca-financas-*.tar.gz
 
+# Cursor MCP (contém API keys locais)
+.cursor/mcp.json
+
 # macOS
 .DS_Store
 */.DS_Store
