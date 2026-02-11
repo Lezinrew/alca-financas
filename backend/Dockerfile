@@ -4,16 +4,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-WORKDIR /app/backend
+WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc \
   && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt ./
+COPY requirements.txt ./
 RUN pip install -r requirements.txt gunicorn
 
-COPY backend/ .
+COPY . .
 
 EXPOSE 8001
 
