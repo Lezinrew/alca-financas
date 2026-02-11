@@ -434,3 +434,276 @@ def comparison_report(transactions_collection, user_id: str, current_month: int,
 
 
 
+
+def overview_report_supabase(
+    transactions_repo,
+    categories_repo,
+    accounts_repo,
+    user_id: str,
+    month: int,
+    year: int,
+    report_type: str,
+    account_id: str = None
+) -> Dict[str, Any]:
+    """
+    Relatório de visão geral usando repositórios Supabase.
+    Substitui overview_report() que usava MongoDB aggregate().
+    """
+    start_date = datetime(year, month, 1)
+    end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+    start_iso = start_date.strftime('%Y-%m-%d')
+    end_iso = end_date.strftime('%Y-%m-%d')
+
+    # Busca transações do período
+    transactions_list = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
+
+    # Filtra por conta se fornecido
+    if account_id:
+        transactions_list = [t for t in transactions_list if t.get('account_id') == account_id]
+
+    result: Dict[str, Any] = {
+        'period': {
+            'month': month,
+            'year': year,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat()
+        },
+        'report_type': report_type
+    }
+
+    if report_type == 'expenses_by_category':
+        # Agrupa despesas por categoria
+        by_category: Dict[str, Dict[str, Any]] = {}
+        for t in transactions_list:
+            if t.get('type') != 'expense':
+                continue
+            cat_id = t.get('category_id') or ''
+            amount = float(t.get('amount', 0))
+            by_category.setdefault(cat_id, {'total': 0, 'count': 0})
+            by_category[cat_id]['total'] += amount
+            by_category[cat_id]['count'] += 1
+
+        # Monta lista com informações das categorias
+        total_amount = 0.0
+        categories_data: List[Dict[str, Any]] = []
+        for cat_id, v in sorted(by_category.items(), key=lambda x: -x[1]['total']):
+            category = categories_repo.find_by_id(cat_id) if cat_id else None
+            total_amount += v['total']
+            categories_data.append({
+                'category_id': cat_id,
+                'category_name': category.get('name', 'Sem categoria') if category else 'Sem categoria',
+                'category_color': category.get('color', '#6b7280') if category else '#6b7280',
+                'category_icon': category.get('icon', 'circle') if category else 'circle',
+                'total': v['total'],
+                'count': v['count']
+            })
+
+        # Calcula percentuais
+        for item in categories_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+
+        result['data'] = categories_data
+        result['total_amount'] = total_amount
+
+    elif report_type == 'income_by_category':
+        # Agrupa receitas por categoria
+        by_category: Dict[str, Dict[str, Any]] = {}
+        for t in transactions_list:
+            if t.get('type') != 'income':
+                continue
+            cat_id = t.get('category_id') or ''
+            amount = float(t.get('amount', 0))
+            by_category.setdefault(cat_id, {'total': 0, 'count': 0})
+            by_category[cat_id]['total'] += amount
+            by_category[cat_id]['count'] += 1
+
+        total_amount = 0.0
+        categories_data: List[Dict[str, Any]] = []
+        for cat_id, v in sorted(by_category.items(), key=lambda x: -x[1]['total']):
+            category = categories_repo.find_by_id(cat_id) if cat_id else None
+            total_amount += v['total']
+            categories_data.append({
+                'category_id': cat_id,
+                'category_name': category.get('name', 'Sem categoria') if category else 'Sem categoria',
+                'category_color': category.get('color', '#6b7280') if category else '#6b7280',
+                'category_icon': category.get('icon', 'circle') if category else 'circle',
+                'total': v['total'],
+                'count': v['count']
+            })
+
+        for item in categories_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+
+        result['data'] = categories_data
+        result['total_amount'] = total_amount
+
+    elif report_type == 'expenses_by_account':
+        # Agrupa despesas por conta
+        by_account: Dict[str, Dict[str, Any]] = {}
+        for t in transactions_list:
+            if t.get('type') != 'expense':
+                continue
+            acc_id = t.get('account_id') or ''
+            amount = float(t.get('amount', 0))
+            by_account.setdefault(acc_id, {'total': 0, 'count': 0})
+            by_account[acc_id]['total'] += amount
+            by_account[acc_id]['count'] += 1
+
+        total_amount = 0.0
+        accounts_data: List[Dict[str, Any]] = []
+        for acc_id, v in sorted(by_account.items(), key=lambda x: -x[1]['total']):
+            account = accounts_repo.find_by_id(acc_id) if acc_id else None
+            total_amount += v['total']
+            accounts_data.append({
+                'account_id': acc_id,
+                'account_name': account.get('name', 'Sem conta associada') if account else 'Sem conta associada',
+                'account_color': account.get('color', '#6c757d') if account else '#6c757d',
+                'account_icon': account.get('icon', 'wallet2') if account else 'wallet2',
+                'total': v['total'],
+                'count': v['count']
+            })
+
+        for item in accounts_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+
+        result['data'] = accounts_data
+        result['total_amount'] = total_amount
+
+    elif report_type == 'income_by_account':
+        # Agrupa receitas por conta
+        by_account: Dict[str, Dict[str, Any]] = {}
+        for t in transactions_list:
+            if t.get('type') != 'income':
+                continue
+            acc_id = t.get('account_id') or ''
+            amount = float(t.get('amount', 0))
+            by_account.setdefault(acc_id, {'total': 0, 'count': 0})
+            by_account[acc_id]['total'] += amount
+            by_account[acc_id]['count'] += 1
+
+        total_amount = 0.0
+        accounts_data: List[Dict[str, Any]] = []
+        for acc_id, v in sorted(by_account.items(), key=lambda x: -x[1]['total']):
+            account = accounts_repo.find_by_id(acc_id) if acc_id else None
+            total_amount += v['total']
+            accounts_data.append({
+                'account_id': acc_id,
+                'account_name': account.get('name', 'Sem conta associada') if account else 'Sem conta associada',
+                'account_color': account.get('color', '#6c757d') if account else '#6c757d',
+                'account_icon': account.get('icon', 'wallet2') if account else 'wallet2',
+                'total': v['total'],
+                'count': v['count']
+            })
+
+        for item in accounts_data:
+            item['percentage'] = (item['total'] / total_amount * 100) if total_amount > 0 else 0
+
+        result['data'] = accounts_data
+        result['total_amount'] = total_amount
+
+    elif report_type == 'balance_by_account':
+        # Busca todas as contas ativas do usuário
+        accounts_list = accounts_repo.find_all({'user_id': user_id, 'is_active': True})
+        accounts_data: List[Dict[str, Any]] = []
+
+        for account in accounts_list:
+            acc_id = account.get('id') or account.get('_id')
+            # Busca todas as transações da conta
+            account_transactions = transactions_repo.find_all({'user_id': user_id, 'account_id': acc_id})
+
+            income_total = sum(float(t.get('amount', 0)) for t in account_transactions if t.get('type') == 'income')
+            expense_total = sum(float(t.get('amount', 0)) for t in account_transactions if t.get('type') == 'expense')
+            initial_balance = float(account.get('initial_balance', 0))
+            current_balance = initial_balance + income_total - expense_total
+
+            accounts_data.append({
+                'account_id': acc_id,
+                'account_name': account.get('name', 'Sem nome'),
+                'account_color': account.get('color', '#6b7280'),
+                'account_icon': account.get('icon', 'wallet2'),
+                'account_type': account.get('type', 'wallet'),
+                'initial_balance': initial_balance,
+                'current_balance': current_balance,
+                'total_income': income_total,
+                'total_expense': expense_total
+            })
+
+        result['data'] = accounts_data
+        result['total_amount'] = sum(item.get('current_balance', 0) for item in accounts_data)
+
+    else:
+        # Tipo de relatório não reconhecido
+        result['data'] = []
+        result['total_amount'] = 0.0
+
+    return result
+
+
+def comparison_report_supabase(
+    transactions_repo,
+    user_id: str,
+    current_month: int,
+    current_year: int
+) -> Dict[str, Any]:
+    """
+    Relatório de comparação usando repositório Supabase.
+    Substitui comparison_report() que usava MongoDB find().
+    """
+    # Período atual
+    current_start = datetime(current_year, current_month, 1)
+    current_end = datetime(current_year + 1, 1, 1) if current_month == 12 else datetime(current_year, current_month + 1, 1)
+
+    # Período anterior
+    if current_month == 1:
+        prev_start = datetime(current_year - 1, 12, 1)
+        prev_end = datetime(current_year, 1, 1)
+    else:
+        prev_start = datetime(current_year, current_month - 1, 1)
+        prev_end = current_start
+
+    # Busca transações dos dois períodos
+    current_transactions = transactions_repo.find_by_user_and_date_range(
+        user_id,
+        current_start.strftime('%Y-%m-%d'),
+        current_end.strftime('%Y-%m-%d')
+    )
+    prev_transactions = transactions_repo.find_by_user_and_date_range(
+        user_id,
+        prev_start.strftime('%Y-%m-%d'),
+        prev_end.strftime('%Y-%m-%d')
+    )
+
+    # Calcula totais
+    current_income = sum(float(t.get('amount', 0)) for t in current_transactions if t.get('type') == 'income')
+    current_expense = sum(float(t.get('amount', 0)) for t in current_transactions if t.get('type') == 'expense')
+
+    prev_income = sum(float(t.get('amount', 0)) for t in prev_transactions if t.get('type') == 'income')
+    prev_expense = sum(float(t.get('amount', 0)) for t in prev_transactions if t.get('type') == 'expense')
+
+    # Calcula variações
+    income_variation = ((current_income - prev_income) / prev_income * 100) if prev_income > 0 else 0
+    expense_variation = ((current_expense - prev_expense) / prev_expense * 100) if prev_expense > 0 else 0
+
+    return {
+        'current_period': {
+            'start_date': current_start.isoformat(),
+            'end_date': current_end.isoformat(),
+            'income': current_income,
+            'expense': current_expense,
+            'balance': current_income - current_expense,
+            'transactions_count': len(current_transactions)
+        },
+        'previous_period': {
+            'start_date': prev_start.isoformat(),
+            'end_date': prev_end.isoformat(),
+            'income': prev_income,
+            'expense': prev_expense,
+            'balance': prev_income - prev_expense,
+            'transactions_count': len(prev_transactions)
+        },
+        'variations': {
+            'income_variation': income_variation,
+            'expense_variation': expense_variation,
+            'balance_variation': ((current_income - current_expense) - (prev_income - prev_expense)) / (prev_income - prev_expense) * 100 if (prev_income - prev_expense) != 0 else 0
+        }
+    }
