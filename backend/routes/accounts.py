@@ -136,7 +136,7 @@ def import_credit_card_statement(account_id: str):
         from services.category_detector import detect_category_from_description, get_or_create_category
         
         # Busca categorias do usuário
-        user_categories = {cat['name']: cat['_id'] for cat in categories_collection.find({'user_id': request.user_id})}
+        user_categories = {cat['name']: (cat.get('id') or cat.get('_id')) for cat in categories_repo.find_all({'user_id': request.user_id})}
         
         imported_transactions = []
         errors = []

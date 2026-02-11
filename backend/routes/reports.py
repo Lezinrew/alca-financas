@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils import require_auth
-from services.report_service import overview_report, comparison_report
+from services.report_service import overview_report_supabase, comparison_report_supabase
 
 
 bp = Blueprint('reports', __name__, url_prefix='/api/reports')
@@ -30,16 +30,16 @@ def reports_overview():
         
         # Valida account_id se fornecido
         if account_id:
-            accounts_collection = current_app.config['ACCOUNTS']
-            account = accounts_collection.find_one({'_id': account_id, 'user_id': request.user_id})
-            if not account:
+            accounts_repo = current_app.config['ACCOUNTS']
+            account = accounts_repo.find_by_id(account_id)
+            if not account or account.get('user_id') != request.user_id:
                 return jsonify({'error': 'Conta não encontrada'}), 404
-        
-        transactions_collection = current_app.config['TRANSACTIONS']
-        categories_collection = current_app.config['CATEGORIES']
-        accounts_collection = current_app.config['ACCOUNTS']
-        
-        data = overview_report(transactions_collection, categories_collection, accounts_collection, request.user_id, month, year, report_type, account_id)
+
+        transactions_repo = current_app.config['TRANSACTIONS']
+        categories_repo = current_app.config['CATEGORIES']
+        accounts_repo = current_app.config['ACCOUNTS']
+
+        data = overview_report_supabase(transactions_repo, categories_repo, accounts_repo, request.user_id, month, year, report_type, account_id)
         return jsonify(data)
     except ValueError as e:
         current_app.logger.error(f"Erro de validação em reports_overview: {str(e)}")
@@ -61,8 +61,8 @@ def reports_evolution():
 def reports_comparison():
     current_month = int(request.args.get('current_month',  datetime.now().month))
     current_year = int(request.args.get('current_year',  datetime.now().year))
-    transactions_collection = current_app.config['TRANSACTIONS']
-    data = comparison_report(transactions_collection, request.user_id, current_month, current_year)
+    transactions_repo = current_app.config['TRANSACTIONS']
+    data = comparison_report_supabase(transactions_repo, request.user_id, current_month, current_year)
     return jsonify(data)
 
 
