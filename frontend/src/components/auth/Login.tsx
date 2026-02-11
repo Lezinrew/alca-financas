@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { GradientButton } from '../ui/gradient-button';
-import { Eye, EyeOff, Loader2, Mail, Lock, Wallet } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const Login: React.FC = () => {
@@ -68,15 +68,21 @@ const Login: React.FC = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-2xl shadow-lg">
-              <Wallet className="w-10 h-10 text-white" aria-hidden />
+          <div className="relative flex justify-center mb-8 animate-fade-in">
+            <div className="relative animate-float">
+              {/* Glow adaptativo: light = emerald, dark = branco suave */}
+              <div
+                className="absolute -inset-12 -z-10 rounded-full blur-3xl opacity-40 animate-glow-pulse bg-emerald-500/15 dark:bg-white/10"
+                aria-hidden
+              />
+              <img
+                src="/alcahub-logo.png"
+                alt="AlçaHub Logo"
+                className="w-44 h-auto drop-shadow-lg dark:drop-shadow-[0_10px_30px_rgba(255,255,255,0.25)]"
+              />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 transition-colors">
-            Alça Finanças
-          </h1>
-          <p className="text-slate-600 dark:text-slate-300 transition-colors">
+          <p className="text-slate-600 dark:text-slate-300 transition-colors mt-2">
             Controle financeiro inteligente
           </p>
         </div>

@@ -1,0 +1,21 @@
+{
+  "name": "AlçaHub - Controle Financeiro",
+  "short_name": "AlçaHub",
+  "description": "Controle financeiro pessoal inteligente",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/logo-alca-hub.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-alca-hub.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
