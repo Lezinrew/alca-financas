@@ -13,7 +13,9 @@ import {
   Calendar,
   CreditCard,
   Menu,
-  X
+  X,
+  Shield,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -22,6 +24,7 @@ const AppShell = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -119,26 +122,83 @@ const AppShell = () => {
         </nav>
 
         {/* User Section */}
-        <div className={`p-4 border-t border-slate-700 ${sidebarHidden ? 'px-2' : ''}`}>
-          <div className={`flex items-center mb-3 ${sidebarHidden ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-              <User className="w-5 h-5 text-white" />
-            </div>
-            {!sidebarHidden && (
-              <div className="ml-3 flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-                <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-              </div>
-            )}
-          </div>
+        <div className={`p-4 border-t border-slate-700 ${sidebarHidden ? 'px-2' : ''} relative`}>
           <button
-            onClick={handleLogout}
-            className={`w-full flex items-center ${sidebarHidden ? 'justify-center px-2' : 'justify-center px-3'} py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-sm font-medium transition-colors`}
-            title={sidebarHidden ? 'Sair' : ''}
+            onClick={() => !sidebarHidden && setUserDropdownOpen(!userDropdownOpen)}
+            className={`w-full flex items-center ${sidebarHidden ? 'justify-center' : 'justify-between'} mb-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors`}
+            title={sidebarHidden ? user?.name : ''}
           >
-            <LogOut className="w-4 h-4 flex-shrink-0" />
-            {!sidebarHidden && <span className="ml-2 whitespace-nowrap">Sair</span>}
+            <div className="flex items-center min-w-0">
+              <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              {!sidebarHidden && (
+                <div className="ml-3 flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                  <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                </div>
+              )}
+            </div>
+            {!sidebarHidden && <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />}
           </button>
+
+          {/* Dropdown Menu */}
+          {userDropdownOpen && !sidebarHidden && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setUserDropdownOpen(false)}
+              />
+              <div className="absolute bottom-full left-4 right-4 mb-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 py-2">
+                <button
+                  onClick={() => {
+                    navigate('/profile');
+                    setUserDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  <User className="w-4 h-4 mr-3" />
+                  Meu Perfil
+                </button>
+                <button
+                  onClick={() => {
+                    navigate('/settings');
+                    setUserDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  <Settings className="w-4 h-4 mr-3" />
+                  Configurações
+                </button>
+                {user?.is_admin && (
+                  <>
+                    <div className="my-1 border-t border-slate-700" />
+                    <button
+                      onClick={() => {
+                        navigate('/admin/dashboard');
+                        setUserDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center px-4 py-2 text-sm text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 transition-colors"
+                    >
+                      <Shield className="w-4 h-4 mr-3" />
+                      Painel Admin
+                    </button>
+                  </>
+                )}
+                <div className="my-1 border-t border-slate-700" />
+                <button
+                  onClick={() => {
+                    setUserDropdownOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
+                >
+                  <LogOut className="w-4 h-4 mr-3" />
+                  Sair
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
