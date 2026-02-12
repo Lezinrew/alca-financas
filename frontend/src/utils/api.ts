@@ -228,6 +228,9 @@ export const oauthAPI = {
 export const adminAPI = {
   getStats: () => api.get('/admin/stats'),
   getUsers: (page = 1, perPage = 10, search = '') => api.get(`/admin/users?page=${page}&per_page=${perPage}&search=${search}`),
+  getUserDetails: (id: string) => api.get(`/admin/users/${id}/details`),
+  getLogs: (page = 1, perPage = 50) => api.get(`/admin/logs?page=${page}&per_page=${perPage}`),
+  exportUserData: (id: string) => api.get(`/admin/users/${id}/export`, { responseType: 'blob' }),
   createUser: (userData: any) => api.post('/admin/users', userData),
   updateUserStatus: (id: string, data: { is_blocked?: boolean; is_admin?: boolean }) => api.put(`/admin/users/${id}`, data),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),

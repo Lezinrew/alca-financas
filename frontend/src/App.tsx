@@ -29,6 +29,8 @@ const CreditCards = lazy(() => import('./components/credit-cards/CreditCards'));
 const CreditCardDetail = lazy(() => import('./components/credit-cards/CreditCardDetail'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
+const UserDetail = lazy(() => import('./pages/admin/UserDetail'));
+const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
 
 // Type definitions
 interface RouteWrapperProps {
@@ -140,6 +142,8 @@ const AppRoutes: React.FC = () => {
           <Route path="admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="admin/dashboard" element={<AdminDashboard />} />
           <Route path="admin/users" element={<UserManagement />} />
+          <Route path="admin/users/:userId" element={<UserDetail />} />
+          <Route path="admin/logs" element={<AdminLogs />} />
         </Route>
 
         {/* Redirecionar qualquer outra rota */}
