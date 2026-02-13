@@ -90,9 +90,7 @@ trap rollback ERR
 
 # Build Backend Docker Image
 echo -e "${BLUE}🔧 Building Backend Docker image...${NC}"
-cd backend
-docker build -t alcahub/backend:latest -t alcahub/backend:$(git rev-parse --short HEAD) .
-cd ..
+docker build -f backend/Dockerfile -t alcahub/backend:latest -t alcahub/backend:$(git rev-parse --short HEAD) .
 
 # Build Frontend
 echo -e "${BLUE}🎨 Building Frontend...${NC}"

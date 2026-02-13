@@ -258,8 +258,8 @@ jobs:
       - name: Build Backend Image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: .
+          file: backend/Dockerfile
           push: false
           tags: alcahub/backend:test
           no-cache: true
@@ -267,8 +267,8 @@ jobs:
       - name: Build Frontend Image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
+          context: .
+          file: frontend/Dockerfile
           push: false
           tags: alcahub/frontend:test
           no-cache: true
