@@ -259,28 +259,30 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./backend
+          file: ./backend/Dockerfile
           push: false
           tags: alcahub/backend:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Build Frontend Image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
+          file: ./frontend/Dockerfile
           push: false
           tags: alcahub/frontend:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
-  # Security Scan
+  # Security Scan (apenas no repositório principal; Code Scanning deve estar habilitado)
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    if: github.event.repository.fork != true
     permissions:
       security-events: write
       contents: read
       actions: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -297,6 +299,7 @@ jobs:
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
