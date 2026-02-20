@@ -5,8 +5,10 @@
 Deploy da aplicação no seu VPS Hostinger usando o domínio alcahub.com.br.
 
 **URLs finais:**
-- Frontend: https://alcahub.com.br
+- Frontend: https://alcahub.com.br (Principal)
+- Frontend: https://alcahub.cloud (Novo)
 - Backend API: https://api.alcahub.com.br
+- Backend API: https://api.alcahub.cloud
 
 ---
 
@@ -16,7 +18,7 @@ Deploy da aplicação no seu VPS Hostinger usando o domínio alcahub.com.br.
 
 Conecte ao VPS e execute:
 ```bash
-ssh root@SEU_IP_VPS
+ssh alcaapp@76.13.239.220
 bash <(curl -s https://raw.githubusercontent.com/Lezinrew/alca-financas/main/scripts/setup-vps.sh)
 ```
 
@@ -32,30 +34,34 @@ Cole o conteúdo de `VPS_BACKEND_ENV.txt` (no seu projeto local).
 
 **API (backend):**
 ```bash
-nano /etc/nginx/sites-available/api.alcahub.com.br
+sudo nano /etc/nginx/sites-available/api.alcahub.com.br
 ```
-Cole a config do arquivo `DEPLOY_VPS_HOSTINGER.md` seção 2.7.
+```nginx
+server_name api.alcahub.com.br api.alcahub.cloud;
+```
 
 **Frontend:**
 ```bash
-nano /etc/nginx/sites-available/alcahub.com.br
+sudo nano /etc/nginx/sites-available/alcahub.com.br
 ```
-Cole a config do arquivo `DEPLOY_VPS_HOSTINGER.md` seção 3.3.
+```nginx
+server_name alcahub.com.br www.alcahub.com.br alcahub.cloud www.alcahub.cloud;
+```
 
 Ativar:
 ```bash
-ln -s /etc/nginx/sites-available/api.alcahub.com.br /etc/nginx/sites-enabled/
-ln -s /etc/nginx/sites-available/alcahub.com.br /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
+sudo ln -s /etc/nginx/sites-available/api.alcahub.com.br /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/alcahub.com.br /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### Passo 4: Configurar DNS
+### Passo 4: Configurar DNS (No Hostinger hPanel para AMBOS os domínios)
 
-No hPanel da Hostinger, adicionar registros A:
+Adicionar registros A em `alcahub.com.br` e `alcahub.cloud`:
 ```
-@ -> SEU_IP_VPS
-www -> SEU_IP_VPS
-api -> SEU_IP_VPS
+@ -> 76.13.239.220
+www -> 76.13.239.220
+api -> 76.13.239.220
 ```
 
 ### Passo 5: Fazer build e upload do frontend
@@ -65,8 +71,9 @@ Na sua máquina local:
 cd frontend
 
 # Criar .env.production
+# Use api.alcahub.cloud (novo) ou api.alcahub.com.br (antigo)
 cat > .env.production << EOF
-VITE_API_URL=https://api.alcahub.com.br
+VITE_API_URL=https://api.alcahub.cloud
 VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_XXXXXXXXXXXXXXXXXXXXXXXX
 EOF
@@ -76,22 +83,25 @@ npm install
 npm run build
 
 # Upload
-rsync -avz --delete dist/ root@SEU_IP_VPS:/var/www/alcahub.com.br/
+rsync -avz --delete dist/ alcaapp@76.13.239.220:/var/www/alcahub.com.br/
 ```
 
 ### Passo 6: Iniciar backend
 
 No VPS:
 ```bash
-supervisorctl start alca-backend
-supervisorctl status
+sudo supervisorctl start alca-backend
+sudo supervisorctl status
 ```
 
-### Passo 7: Instalar SSL (após DNS propagar)
+### Passo 7: Instalar/Expandir SSL
 
 ```bash
-certbot --nginx -d api.alcahub.com.br
-certbot --nginx -d alcahub.com.br -d www.alcahub.com.br
+# Frontend (Todos os domínios)
+sudo certbot --nginx -d alcahub.com.br -d www.alcahub.com.br -d alcahub.cloud -d www.alcahub.cloud
+
+# API (Todos os domínios)
+sudo certbot --nginx -d api.alcahub.com.br -d api.alcahub.cloud
 ```
 
 ### Passo 8: Testar
@@ -112,13 +122,13 @@ Após o setup inicial, use o script de deploy:
 
 ```bash
 # Deploy completo (backend + frontend)
-VPS_IP=SEU_IP_VPS ./scripts/deploy-vps.sh
+VPS_IP=76.13.239.220 ./scripts/deploy-vps.sh
 
 # Ou apenas backend
-VPS_IP=SEU_IP_VPS ./scripts/deploy-vps.sh backend
+VPS_IP=76.13.239.220 ./scripts/deploy-vps.sh backend
 
 # Ou apenas frontend
-VPS_IP=SEU_IP_VPS ./scripts/deploy-vps.sh frontend
+VPS_IP=76.13.239.220 ./scripts/deploy-vps.sh frontend
 ```
 
 ---

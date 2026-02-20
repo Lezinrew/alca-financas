@@ -11,10 +11,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configurações
-VPS_IP="${VPS_IP:-}"  # Definir via environment ou pedir
-VPS_USER="${VPS_USER:-root}"
-DOMAIN="alcahub.com.br"
-API_DOMAIN="api.alcahub.com.br"
+VPS_IP="${VPS_IP:-76.13.239.220}"  # Definir via environment ou pedir
+VPS_USER="${VPS_USER:-alcaapp}"
+DOMAIN="alcahub.cloud"
+API_DOMAIN="api.alcahub.cloud"
 
 # Função para imprimir mensagens
 print_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
@@ -49,7 +49,7 @@ source venv/bin/activate
 pip install -r requirements.txt --quiet
 exit
 ENDSU
-supervisorctl restart alca-backend
+sudo supervisorctl restart alca-backend
 echo "Backend reiniciado com sucesso"
 ENDSSH
 
