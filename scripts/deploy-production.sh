@@ -95,7 +95,7 @@ docker build -f backend/Dockerfile -t alcahub/backend:latest -t alcahub/backend:
 # Build Frontend
 echo -e "${BLUE}🎨 Building Frontend...${NC}"
 cd frontend
-export VITE_API_URL=https://api.alcahub.com.br
+export VITE_API_URL=https://api.alcahub.cloud
 export NODE_ENV=production
 npm run build
 cd ..
@@ -125,7 +125,7 @@ echo -e "${BLUE}🏥 Running health checks...${NC}"
 sleep 5
 
 # Check API
-API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://api.alcahub.com.br/api/health)
+API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://api.alcahub.cloud/api/health)
 if [ "$API_STATUS" = "200" ]; then
     echo -e "${GREEN}✅ API is healthy${NC}"
 else
@@ -134,7 +134,7 @@ else
 fi
 
 # Check Frontend
-WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://alcahub.com.br)
+WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://alcahub.cloud)
 if [ "$WEB_STATUS" = "200" ]; then
     echo -e "${GREEN}✅ Frontend is healthy${NC}"
 else
@@ -166,8 +166,8 @@ echo ""
 echo -e "${GREEN}✅ Deploy concluído com sucesso!${NC}"
 echo ""
 echo "🌐 URLs:"
-echo "   Frontend: https://alcahub.com.br"
-echo "   API: https://api.alcahub.com.br"
+echo "   Frontend: https://alcahub.cloud"
+echo "   API: https://api.alcahub.cloud"
 echo ""
 echo "📊 Monitore os logs:"
 echo "   ssh ${DEPLOY_USER}@${DEPLOY_HOST} 'docker-compose logs -f'"
