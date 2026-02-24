@@ -69,12 +69,13 @@ deploy_frontend() {
 
     # Verificar se .env.production existe
     if [ ! -f .env.production ]; then
-        print_warn "Criando .env.production..."
-        cat > .env.production << EOF
-VITE_API_URL=https://${API_DOMAIN}
-VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_XXXXXXXXXXXXXXXXXXXXXXXX
-EOF
+        print_warn "Arquivo .env.production não encontrado!"
+        print_warn "⚠️ Crie um arquivo no caminho frontend/.env.production com suas chaves de API reais antes do build."
+        print_warn "Exemplo do conteúdo:"
+        echo "VITE_API_URL=https://${API_DOMAIN}"
+        echo "VITE_SUPABASE_URL=https://<seu-projeto>.supabase.co"
+        echo "VITE_SUPABASE_ANON_KEY=sb_publishable_..."
+        exit 1
     fi
 
     npm install --silent
