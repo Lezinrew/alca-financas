@@ -13,38 +13,35 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Configurações do servidor
-SERVER_HOST="alcahub.com.br"
-SERVER_USER="root"
-SERVER_PASS="4203434@Mudar"
-PROJECT_DIR="/var/www/alca-financas"
+# Configurações do servidor (use variáveis de ambiente: PROD_HOST, PROD_USER, PROD_SSH_KEY)
+SERVER_HOST="${PROD_HOST:-alcahub.com.br}"
+SERVER_USER="${PROD_USER:-root}"
+PROJECT_DIR="${PROJECT_DIR:-/var/www/alca-financas}"
 
 echo -e "${BLUE}🚀 Fazendo deploy do frontend...${NC}"
 echo ""
 
-# Instalar sshpass se não estiver instalado
-if ! command -v sshpass &> /dev/null; then
-    echo -e "${YELLOW}⚠️  sshpass não encontrado. Instalando...${NC}"
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install hudochenkov/sshpass/sshpass 2>/dev/null || echo -e "${RED}❌ Instale sshpass manualmente${NC}"
-    else
-        sudo apt-get update && sudo apt-get install -y sshpass
-    fi
+# Requer chave SSH (PROD_SSH_KEY) ou ssh-agent com chave carregada
+# NUNCA use senha hardcoded. Configure: export PROD_SSH_KEY="$(cat ~/.ssh/id_rsa)"
+if [ -z "$PROD_SSH_KEY" ]; then
+    echo -e "${YELLOW}Usando ssh-agent (certifique-se de que a chave está carregada)${NC}"
+    SSH_CMD="ssh -o StrictHostKeyChecking=no"
+    SCP_CMD="scp -o StrictHostKeyChecking=no"
+else
+    SSH_KEY_FILE=$(mktemp)
+    echo "$PROD_SSH_KEY" > "$SSH_KEY_FILE"
+    chmod 600 "$SSH_KEY_FILE"
+    trap "rm -f $SSH_KEY_FILE" EXIT
+    SSH_CMD="ssh -i $SSH_KEY_FILE -o StrictHostKeyChecking=no"
+    SCP_CMD="scp -i $SSH_KEY_FILE -o StrictHostKeyChecking=no"
 fi
 
-# Função para executar comandos remotos
 execute_remote() {
-    sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o PreferredAuthentications=password -o PubkeyAuthentication=no \
-        -o IdentitiesOnly=yes -o NumberOfPasswordPrompts=1 \
-        "${SERVER_USER}@${SERVER_HOST}" "$1"
+    $SSH_CMD "${SERVER_USER}@${SERVER_HOST}" "$1"
 }
 
-# Função para copiar arquivos
 copy_file() {
-    sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o PreferredAuthentications=password -o PubkeyAuthentication=no \
-        -o IdentitiesOnly=yes "$1" "${SERVER_USER}@${SERVER_HOST}:$2"
+    $SCP_CMD "$1" "${SERVER_USER}@${SERVER_HOST}:$2"
 }
 
 # 1. Fazer pull do repositório
