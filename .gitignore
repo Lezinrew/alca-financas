@@ -4,6 +4,8 @@
 backend/.env*
 frontend/.env*
 mobile/.env*
+services/openclaw/.env
+!services/openclaw/.env.example
 
 # Virtual environments
 venv/
