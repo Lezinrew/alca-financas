@@ -28,7 +28,7 @@ client = MongoClient(mongo_uri)
 db = client[db_name]
 
 email = 'demo@alca.fin'
-password_plain = 'demo123'
+password_plain = os.getenv('DEMO_PASSWORD', 'demo123') # Ideally should be injected via env var in production
 
 existing = db.users.find_one({'email': email})
 hashed = bcrypt.hashpw(password_plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')

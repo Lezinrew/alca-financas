@@ -14,7 +14,7 @@ mkdir -p backend frontend
 
 # ===== 1) .envs =====
 cat > backend/.env <<EOF
-SECRET_KEY=change_me
+SECRET_KEY=$(openssl rand -hex 32)
 MONGO_URI=mongodb://mongo:27017
 MONGO_DB=finance
 CORS_ORIGINS=http://localhost:5173,http://localhost

@@ -1,15 +1,9 @@
 # Environment files
-backend/.env
-backend/.env.local
 .env
-.env.local
-.env.production
-frontend/.env
-frontend/.env.local
-frontend/.env.production
-mobile/.env
-mobile/.env.local
-mobile/.env.production
+.env.*
+backend/.env*
+frontend/.env*
+mobile/.env*
 
 # Virtual environments
 venv/
@@ -55,6 +49,9 @@ alca-financas-*.tar.gz
 
 # Cursor MCP (contém API keys locais)
 .cursor/mcp.json
+
+# Claude (pode conter credenciais)
+.claude/
 
 # macOS
 .DS_Store
