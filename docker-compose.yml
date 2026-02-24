@@ -15,6 +15,9 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
       BACKEND_PORT: ${BACKEND_PORT:-8001}
       HOST: 0.0.0.0
+      # OpenClaw (rede interna; só existe se o serviço openclaw-gateway estiver no mesmo compose)
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
     ports:
       - "${BACKEND_PORT:-8001}:${BACKEND_PORT:-8001}"
     volumes:
@@ -38,6 +41,73 @@ services:
       - backend
     restart: unless-stopped
 
+  # OpenClaw - microserviço interno (sem porta no host; apenas rede Docker)
+  openclaw-gateway:
+    build:
+      context: services/openclaw
+      dockerfile: Dockerfile
+    image: openclaw-gateway:local
+    container_name: openclaw-gateway
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENCLAW_GATEWAY_BIND: "0.0.0.0"
+      OPENCLAW_GATEWAY_PORT: "18789"
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - openclaw_config:/home/node/.openclaw
+      - openclaw_workspace:/home/node/.openclaw/workspace
+    networks:
+      - default
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:mode=1777,size=64M
+    user: "1000:1000"
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+      test: ["CMD-SHELL", "node dist/index.js health --token \"$$OPENCLAW_GATEWAY_TOKEN\" || exit 1"]
+
+  # OpenClaw CLI: onboarding, dashboard, canais, dispositivos (rode sob demanda)
+  openclaw-cli:
+    image: openclaw-gateway:local
+    container_name: openclaw-cli
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
+      BROWSER: echo
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - openclaw_config:/home/node/.openclaw
+      - openclaw_workspace:/home/node/.openclaw/workspace
+    networks:
+      - default
+    profiles:
+      - cli
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    entrypoint: ["node", "dist/index.js"]
+    command: ["--help"]
+
 # Note: Supabase is a managed service, so no database container is needed.
 # Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file.
 #
@@ -47,6 +117,10 @@ services:
 # 3. Start: supabase start
 # 4. This will start a local Supabase instance with PostgreSQL
 # 5. Update .env with local Supabase credentials
+
+volumes:
+  openclaw_config:
+  openclaw_workspace:
 
 networks:
   default:

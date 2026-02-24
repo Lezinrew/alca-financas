@@ -1,0 +1,14 @@
+# Exemplo: expor UI do OpenClaw apenas em 127.0.0.1 (acesso local ao Control UI)
+# Usar: cp docker-compose.override.example.yml docker-compose.override.yml
+# No compose principal, não há override; para expor só em loopback no host, use:
+#
+# docker compose -f ../../docker-compose.yml -f docker-compose.override.yml up -d
+#
+# Ou no docker-compose.yml do projeto, no serviço openclaw-gateway, adicione:
+#   ports:
+#     - "127.0.0.1:18789:18789"
+
+services:
+  openclaw-gateway:
+    ports:
+      - "127.0.0.1:18789:18789"

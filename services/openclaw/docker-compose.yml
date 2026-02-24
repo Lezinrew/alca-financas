@@ -1,0 +1,87 @@
+# OpenClaw - microserviço interno (rede Docker apenas, sem porta pública)
+# Use com: docker compose -f ../../docker-compose.yml -f docker-compose.yml up -d
+# Ou inclua este serviço no docker-compose principal do projeto.
+
+services:
+  openclaw-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw-gateway:local
+    container_name: openclaw-gateway
+    env_file:
+      - .env
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENCLAW_GATEWAY_BIND: "0.0.0.0"
+      OPENCLAW_GATEWAY_PORT: "18789"
+      # Opcional: chaves de provedores (não commitar)
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - openclaw_config:/home/node/.openclaw
+      - openclaw_workspace:/home/node/.openclaw/workspace
+    # Sem ports: = não expor ao host; apenas rede interna Docker
+    # Para UI local (dev): descomente e use 127.0.0.1 apenas:
+    # ports:
+    #   - "127.0.0.1:18789:18789"
+    networks:
+      - openclaw-internal
+    restart: unless-stopped
+    init: true
+    # Hardening: sem root, sem novas capacidades, filesystem read-only onde possível
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:mode=1777,size=64M
+    user: "1000:1000"
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+      test: ["CMD-SHELL", "node dist/index.js health --token \"$$OPENCLAW_GATEWAY_TOKEN\" || exit 1"]
+
+  # CLI apenas para onboarding/config (rode sob demanda: docker compose run --rm openclaw-cli ...)
+  openclaw-cli:
+    image: openclaw-gateway:local
+    container_name: openclaw-cli
+    env_file:
+      - .env
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      BROWSER: echo
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - openclaw_config:/home/node/.openclaw
+      - openclaw_workspace:/home/node/.openclaw/workspace
+    networks:
+      - openclaw-internal
+    profiles:
+      - cli
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    entrypoint: ["node", "dist/index.js"]
+    command: ["--help"]
+
+volumes:
+  openclaw_config:
+  openclaw_workspace:
+
+networks:
+  openclaw-internal:
+    driver: bridge
