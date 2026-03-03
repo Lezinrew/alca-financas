@@ -3,6 +3,7 @@ import uuid
 import pandas as pd
 from datetime import datetime
 from utils.auth_utils import require_auth
+from utils.tenant_context import require_tenant
 from services.account_service import AccountService
 from services.transaction_service import TransactionService
 from services.category_service import CategoryService
@@ -20,13 +21,14 @@ def _account_id(acc):
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 @limiter.limit("200 per hour")  # Aumenta limite para GET de contas (muitos componentes precisam)
+@require_tenant
 def accounts():
     account_repo = current_app.config['ACCOUNTS']
     transactions_repo = current_app.config['TRANSACTIONS']
     service = AccountService(account_repo, transactions_repo)
 
     if request.method == 'GET':
-        accounts = service.list_accounts(request.user_id)
+        accounts = service.list_accounts(request.user_id, tenant_id=getattr(request, 'tenant_id', None))
         filtered_accounts = [acc for acc in accounts if acc.get('user_id') == request.user_id]
         for acc in filtered_accounts:
             aid = _account_id(acc)
@@ -45,7 +47,7 @@ def accounts():
             return jsonify({'error': 'Dados não fornecidos. Certifique-se de enviar JSON válido.'}), 400
         
         print(f"DEBUG: Criando conta - user_id={request.user_id}, data={request_data}")
-        account = service.create_account(request.user_id, request_data)
+        account = service.create_account(request.user_id, request_data, tenant_id=getattr(request, 'tenant_id', None))
         return jsonify(account), 201
     except ValidationException as e:
         print(f"DEBUG: ValidationException: {e.to_dict()}")

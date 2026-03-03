@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils import require_auth
+from utils.tenant_context import require_tenant
 from services.category_service import CategoryService
 from utils.exceptions import ValidationException, NotFoundException
 
@@ -7,13 +8,14 @@ bp = Blueprint('categories', __name__, url_prefix='/api/categories')
 
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
+@require_tenant
 def categories():
     category_repo = current_app.config['CATEGORIES']
     transactions_repo = current_app.config['TRANSACTIONS']
     service = CategoryService(category_repo, transactions_repo)
 
     if request.method == 'GET':
-        return jsonify(service.list_categories(request.user_id))
+        return jsonify(service.list_categories(request.user_id, tenant_id=getattr(request, 'tenant_id', None)))
     
     try:
         # Debug: verifica Content-Type
@@ -37,7 +39,7 @@ def categories():
             return jsonify({'error': 'Dados devem ser um objeto JSON'}), 400
         
         print(f"DEBUG: Chamando create_category com user_id={request.user_id}, data={data}")
-        category = service.create_category(request.user_id, data)
+        category = service.create_category(request.user_id, data, tenant_id=getattr(request, 'tenant_id', None))
         return jsonify(category), 201
     except ValidationException as e:
         print(f"DEBUG: ValidationException: {e.to_dict()}")
