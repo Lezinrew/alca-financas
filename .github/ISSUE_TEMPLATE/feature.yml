@@ -1,0 +1,38 @@
+name: Feature Request
+description: Sugerir uma nova funcionalidade ou melhoria.
+title: "[FEATURE] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Descrição da feature
+      description: Qual problema essa feature resolve? Qual o objetivo principal?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Detalhes / Escopo
+      description: |
+        Descreva o comportamento esperado, fluxos principais e limitações.
+    validations:
+      required: false
+  - type: input
+    id: skill
+    attributes:
+      label: Skill principal impactado
+      description: Veja `skills/SKILLS_REGISTRY.md`.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critérios de aceite
+      description: Liste os critérios objetivos para considerar a feature concluída.
+      placeholder: |
+        - [ ] Usuário consegue ...
+        - [ ] Dados são persistidos em ...
+    validations:
+      required: false

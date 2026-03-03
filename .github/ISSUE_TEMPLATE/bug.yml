@@ -1,0 +1,52 @@
+name: Bug Report
+description: Reportar um problema em produção ou desenvolvimento.
+title: "[BUG] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Resumo
+      description: Descreva o problema de forma curta e objetiva.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      description: Liste os passos para reproduzir o bug.
+      placeholder: |
+        1. Acessar ...
+        2. Clicar em ...
+        3. Observar ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportamento atual
+    validations:
+      required: true
+  - type: input
+    id: skill
+    attributes:
+      label: Skill principal impactado
+      description: Veja `skills/SKILLS_REGISTRY.md` (ex.: transactions, accounts, authentication).
+    validations:
+      required: false
+  - type: textarea
+    id: env
+    attributes:
+      label: Ambiente
+      description: |
+        Informe detalhes do ambiente (produção, staging, local).
+      placeholder: "Ex.: produção (api.alcahub.com.br), navegador X, versão Y."
+    validations:
+      required: false
