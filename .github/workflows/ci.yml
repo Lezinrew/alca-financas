@@ -3,8 +3,28 @@ name: CI/CD Pipeline - Supabase
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'skills/**'
+      - '.github/workflows/**'
+      - 'Makefile'
   pull_request:
     branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'skills/**'
+      - '.github/workflows/**'
+      - 'Makefile'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '18.x'
@@ -272,6 +292,18 @@ jobs:
           push: false
           tags: alcahub/frontend:test
           no-cache: true
+
+  # Docs link check (ensure docs/INDEX.md links resolve)
+  docs-link-check:
+    name: Docs Link Check
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run docs link check via Makefile
+        run: make docs-check
 
   # Security Scan (apenas no repositório principal; Code Scanning deve estar habilitado)
   security-scan:
