@@ -199,9 +199,38 @@ CREATE POLICY transactions_tenant_policy_delete ON public.transactions
 -- Sem policies: acesso apenas via service_role (backend OAuth flow)
 -- =============================================================================
 
+-- =============================================================================
+-- HARDENING: garantir que NENHUMA policy fique exposta para PUBLIC/ANON
+-- =============================================================================
+-- Este bloco protege contra regressões (ex: policies criadas via UI)
+-- e garante que TODAS as policies fiquem restritas a 'authenticated'
+-- =============================================================================
+
+-- Remove policies genéricas/permissivas criadas por UI (se existirem)
+DROP POLICY IF EXISTS "Users can view own data"   ON public.users;
+DROP POLICY IF EXISTS "Users can insert own data" ON public.users;
+DROP POLICY IF EXISTS "Users can update own data" ON public.users;
+
+-- Força TODAS as policies do schema public a ficarem restritas a authenticated
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format(
+      'ALTER POLICY %I ON %I.%I TO authenticated;',
+      r.policyname, r.schemaname, r.tablename
+    );
+  END LOOP;
+END $$;
+
 COMMIT;
 
 -- =============================================================================
--- Migration complete: RLS policies ready
+-- Migration complete: RLS policies ready + hardened
 -- Next: 20260303_000004_triggers.sql
 -- =============================================================================
