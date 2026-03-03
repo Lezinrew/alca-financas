@@ -1,0 +1,103 @@
+graph TB
+    subgraph "Core Platform"
+        infra[infrastructure-platform<br/>🔴 RLS, Rate Limiting, CI/CD]
+    end
+
+    subgraph "User & Identity"
+        auth[authentication<br/>🔴 JWT, OAuth, Supabase Auth]
+        users[users-profile<br/>🟡 Profile, Settings]
+        admin[admin-governance<br/>🔴 Admin Panel, Audit Logs]
+    end
+
+    subgraph "Tenancy"
+        tenantCore[tenant-core<br/>🔴 Tenants & Membership]
+    end
+
+    subgraph "Financial Core"
+        accounts[accounts<br/>🟡 Bank, Credit Cards]
+        categories[categories<br/>🟢 Income/Expense Categories]
+        transactions[transactions<br/>🔴 Core Ledger]
+        recurring[recurring<br/>🟡 Fixed & Recurring Expenses]
+        budgets[budgets<br/>🟡 Budgets & Goals]
+    end
+
+    subgraph "Analytics & Reporting"
+        dashboard[dashboard<br/>🟢 KPIs, Charts]
+        reports[reports<br/>🟢 Financial Reports]
+    end
+
+    subgraph "Integrations & Intelligence"
+        imports[imports-integrations<br/>🟡 CSV Import, Auto-detect]
+        ai[ai-insights<br/>🟢 AI Detection]
+        notifications[notifications<br/>🟡 Email Service]
+    end
+
+    subgraph "Developer Operations"
+        githubOps[github-operations<br/>🟡 GitHub & CI/CD]
+    end
+
+    %% Infrastructure dependencies (implicit for all)
+    infra -.provides infrastructure.-> auth
+    infra -.provides infrastructure.-> users
+    infra -.provides infrastructure.-> accounts
+    infra -.provides infrastructure.-> categories
+    infra -.provides infrastructure.-> transactions
+    infra -.provides infrastructure.-> dashboard
+    infra -.provides infrastructure.-> reports
+    infra -.provides infrastructure.-> imports
+    infra -.provides infrastructure.-> ai
+    infra -.provides infrastructure.-> notifications
+    infra -.provides infrastructure.-> admin
+    infra -.enables CI/CD.-> githubOps
+
+    %% User & Identity dependencies
+    auth --> users
+    users --> admin
+    auth --> admin
+
+    %% Financial Core dependencies
+    users --> accounts
+    users --> categories
+    users --> transactions
+    tenantCore --> accounts
+    tenantCore --> categories
+    tenantCore --> transactions
+    tenantCore --> budgets
+    accounts --> transactions
+    categories --> transactions
+    transactions --> recurring
+    transactions --> budgets
+
+    %% Analytics dependencies
+    transactions --> dashboard
+    accounts --> dashboard
+    categories --> dashboard
+    tenantCore --> dashboard
+    tenantCore --> reports
+    transactions --> reports
+    accounts --> reports
+    categories --> reports
+
+    %% Integrations dependencies
+    transactions --> imports
+    accounts --> imports
+    categories --> imports
+    tenantCore --> imports
+    tenantCore --> notifications
+    ai --> imports
+    categories --> ai
+    accounts --> ai
+
+    %% Notifications dependencies
+    auth --> notifications
+    users --> notifications
+
+    classDef highRisk fill:#ffcccc,stroke:#cc0000,stroke-width:2px
+    classDef mediumRisk fill:#fff4cc,stroke:#ccaa00,stroke-width:2px
+    classDef lowRisk fill:#ccffcc,stroke:#00cc00,stroke-width:2px
+    classDef platform fill:#cce5ff,stroke:#0066cc,stroke-width:3px
+
+    class auth,transactions,admin,tenantCore highRisk
+    class accounts,categories,imports,notifications,recurring,budgets,githubOps mediumRisk
+    class dashboard,reports,ai lowRisk
+    class infra platform
