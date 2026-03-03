@@ -60,3 +60,9 @@ alca-financas-*.tar.gz
 */.DS_Store
 **/.DS_Store
 .env.vps.production
+
+# Local runtime data
+mongo_data/
+
+# DB operational exports
+scripts/db/_exports/
