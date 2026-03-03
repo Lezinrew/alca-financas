@@ -30,7 +30,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- users: Usuários da aplicação (auth própria ou Supabase Auth)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.users (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     email character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     password bytea,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- tenants: Organizações/workspaces (multi-tenant core)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.tenants (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     name text NOT NULL,
     slug text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 -- tenant_members: Relação user ↔ tenant com role
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.tenant_members (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     tenant_id uuid NOT NULL,
     user_id uuid NOT NULL,
     role text NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_members (
 -- categories: Categorias de transações (income/expense)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.categories (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     name character varying(255) NOT NULL,
     type character varying(20) NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
 -- accounts: Contas bancárias, cartões, savings, etc
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.accounts (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     name character varying(255) NOT NULL,
     type character varying(50) NOT NULL,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS public.accounts (
 -- transactions: Transações financeiras (core do sistema)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.transactions (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     category_id uuid,
     account_id uuid,
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 -- oauth_states: Cache temporário de estados OAuth (CSRF protection)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.oauth_states (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
     state character varying(255) NOT NULL,
     provider character varying(50) NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
