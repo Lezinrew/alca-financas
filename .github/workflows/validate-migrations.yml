@@ -1,0 +1,119 @@
+name: Validate Database Migrations
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/db/**'
+      - '.github/workflows/validate-migrations.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/db/**'
+
+jobs:
+  validate-migrations:
+    name: Validate Migrations (PostgreSQL 15)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: alca_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create Supabase-compatible mocks
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/alca_test
+        run: |
+          # Create Supabase roles
+          psql $DATABASE_URL -c "CREATE ROLE authenticated NOLOGIN;" || true
+          psql $DATABASE_URL -c "CREATE ROLE anon NOLOGIN;" || true
+
+          # Create auth schema and mock auth.uid()
+          psql $DATABASE_URL -c "CREATE SCHEMA IF NOT EXISTS auth;"
+          psql $DATABASE_URL -c "
+            CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+            LANGUAGE sql STABLE
+            AS \$\$ SELECT NULL::uuid; \$\$;
+          "
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/alca_test
+        run: |
+          echo "🔧 Applying migrations in order..."
+          psql $DATABASE_URL -f supabase/migrations/20260303_000001_init.sql
+          psql $DATABASE_URL -f supabase/migrations/20260303_000002_functions.sql
+          psql $DATABASE_URL -f supabase/migrations/20260303_000003_rls_policies.sql
+          psql $DATABASE_URL -f supabase/migrations/20260303_000004_triggers.sql
+
+      - name: Validate database schema
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/alca_test
+        run: |
+          echo "✅ Running validation script..."
+          chmod +x scripts/db/validate-migrations.sh
+          ./scripts/db/validate-migrations.sh
+
+      - name: Check for insecure policies
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/alca_test
+        run: |
+          echo "🔐 Checking for policies with TO public..."
+          PUBLIC_POLICIES=$(psql $DATABASE_URL -t -c "SELECT COUNT(*) FROM pg_policies WHERE schemaname = 'public' AND roles @> ARRAY['public']::name[];")
+          PUBLIC_POLICIES=$(echo $PUBLIC_POLICIES | xargs) # trim
+
+          if [ "$PUBLIC_POLICIES" -eq 0 ]; then
+            echo "✅ No policies with TO public (secure)"
+          else
+            echo "❌ SECURITY RISK: Found $PUBLIC_POLICIES policies with TO public!"
+            psql $DATABASE_URL -c "SELECT schemaname, tablename, policyname, roles FROM pg_policies WHERE schemaname = 'public' AND roles @> ARRAY['public']::name[];"
+            exit 1
+          fi
+
+      - name: Verify RLS is enabled
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/alca_test
+        run: |
+          echo "🛡️  Checking RLS status..."
+          RLS_COUNT=$(psql $DATABASE_URL -t -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true;")
+          RLS_COUNT=$(echo $RLS_COUNT | xargs) # trim
+
+          if [ "$RLS_COUNT" -eq 7 ]; then
+            echo "✅ RLS enabled on all 7 tables"
+          else
+            echo "❌ RLS not enabled on all tables (found: $RLS_COUNT, expected: 7)"
+            psql $DATABASE_URL -c "SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "========================================="
+          echo "✅ MIGRATION VALIDATION PASSED"
+          echo "========================================="
+          echo "All migrations applied successfully"
+          echo "Schema validated"
+          echo "Security checks passed"
+          echo ""
