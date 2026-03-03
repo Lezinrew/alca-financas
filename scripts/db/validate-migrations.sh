@@ -95,13 +95,26 @@ fi
 # 5. Verificar Triggers
 # =============================================================================
 echo "⚡ Checking triggers..."
-TRIGGERS_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM pg_trigger WHERE tgname LIKE 'update_%_updated_at';")
+TRIGGERS_COUNT=$(psql "$DATABASE_URL" -t -c "
+    SELECT COUNT(*)
+    FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE t.tgname LIKE 'update_%_updated_at'
+    AND n.nspname = 'public';
+")
 
 if [ "$TRIGGERS_COUNT" -eq 4 ]; then
     echo -e "${GREEN}✅ Triggers: $TRIGGERS_COUNT/4${NC}"
 else
     echo -e "${RED}❌ Triggers: $TRIGGERS_COUNT/4 (expected 4)${NC}"
-    psql "$DATABASE_URL" -c "SELECT tgname, tgrelid::regclass FROM pg_trigger WHERE tgname LIKE 'update_%';"
+    psql "$DATABASE_URL" -c "
+        SELECT t.tgname, c.relnamespace::regnamespace || '.' || c.relname AS table_name
+        FROM pg_trigger t
+        JOIN pg_class c ON t.tgrelid = c.oid
+        WHERE t.tgname LIKE 'update_%_updated_at'
+        ORDER BY c.relnamespace::regnamespace, c.relname;
+    "
     exit 1
 fi
 
