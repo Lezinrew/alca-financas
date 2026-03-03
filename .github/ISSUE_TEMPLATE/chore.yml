@@ -1,0 +1,27 @@
+name: Chore / Maintenance
+description: Tarefa técnica, refatoração ou melhoria interna.
+title: "[CHORE] "
+labels:
+  - chore
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Descrição
+      description: O que precisa ser feito e por quê?
+    validations:
+      required: true
+  - type: input
+    id: skill
+    attributes:
+      label: Skill(s) impactado(s)
+      description: Veja `skills/SKILLS_REGISTRY.md`.
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impacto
+      description: Impacto em performance, segurança ou DX (se houver).
+    validations:
+      required: false

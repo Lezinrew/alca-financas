@@ -1,0 +1,36 @@
+name: Security Issue
+description: Reportar uma vulnerabilidade de segurança potencial ou confirmada.
+title: "[SECURITY] "
+labels:
+  - security
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Resumo
+      description: Descreva o problema de segurança de forma clara e objetiva.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impacto
+      description: Qual o impacto potencial? (exposição de dados, perda de integridade, etc.)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      description: Passos para reproduzir o problema, se conhecidos.
+    validations:
+      required: false
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Mitigações temporárias
+      description: Alguma mitigação ou workaround conhecido?
+    validations:
+      required: false
+*** End Patch"/>
+```}้า

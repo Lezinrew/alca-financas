@@ -1,0 +1,12 @@
+# CODEOWNERS
+#
+# TODO: substituir pelos usuários/grupos reais do GitHub.
+
+*       @TODO-definir-codeowners
+
+# Exemplos futuros:
+# backend/*      @backend-team
+# frontend/*     @frontend-team
+# docs/*         @docs-maintainers
+# skills/*       @architecture-group
+
