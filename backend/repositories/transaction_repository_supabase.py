@@ -12,11 +12,12 @@ class TransactionRepository(BaseRepository):
         super().__init__("transactions")
     
     def find_by_filter(
-        self, 
-        user_id: str, 
-        filters: Dict[str, Any], 
-        page: int = 1, 
-        per_page: int = 20
+        self,
+        user_id: str,
+        filters: Dict[str, Any],
+        page: int = 1,
+        per_page: int = 20,
+        tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Busca transações com filtros e paginação
@@ -24,9 +25,13 @@ class TransactionRepository(BaseRepository):
         try:
             supabase = get_supabase()
             query = supabase.table(self.table_name).select("*", count="exact")
-            
+
             # Filtro obrigatório: user_id
             query = query.eq("user_id", user_id)
+
+            # Filtro opcional: tenant_id (quando resolvido)
+            if tenant_id:
+                query = query.eq("tenant_id", tenant_id)
             
             # Filtro por mês/ano
             if filters.get('month') and filters.get('year'):
@@ -85,7 +90,12 @@ class TransactionRepository(BaseRepository):
             }
     
     def find_by_user_and_date_range(
-        self, user_id: str, start_date: str, end_date: str, limit: Optional[int] = None
+        self,
+        user_id: str,
+        start_date: str,
+        end_date: str,
+        limit: Optional[int] = None,
+        tenant_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Busca transações do usuário em um intervalo de datas (ISO)."""
         try:
@@ -98,6 +108,8 @@ class TransactionRepository(BaseRepository):
                 .lt("date", end_date)
                 .order("date", desc=True)
             )
+            if tenant_id:
+                query = query.eq("tenant_id", tenant_id)
             if limit:
                 query = query.limit(limit)
             response = query.execute()

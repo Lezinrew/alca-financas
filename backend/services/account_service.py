@@ -23,8 +23,8 @@ class AccountService:
         self.account_repo = account_repo
         self.transactions_repo = transactions_repo
 
-    def list_accounts(self, user_id: str) -> List[Dict[str, Any]]:
-        accounts = self.account_repo.find_by_user(user_id)
+    def list_accounts(self, user_id: str, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        accounts = self.account_repo.find_by_user(user_id, tenant_id=tenant_id)
         # Garante que todas as contas pertencem ao usuário (segurança extra)
         filtered_accounts = []
         for acc in accounts:
@@ -36,7 +36,7 @@ class AccountService:
                 filtered_accounts.append(acc)
         return filtered_accounts
 
-    def create_account(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_account(self, user_id: str, data: Dict[str, Any], tenant_id: Optional[str] = None) -> Dict[str, Any]:
         # Validação mais robusta
         name = data.get('name', '').strip() if data.get('name') else ''
         account_type = data.get('type', '').strip() if data.get('type') else ''
@@ -50,7 +50,7 @@ class AccountService:
         if account_type not in ['wallet', 'checking', 'savings', 'credit_card', 'investment']:
             raise ValidationException('Tipo de conta inválido. Tipos válidos: wallet, checking, savings, credit_card, investment')
 
-        existing = self.account_repo.find_by_name(user_id, name)
+        existing = self.account_repo.find_by_name(user_id, name, tenant_id=tenant_id)
         if existing:
             raise ValidationException(f'Conta "{name}" já existe')
 
@@ -91,6 +91,7 @@ class AccountService:
         account_data = {
             'id': new_id,
             'user_id': user_id,
+            'tenant_id': tenant_id,
             'name': name,
             'type': account_type,
             'balance': initial_balance,

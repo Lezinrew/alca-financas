@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from utils.auth_utils import require_auth
+from utils.tenant_context import require_tenant
 from services.transaction_service import TransactionService
 from utils.exceptions import ValidationException, NotFoundException
 
@@ -12,6 +13,7 @@ bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
 
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
+@require_tenant
 def transactions():
     transaction_repo = current_app.config['TRANSACTIONS']
     categories_repo = current_app.config['CATEGORIES']
@@ -52,11 +54,23 @@ def transactions():
         if account_id and account_id.strip():
             filters['account_id'] = account_id
         
-        return jsonify(service.list_transactions(request.user_id, filters, page, per_page))
+        return jsonify(
+            service.list_transactions(
+                request.user_id,
+                filters,
+                page,
+                per_page,
+                tenant_id=getattr(request, 'tenant_id', None),
+            )
+        )
 
     try:
         data = request.get_json()
-        result = service.create_transaction(request.user_id, data)
+        result = service.create_transaction(
+            request.user_id,
+            data,
+            tenant_id=getattr(request, 'tenant_id', None),
+        )
         return jsonify({'message': f"{result['count']} transação(ões) criada(s) com sucesso", 'count': result['count']}), 201
     except ValidationException as e:
         return jsonify(e.to_dict()), e.status_code

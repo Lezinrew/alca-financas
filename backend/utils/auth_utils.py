@@ -87,13 +87,15 @@ def check_password(password: str, hashed) -> bool:
 
 import uuid
 
-def generate_jwt(user_id: str) -> dict:
+def generate_jwt(user_id: str, tenant_id: str | None = None) -> dict:
     access_payload = {
         'user_id': str(user_id),
         'type': 'access',
         'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRES_HOURS),
         'jti': str(uuid.uuid4())
     }
+    if tenant_id:
+        access_payload['tenant_id'] = str(tenant_id)
     refresh_payload = {
         'user_id': str(user_id),
         'type': 'refresh',

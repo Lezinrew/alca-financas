@@ -8,14 +8,14 @@ class CategoryService:
         self.category_repo = category_repo
         self.transactions_repo = transactions_repo
 
-    def list_categories(self, user_id: str) -> List[Dict[str, Any]]:
-        categories = self.category_repo.find_by_user(user_id)
+    def list_categories(self, user_id: str, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        categories = self.category_repo.find_by_user(user_id, tenant_id=tenant_id)
         for cat in categories:
             cat['id'] = cat.get('id') or cat.get('_id')
             cat.pop('_id', None)
         return categories
 
-    def create_category(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_category(self, user_id: str, data: Dict[str, Any], tenant_id: Optional[str] = None) -> Dict[str, Any]:
         name = data.get('name', '').strip() if data.get('name') else ''
         category_type = data.get('type', '').strip() if data.get('type') else ''
         
@@ -26,7 +26,7 @@ class CategoryService:
         if category_type not in ['income', 'expense']:
             raise ValidationException('Tipo deve ser income ou expense')
 
-        existing = self.category_repo.find_by_name_and_type(user_id, name, category_type)
+        existing = self.category_repo.find_by_name_and_type(user_id, name, category_type, tenant_id=tenant_id)
         if existing:
             raise ValidationException(f'Categoria "{name}" já existe para este tipo')
 
@@ -34,6 +34,7 @@ class CategoryService:
         category_data = {
             'id': new_id,
             'user_id': user_id,
+            'tenant_id': tenant_id,
             'name': name,
             'type': category_type,
             'color': data.get('color', '#6366f1'),
