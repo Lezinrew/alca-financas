@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify
+from typing import Optional
 import bcrypt
 import jwt
 import os
@@ -87,7 +88,7 @@ def check_password(password: str, hashed) -> bool:
 
 import uuid
 
-def generate_jwt(user_id: str, tenant_id: str | None = None) -> dict:
+def generate_jwt(user_id: str, tenant_id: Optional[str] = None) -> dict:
     access_payload = {
         'user_id': str(user_id),
         'type': 'access',
