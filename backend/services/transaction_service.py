@@ -72,23 +72,20 @@ class TransactionService:
             raise ValidationException('Data inválida. Use o formato YYYY-MM-DD')
 
         account_id = data.get('account_id')
-        account_tenant_id = tenant_id  # default: mesmo tenant da request
         if account_id:
             account = _account_for(self.accounts_repo, account_id, user_id)
             if not account:
                 raise ValidationException('Conta não encontrada')
-            account_tenant_id = account.get('tenant_id') or tenant_id
 
         category_id = data.get('category_id')
-        category_tenant_id = tenant_id
         if category_id:
             category = _category_for(self.categories_repo, category_id)
-            if category:
-                category_tenant_id = category.get('tenant_id') or tenant_id
+            if not category:
+                raise ValidationException('Categoria não encontrada')
 
         # Handle installments
         if data.get('installments') and int(data['installments']) > 1:
-            return self._create_installments(data, user_id, tenant_id, date, account_id, account_tenant_id, category_tenant_id)
+            return self._create_installments(data, user_id, tenant_id, date, account_id)
 
         new_id = str(uuid.uuid4())
         date_val = date.strftime('%Y-%m-%d') if isinstance(date, datetime) else date
@@ -104,8 +101,6 @@ class TransactionService:
             'type': data.get('type', 'expense'),
             'category_id': data.get('category_id'),
             'account_id': account_id,
-            'account_tenant_id': account_tenant_id,
-            'category_tenant_id': category_tenant_id,
             'date': date_val,
             'is_recurring': data.get('is_recurring', False),
             'status': data.get('status', 'pending'),
@@ -196,8 +191,7 @@ class TransactionService:
 
         return self.transaction_repo.delete(transaction_id)
 
-    def _create_installments(self, data: Dict[str, Any], user_id: str, tenant_id: str, base_date: datetime, account_id: Optional[str], account_tenant_id: Optional[str], category_tenant_id: Optional[str] = None) -> Dict[str, Any]:
-        category_tenant_id = category_tenant_id or tenant_id
+    def _create_installments(self, data: Dict[str, Any], user_id: str, tenant_id: str, base_date: datetime, account_id: Optional[str]) -> Dict[str, Any]:
         installments = int(data.get('installments', 1))
         status = data.get('status', 'pending')
         total_amount = parse_money_value(data.get('amount'))
@@ -221,8 +215,6 @@ class TransactionService:
                 'type': data.get('type', 'expense'),
                 'category_id': data.get('category_id'),
                 'account_id': account_id,
-                'account_tenant_id': account_tenant_id or tenant_id,
-                'category_tenant_id': category_tenant_id,
                 'date': date_str,
                 'is_recurring': False,
                 'status': status,
