@@ -66,3 +66,8 @@ mongo_data/
 
 # DB operational exports
 scripts/db/_exports/
+
+# Security: Scripts with hardcoded credentials
+scripts/insecure-legacy/
+scripts/**/insecure*.sh
+scripts/**/*password*.sh
