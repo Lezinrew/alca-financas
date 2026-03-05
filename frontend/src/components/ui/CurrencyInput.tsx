@@ -57,10 +57,11 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
       return `${reaisFormatted},${centavosFormatted}`;
     };
 
-    // Converte centavos para string decimal (1000 = "10.00" para API)
+    // Converte centavos para string decimal no formato BR (1000 = "10,00" para API)
     const centavosToDecimalString = (cents: number): string => {
       const decimal = cents / 100;
-      return decimal.toFixed(2);
+      // Retorna no formato BR com vírgula (não ponto)
+      return decimal.toFixed(2).replace('.', ',');
     };
 
     // Sincroniza com prop value externa
