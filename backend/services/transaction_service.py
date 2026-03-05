@@ -76,6 +76,7 @@ class TransactionService:
                 raise ValidationException('Conta não encontrada')
             # Pega o tenant_id da conta para o campo account_tenant_id
             account_tenant_id = account.get('tenant_id')
+            print(f"DEBUG: account_id={account_id}, account={account}, account_tenant_id={account_tenant_id}")
 
         # Handle installments
         if data.get('installments') and int(data['installments']) > 1:
