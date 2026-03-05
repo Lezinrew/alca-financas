@@ -17,6 +17,7 @@ NC='\033[0m'
 SERVER_HOST="${SERVER_HOST:-}"
 SERVER_USER="${SERVER_USER:-root}"
 SERVER_SSH_KEY="${SERVER_SSH_KEY:-}"
+SERVER_PASSWORD="${SERVER_PASSWORD:-}"
 PROJECT_DIR="${PROJECT_DIR:-/var/www/alca-financas}"
 DOMAIN="${DOMAIN:-alcahub.cloud}"
 
@@ -34,19 +35,33 @@ echo -e "${BLUE}📁 Diretório: ${PROJECT_DIR}${NC}"
 echo -e "${BLUE}🌐 Domínio: ${DOMAIN}${NC}"
 echo ""
 
-# Construir comando SSH
-SSH_CMD="ssh -o StrictHostKeyChecking=no"
+# Configurar autenticação SSH
+SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+
 if [ -n "$SERVER_SSH_KEY" ]; then
-    SSH_KEY_FILE=$(mktemp)
-    echo "$SERVER_SSH_KEY" > "$SSH_KEY_FILE"
-    chmod 600 "$SSH_KEY_FILE"
-    trap "rm -f $SSH_KEY_FILE" EXIT
-    SSH_CMD="$SSH_CMD -i $SSH_KEY_FILE"
+    # Usar chave SSH se fornecida
+    SSH_CMD="$SSH_CMD -i $SERVER_SSH_KEY"
+else
+    # Pedir senha uma única vez
+    if [ -z "$SERVER_PASSWORD" ]; then
+        read -sp "Digite a senha SSH para ${SERVER_USER}@${SERVER_HOST}: " SERVER_PASSWORD
+        echo ""
+    fi
+
+    # Verificar se sshpass está instalado
+    if ! command -v sshpass &> /dev/null; then
+        echo -e "${RED}❌ sshpass não encontrado. Instale: brew install hudochenkov/sshpass/sshpass${NC}"
+        exit 1
+    fi
+
+    SSH_CMD="sshpass -p '$SERVER_PASSWORD' $SSH_CMD"
 fi
+
+SSH_CMD="$SSH_CMD ${SERVER_USER}@${SERVER_HOST}"
 
 # Função para executar comandos remotos
 remote_exec() {
-    $SSH_CMD "${SERVER_USER}@${SERVER_HOST}" "$1"
+    eval "$SSH_CMD \"$1\"" 2>&1 | grep -v "Warning: Permanently added"
 }
 
 # 1. Git pull

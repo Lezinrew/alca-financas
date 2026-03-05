@@ -17,6 +17,7 @@ NC='\033[0m'
 SERVER_HOST="${SERVER_HOST:-}"
 SERVER_USER="${SERVER_USER:-}"
 SERVER_SSH_KEY="${SERVER_SSH_KEY:-}"
+SERVER_PASSWORD="${SERVER_PASSWORD:-}"
 PROJECT_DIR="${PROJECT_DIR:-/var/www/alca-financas}"
 DOMAIN="${DOMAIN:-alcahub.cloud}"
 
@@ -51,22 +52,51 @@ log_info "Diretório: ${PROJECT_DIR}"
 log_info "Domínio: ${DOMAIN}"
 echo ""
 
-# Construir comando SSH
-SSH_CMD="ssh"
+# Configurar autenticação SSH
+USE_SSHPASS=false
+SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+
 if [ -n "$SERVER_SSH_KEY" ]; then
+    # Usar chave SSH se fornecida
+    log_info "Usando chave SSH para autenticação"
     SSH_CMD="$SSH_CMD -i $SERVER_SSH_KEY"
+else
+    # Pedir senha uma única vez
+    if [ -z "$SERVER_PASSWORD" ]; then
+        echo -e "${YELLOW}Chave SSH não configurada. Usando autenticação por senha.${NC}"
+        read -sp "Digite a senha SSH para ${SERVER_USER}@${SERVER_HOST}: " SERVER_PASSWORD
+        echo ""
+    fi
+
+    # Verificar se sshpass está instalado
+    if ! command -v sshpass &> /dev/null; then
+        log_warn "sshpass não encontrado. Instalando..."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            if command -v brew &> /dev/null; then
+                brew install hudochenkov/sshpass/sshpass 2>/dev/null || log_error "Instale sshpass: brew install hudochenkov/sshpass/sshpass"
+            else
+                log_error "Instale Homebrew ou sshpass manualmente"
+            fi
+        else
+            sudo apt-get update -qq && sudo apt-get install -y -qq sshpass 2>/dev/null || log_error "Instale sshpass: sudo apt-get install sshpass"
+        fi
+    fi
+
+    USE_SSHPASS=true
+    SSH_CMD="sshpass -p '$SERVER_PASSWORD' $SSH_CMD"
 fi
-SSH_CMD="$SSH_CMD -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST}"
+
+SSH_CMD="$SSH_CMD ${SERVER_USER}@${SERVER_HOST}"
 
 # Função para executar comandos remotos
 remote_exec() {
-    $SSH_CMD "$1"
+    eval "$SSH_CMD \"$1\"" 2>&1 | grep -v "Warning: Permanently added"
 }
 
 # Testar conexão
 log_info "Testando conexão SSH..."
 if ! remote_exec "echo 'OK'" > /dev/null 2>&1; then
-    log_error "Não foi possível conectar ao servidor via SSH"
+    log_error "Não foi possível conectar ao servidor via SSH. Verifique credenciais."
 fi
 log_success "Conexão SSH estabelecida"
 
