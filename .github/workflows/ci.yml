@@ -198,17 +198,13 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
-      - name: Run ESLint
-        working-directory: ./frontend
-        run: npm run lint || echo "Lint completed with warnings"
-
       - name: Run TypeScript type check
         working-directory: ./frontend
-        run: npx tsc --noEmit || echo "TypeScript check completed"
+        run: npx tsc --noEmit
 
       - name: Run unit tests
         working-directory: ./frontend
-        run: npm run test:run -- --coverage || echo "Tests completed"
+        run: npm run test:run -- --coverage
 
       - name: Build application
         working-directory: ./frontend

@@ -92,7 +92,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           setAccounts(activeAccounts);
         } else {
           console.error('Erro ao carregar contas: resposta não OK', response.status);
-          const errorText = await response.text();
+          const errorText = response.data || response.statusText || 'Erro desconhecido';
           console.error('Erro detalhado:', errorText);
         }
       } catch (err) {

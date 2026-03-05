@@ -57,13 +57,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
         
         return undefined;
       }
-      
-      // Se é número, converte para string
-      // A biblioteca vai formatar automaticamente
-      if (typeof value === 'number') {
-        return value.toString();
-      }
-      
+
       return value;
     }, [value]);
 
@@ -85,7 +79,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
           'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
-        onValueChange={(val, name, values) => {
+        onValueChange={(val, name, _values) => {
           // A biblioteca retorna o valor formatado automaticamente
           // Com fixedDecimalLength={2} e decimalSeparator={','}, deveria formatar com vírgula
           // Mas garantimos que sempre tenha vírgula com 2 decimais
