@@ -3,18 +3,22 @@ import uuid
 from typing import Dict, Any
 
 
-def create_default_categories(categories_repo_or_collection, user_id: str):
+def create_default_categories(categories_repo_or_collection, user_id: str, tenant_id: str = None):
     """
     Cria categorias padrão para um usuário.
     Aceita tanto repositório Supabase quanto collection MongoDB para compatibilidade.
     """
+    # Se não foi fornecido tenant_id, usar user_id como tenant_id (tenant default)
+    if not tenant_id:
+        tenant_id = user_id
+
     default_categories = [
-        {'id': str(uuid.uuid4()), 'user_id': user_id, 'name': 'Alimentação', 'type': 'expense', 'color': '#FF6B6B', 'icon': 'basket', 'active': True},
-        {'id': str(uuid.uuid4()), 'user_id': user_id, 'name': 'Transporte', 'type': 'expense', 'color': '#4ECDC4', 'icon': 'car-front', 'active': True},
-        {'id': str(uuid.uuid4()), 'user_id': user_id, 'name': 'Casa', 'type': 'expense', 'color': '#45B7D1', 'icon': 'house', 'active': True},
-        {'id': str(uuid.uuid4()), 'user_id': user_id, 'name': 'Saúde', 'type': 'expense', 'color': '#96CEB4', 'icon': 'heart-pulse', 'active': True},
-        {'id': str(uuid.uuid4()), 'user_id': user_id, 'name': 'Salário', 'type': 'income', 'color': '#52C41A', 'icon': 'currency-dollar', 'active': True},
-        {'id': str(uuid.uuid4()), 'user_id': user_id, 'name': 'Freelance', 'type': 'income', 'color': '#1890FF', 'icon': 'briefcase', 'active': True}
+        {'id': str(uuid.uuid4()), 'user_id': user_id, 'tenant_id': tenant_id, 'name': 'Alimentação', 'type': 'expense', 'color': '#FF6B6B', 'icon': 'basket', 'active': True},
+        {'id': str(uuid.uuid4()), 'user_id': user_id, 'tenant_id': tenant_id, 'name': 'Transporte', 'type': 'expense', 'color': '#4ECDC4', 'icon': 'car-front', 'active': True},
+        {'id': str(uuid.uuid4()), 'user_id': user_id, 'tenant_id': tenant_id, 'name': 'Casa', 'type': 'expense', 'color': '#45B7D1', 'icon': 'house', 'active': True},
+        {'id': str(uuid.uuid4()), 'user_id': user_id, 'tenant_id': tenant_id, 'name': 'Saúde', 'type': 'expense', 'color': '#96CEB4', 'icon': 'heart-pulse', 'active': True},
+        {'id': str(uuid.uuid4()), 'user_id': user_id, 'tenant_id': tenant_id, 'name': 'Salário', 'type': 'income', 'color': '#52C41A', 'icon': 'currency-dollar', 'active': True},
+        {'id': str(uuid.uuid4()), 'user_id': user_id, 'tenant_id': tenant_id, 'name': 'Freelance', 'type': 'income', 'color': '#1890FF', 'icon': 'briefcase', 'active': True}
     ]
     
     # Verificar se é repositório Supabase ou collection MongoDB
