@@ -30,8 +30,10 @@ if not JWT_SECRET or JWT_SECRET == 'dev-secret-key' or len(JWT_SECRET) < 32:
 JWT_EXPIRES_HOURS = int(os.getenv('JWT_EXPIRES_HOURS', 24))
 
 
-def hash_password(password: str) -> bytes:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+def hash_password(password: str) -> str:
+    """Hash password and return as string (UTF-8 decoded) for JSON serialization."""
+    hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed_bytes.decode('utf-8')
 
 
 def _normalize_password_hash(hashed):
