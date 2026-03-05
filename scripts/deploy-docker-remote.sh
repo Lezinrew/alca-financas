@@ -325,10 +325,12 @@ echo "  → Limpando containers órfãos..."
 remote_exec "docker ps -a --filter 'name=alca-financas' --format '{{.ID}}' | xargs -r docker rm -f 2>&1" || true
 
 echo "  → Verificando porta 8001..."
-remote_exec "lsof -ti:8001 | xargs -r kill -9 2>&1" || echo "  → Porta 8001 livre"
+remote_exec "lsof -ti:8001 | xargs -r kill -9 2>&1" || true
+remote_exec "fuser -k 8001/tcp 2>&1" || echo "  → Porta 8001 livre"
 
 echo "  → Verificando porta 80..."
-remote_exec "lsof -ti:80 | xargs -r kill -9 2>&1" || echo "  → Porta 80 livre"
+remote_exec "lsof -ti:80 | xargs -r kill -9 2>&1" || true
+remote_exec "fuser -k 80/tcp 2>&1" || echo "  → Porta 80 livre"
 
 # 7. Iniciar containers
 log_info "Iniciando containers..."
