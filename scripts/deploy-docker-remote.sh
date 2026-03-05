@@ -116,22 +116,85 @@ remote_exec "mkdir -p ${PROJECT_DIR} && cd ${PROJECT_DIR} && \
     fi"
 log_success "Código atualizado"
 
-# 3. Verificar arquivo .env
-log_info "Verificando configurações..."
-if ! remote_exec "test -f ${PROJECT_DIR}/.env"; then
-    log_warn "Arquivo .env não encontrado!"
-    log_warn "Criando .env.example..."
+# 3. Configurar arquivo .env
+log_info "Configurando arquivo .env no servidor..."
 
+# Detectar credenciais Supabase do ambiente local
+SUPABASE_URL_LOCAL="${SUPABASE_URL:-}"
+SUPABASE_SERVICE_ROLE_KEY_LOCAL="${SUPABASE_SERVICE_ROLE_KEY:-}"
+SUPABASE_ANON_KEY_LOCAL="${SUPABASE_ANON_KEY:-}"
+VITE_SUPABASE_URL_LOCAL="${VITE_SUPABASE_URL:-}"
+VITE_SUPABASE_ANON_KEY_LOCAL="${VITE_SUPABASE_ANON_KEY:-}"
+
+# Se não estiver no environment, tentar ler do .env local
+if [ -z "$SUPABASE_URL_LOCAL" ] && [ -f ".env" ]; then
+    log_info "Lendo credenciais do arquivo .env local..."
+    SUPABASE_URL_LOCAL=$(grep "^SUPABASE_URL=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    SUPABASE_SERVICE_ROLE_KEY_LOCAL=$(grep "^SUPABASE_SERVICE_ROLE_KEY=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    SUPABASE_ANON_KEY_LOCAL=$(grep "^SUPABASE_ANON_KEY=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    VITE_SUPABASE_URL_LOCAL=$(grep "^VITE_SUPABASE_URL=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    VITE_SUPABASE_ANON_KEY_LOCAL=$(grep "^VITE_SUPABASE_ANON_KEY=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+# Usar VITE vars como fallback se as principais não existirem
+SUPABASE_URL_LOCAL="${SUPABASE_URL_LOCAL:-$VITE_SUPABASE_URL_LOCAL}"
+SUPABASE_ANON_KEY_LOCAL="${SUPABASE_ANON_KEY_LOCAL:-$VITE_SUPABASE_ANON_KEY_LOCAL}"
+
+# Verificar se encontrou credenciais
+if [ -n "$SUPABASE_URL_LOCAL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY_LOCAL" ]; then
+    log_success "Credenciais Supabase detectadas localmente!"
+    log_info "  URL: ${SUPABASE_URL_LOCAL}"
+
+    # Gerar secrets seguros
+    SECRET_KEY_GEN=$(openssl rand -hex 32 2>/dev/null || echo "CHANGE_ME_$(date +%s)")
+    JWT_SECRET_GEN=$(openssl rand -hex 32 2>/dev/null || echo "CHANGE_ME_JWT_$(date +%s)")
+
+    # Criar .env no servidor com credenciais detectadas
+    log_info "Criando .env no servidor com suas credenciais..."
     remote_exec "cat > ${PROJECT_DIR}/.env << 'ENVEOF'
 # Supabase
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_URL=${SUPABASE_URL_LOCAL}
+SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY_LOCAL}
+${SUPABASE_ANON_KEY_LOCAL:+SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY_LOCAL}}
 
 # Backend
-SECRET_KEY=$(openssl rand -hex 32)
-JWT_SECRET=$(openssl rand -hex 32)
+SECRET_KEY=${SECRET_KEY_GEN}
+JWT_SECRET=${JWT_SECRET_GEN}
 BACKEND_PORT=8001
 FLASK_ENV=production
+HOST=0.0.0.0
+
+# CORS
+CORS_ORIGINS=https://${DOMAIN},https://www.${DOMAIN}
+
+# Frontend Build
+VITE_API_URL=https://${DOMAIN}
+VITE_SUPABASE_URL=${SUPABASE_URL_LOCAL}
+${SUPABASE_ANON_KEY_LOCAL:+VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY_LOCAL}}
+ENVEOF
+"
+    log_success "Arquivo .env criado com suas credenciais!"
+
+elif ! remote_exec "test -f ${PROJECT_DIR}/.env"; then
+    # Não encontrou credenciais locais e .env remoto não existe
+    log_warn "Credenciais Supabase não encontradas no ambiente local!"
+    log_warn "Criando .env template no servidor..."
+
+    SECRET_KEY_GEN=$(openssl rand -hex 32 2>/dev/null || echo "CHANGE_ME_$(date +%s)")
+    JWT_SECRET_GEN=$(openssl rand -hex 32 2>/dev/null || echo "CHANGE_ME_JWT_$(date +%s)")
+
+    remote_exec "cat > ${PROJECT_DIR}/.env << 'ENVEOF'
+# Supabase (CONFIGURE ESTAS VARIÁVEIS!)
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# Backend
+SECRET_KEY=${SECRET_KEY_GEN}
+JWT_SECRET=${JWT_SECRET_GEN}
+BACKEND_PORT=8001
+FLASK_ENV=production
+HOST=0.0.0.0
 
 # CORS
 CORS_ORIGINS=https://${DOMAIN},https://www.${DOMAIN}
@@ -143,9 +206,16 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ENVEOF
 "
 
-    log_error "Configure o arquivo ${PROJECT_DIR}/.env com suas credenciais Supabase antes de continuar!"
+    log_error "Configure o arquivo ${PROJECT_DIR}/.env com suas credenciais Supabase!
+
+Para definir credenciais localmente antes de rodar o script:
+  export SUPABASE_URL='https://seu-projeto.supabase.co'
+  export SUPABASE_SERVICE_ROLE_KEY='eyJ...'
+  export SUPABASE_ANON_KEY='eyJ...'
+
+Ou crie um arquivo .env na raiz do projeto com essas variáveis."
 else
-    log_success "Arquivo .env encontrado"
+    log_success "Arquivo .env já existe no servidor"
 fi
 
 # 4. Build do frontend com configurações de produção
