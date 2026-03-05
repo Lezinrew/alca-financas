@@ -75,16 +75,17 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
 # Rate Limiting
 limiter.init_app(app)
 
-# CORS configuration - permite localhost e IPs locais
-cors_origins = os.getenv('CORS_ORIGINS', '*')
+# CORS: em produção defina CORS_ORIGINS com a URL do front (ex: https://alcahub.cloud)
+cors_origins = os.getenv('CORS_ORIGINS', '*').strip()
 if cors_origins == '*':
-    # Se não especificado, permite localhost em portas comuns
+    # Se não especificado, permite apenas localhost (produção DEVE definir CORS_ORIGINS)
     cors_origins = 'http://localhost:3000,http://localhost:5173,http://localhost:3001,http://127.0.0.1:3000'
+origins_list = [o.strip() for o in cors_origins.split(',') if o.strip()]
 
 CORS(app,
-     origins=cors_origins.split(','),
+     origins=origins_list,
      supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'X-Tenant-Id'],
      expose_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
      max_age=3600)
