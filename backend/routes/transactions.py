@@ -65,11 +65,14 @@ def transactions():
         )
 
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        tenant_id = getattr(request, 'tenant_id', None)
+        if not tenant_id:
+            return jsonify({'error': 'Workspace não identificado. Recarregue a página ou faça login novamente.'}), 403
         result = service.create_transaction(
             request.user_id,
             data,
-            tenant_id=getattr(request, 'tenant_id', None),
+            tenant_id=tenant_id,
         )
         return jsonify({'message': f"{result['count']} transação(ões) criada(s) com sucesso", 'count': result['count']}), 201
     except ValidationException as e:
