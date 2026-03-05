@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Account, AccountType, AccountPayload } from '../../types/account';
 import CurrencyInput from '../ui/CurrencyInput';
-import { parseCurrencyString } from '../../lib/utils';
+import { parseCurrencyString, formatNumberToBR } from '../../lib/utils';
 
 interface AccountFormData {
   name: string;
@@ -68,8 +68,8 @@ const AccountForm: React.FC<AccountFormProps> = ({ show, onHide, onSubmit, accou
         name: account.name || '',
         type: account.type || 'wallet',
         institution: account.institution || '',
-        initial_balance: account.initial_balance?.toString() || '0',
-        current_balance: account.current_balance?.toString() || account.initial_balance?.toString() || '0',
+        initial_balance: formatNumberToBR(account.initial_balance),
+        current_balance: formatNumberToBR(account.current_balance ?? account.initial_balance),
         color: account.color || '#6366f1',
         icon: account.icon || 'wallet2',
         is_active: account.is_active !== false

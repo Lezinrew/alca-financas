@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
 from utils.exceptions import ValidationException, NotFoundException
+from utils.money_utils import parse_money_value
 
 
 def _parse_date(d):
@@ -54,35 +55,15 @@ class AccountService:
         if existing:
             raise ValidationException(f'Conta "{name}" já existe')
 
-        # Trata initial_balance de diferentes formas
+        # Trata initial_balance de diferentes formas (aceita string pt-BR ou número)
         # Para cartões de crédito, também aceita 'limit' como sinônimo de initial_balance
         initial_balance = 0.0
         if 'initial_balance' in data:
-            try:
-                initial_balance = float(data['initial_balance'])
-            except (ValueError, TypeError):
-                # Tenta converter string com formatação de moeda
-                balance_str = str(data['initial_balance']).replace('R$', '').replace(' ', '').replace(',', '.').strip()
-                try:
-                    initial_balance = float(balance_str)
-                except ValueError:
-                    initial_balance = 0.0
+            initial_balance = parse_money_value(data['initial_balance'])
         elif account_type == 'credit_card' and 'limit' in data:
-            # Para cartões de crédito, usa 'limit' como initial_balance
-            try:
-                initial_balance = float(data['limit'])
-            except (ValueError, TypeError):
-                # Tenta converter string com formatação de moeda
-                limit_str = str(data['limit']).replace('R$', '').replace(' ', '').replace(',', '.').strip()
-                try:
-                    initial_balance = float(limit_str)
-                except ValueError:
-                    initial_balance = 0.0
+            initial_balance = parse_money_value(data['limit'])
         elif 'balance' in data:
-            try:
-                initial_balance = float(data['balance'])
-            except (ValueError, TypeError):
-                initial_balance = 0.0
+            initial_balance = parse_money_value(data['balance'])
         
         # Para cartões de crédito, current_balance começa em 0 (sem gastos)
         # Para outras contas, current_balance = initial_balance
@@ -116,8 +97,10 @@ class AccountService:
                 account_data['due_day'] = int(data['due_day'])
             if 'card_type' in data:
                 account_data['card_type'] = data['card_type']
-            if 'account_id' in data:
-                account_data['account_id'] = data['account_id']
+            # account_id só se for UUID válido (vinculação a conta corrente); vazio não envia
+            aid = data.get('account_id')
+            if aid and str(aid).strip():
+                account_data['account_id'] = str(aid).strip()
         
         created_id = self.account_repo.create(account_data)
         if created_id:
@@ -145,10 +128,23 @@ class AccountService:
         if 'is_active' in data:
             update_data['is_active'] = bool(data['is_active'])
         if 'initial_balance' in data:
-            update_data['initial_balance'] = float(data['initial_balance'])
+            update_data['initial_balance'] = parse_money_value(data['initial_balance'])
+        # Para cartão de crédito, aceita 'limit' como sinônimo de initial_balance
+        if account.get('type') == 'credit_card' and 'limit' in data and 'initial_balance' not in data:
+            update_data['initial_balance'] = parse_money_value(data['limit'])
         if 'current_balance' in data:
-            # Permite editar o saldo atual manualmente
-            update_data['current_balance'] = float(data['current_balance'])
+            update_data['current_balance'] = parse_money_value(data['current_balance'])
+        # Campos de cartão de crédito no update
+        if account.get('type') == 'credit_card':
+            if 'closing_day' in data:
+                update_data['closing_day'] = int(data['closing_day'])
+            if 'due_day' in data:
+                update_data['due_day'] = int(data['due_day'])
+            if 'card_type' in data:
+                update_data['card_type'] = data['card_type']
+            if 'account_id' in data:
+                aid = data.get('account_id')
+                update_data['account_id'] = str(aid).strip() if aid and str(aid).strip() else None
 
         if update_data:
             self.account_repo.update(account_id, update_data)

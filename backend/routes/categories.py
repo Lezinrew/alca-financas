@@ -38,8 +38,17 @@ def categories():
         if not isinstance(data, dict):
             return jsonify({'error': 'Dados devem ser um objeto JSON'}), 400
         
-        print(f"DEBUG: Chamando create_category com user_id={request.user_id}, data={data}")
-        category = service.create_category(request.user_id, data, tenant_id=getattr(request, 'tenant_id', None))
+        tenant_id = getattr(request, 'tenant_id', None)
+        if not tenant_id:
+            return (
+                jsonify({
+                    'error': 'Workspace não identificado. Recarregue a página ou faça login novamente.',
+                    'code': 'tenant_required',
+                }),
+                403,
+            )
+        print(f"DEBUG: Chamando create_category com user_id={request.user_id}, tenant_id={tenant_id}, data={data}")
+        category = service.create_category(request.user_id, data, tenant_id=tenant_id)
         return jsonify(category), 201
     except ValidationException as e:
         print(f"DEBUG: ValidationException: {e.to_dict()}")

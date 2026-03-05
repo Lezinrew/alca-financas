@@ -8,7 +8,7 @@ import {
   TransactionStatus,
   TransactionType,
 } from '../../types/transaction';
-import { parseCurrencyString } from '../../lib/utils';
+import { parseCurrencyString, formatNumberToBR } from '../../lib/utils';
 import { accountsAPI } from '../../utils/api';
 
 interface TransactionFormData {
@@ -141,7 +141,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
       setFormData({
         description: transaction.description || '',
-        amount: transaction.amount?.toString() || '',
+        amount: formatNumberToBR(transaction.amount),
         type: transaction.type || defaultType,
         category_id: transaction.category_id || '',
         account_id: transaction.account_id || '',

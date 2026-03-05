@@ -1,5 +1,6 @@
 name: CI/CD Pipeline - Supabase
 
+# Dispara em: push/PR em main ou develop (só se mudar os paths abaixo), ou manualmente em Actions
 on:
   push:
     branches: [ main, develop ]
@@ -21,6 +22,7 @@ on:
       - 'skills/**'
       - '.github/workflows/**'
       - 'Makefile'
+  workflow_dispatch: {}  # Permite rodar manualmente em Actions > CI/CD Pipeline - Supabase > Run workflow
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -325,7 +327,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         continue-on-error: true
         with:
