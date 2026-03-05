@@ -144,6 +144,15 @@ def health():
     """Simple health check endpoint."""
     return {'status': 'ok'}, 200
 
+# Observabilidade: métricas Prometheus (opcional, requer prometheus-client)
+try:
+    from metrics import init_metrics
+    init_metrics(app)
+    app.config.setdefault("ENV", os.getenv("FLASK_ENV", "production"))
+    logger.info("✅ Métricas Prometheus em /api/metrics")
+except Exception as e:
+    logger.debug("Métricas Prometheus não carregadas: %s", e)
+
 # Registrar blueprints (condicional para permitir CI/testes sem DB real)
 if not SKIP_DB_INIT:
     # Registrar blueprints de autenticação
