@@ -293,15 +293,20 @@ log_info "Fazendo build do frontend..."
 echo "  → Criando diretório build/frontend..."
 remote_exec "cd ${PROJECT_DIR} && mkdir -p build/frontend"
 echo "  → Iniciando build do frontend (pode demorar 2-3 minutos)..."
-echo "  → Executando: npm ci && npm run build"
-remote_exec "cd ${PROJECT_DIR} && \
-    docker run --rm -v \$(pwd)/frontend:/app -v \$(pwd)/build/frontend:/app/dist -w /app \
-        -e VITE_API_URL=\${VITE_API_URL:-https://${DOMAIN}} \
-        -e VITE_SUPABASE_URL=\${VITE_SUPABASE_URL} \
-        -e VITE_SUPABASE_ANON_KEY=\${VITE_SUPABASE_ANON_KEY} \
-        --env-file .env \
-        node:20-alpine sh -c 'npm ci --quiet && npm run build && cp -r dist/* /app/dist/' 2>&1 | grep -E '(✓|built|error|ERROR|WARN)' || true"
-log_success "Frontend buildado"
+echo "  → Executando: npm install && npm run build"
+if remote_exec "cd ${PROJECT_DIR} && \
+    docker run --rm \
+        -v ${PROJECT_DIR}/frontend:/app \
+        -v ${PROJECT_DIR}/build/frontend:/app/dist \
+        -w /app \
+        -e VITE_API_URL=https://${DOMAIN} \
+        -e VITE_SUPABASE_URL=${SUPABASE_URL_LOCAL} \
+        -e VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY_LOCAL} \
+        node:20-alpine sh -c 'npm install --quiet && npm run build && cp -r dist/* /app/dist/' 2>&1"; then
+    log_success "Frontend buildado"
+else
+    log_error "Falha no build do frontend"
+fi
 
 # 5. Build das imagens Docker
 log_info "Construindo imagens Docker..."
