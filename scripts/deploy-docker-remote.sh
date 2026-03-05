@@ -2,9 +2,17 @@
 ###############################################################################
 # Deploy Remoto - Alça Finanças com Docker (Supabase)
 # Script moderno para deploy via SSH usando Docker Compose
+# Uso: ./scripts/deploy-docker-remote.sh [--debug]
 ###############################################################################
 
 set -e
+
+# Debug mode
+DEBUG_MODE=false
+if [ "$1" = "--debug" ] || [ "$1" = "-d" ]; then
+    DEBUG_MODE=true
+    set -x
+fi
 
 # Cores
 GREEN='\033[0;32m'
@@ -90,11 +98,31 @@ SSH_CMD="$SSH_CMD ${SERVER_USER}@${SERVER_HOST}"
 
 # Função para executar comandos remotos (com output visível)
 remote_exec() {
-    eval "$SSH_CMD \"$1\"" 2>&1 | grep -v "Warning: Permanently added" | grep -v "^$"
+    if [ "$DEBUG_MODE" = true ]; then
+        echo "[DEBUG] Executando: $1" >&2
+    fi
+
+    local output
+    local exit_code
+
+    output=$(eval "$SSH_CMD \"$1\"" 2>&1)
+    exit_code=$?
+
+    # Filtrar warnings SSH
+    echo "$output" | grep -v "Warning: Permanently added" | grep -v "^$" || true
+
+    if [ "$DEBUG_MODE" = true ]; then
+        echo "[DEBUG] Exit code: $exit_code" >&2
+    fi
+
+    return $exit_code
 }
 
 # Função para executar comandos remotos silenciosos (para testes)
 remote_exec_silent() {
+    if [ "$DEBUG_MODE" = true ]; then
+        echo "[DEBUG] Executando (silent): $1" >&2
+    fi
     eval "$SSH_CMD \"$1\"" > /dev/null 2>&1
 }
 
@@ -130,21 +158,32 @@ log_success "Docker e Docker Compose prontos"
 
 # 2. Criar/atualizar diretório do projeto
 log_info "Preparando diretório do projeto..."
-remote_exec "mkdir -p ${PROJECT_DIR}"
-echo "  → Diretório criado: ${PROJECT_DIR}"
 
-echo -n "  → Verificando repositório Git... "
-if remote_exec_silent "cd ${PROJECT_DIR} && test -d .git"; then
-    echo "existe, atualizando..."
-    echo "  → Git fetch origin..."
-    remote_exec "cd ${PROJECT_DIR} && git fetch origin" | tail -3
-    echo "  → Git reset --hard origin/main..."
-    remote_exec "cd ${PROJECT_DIR} && git reset --hard origin/main" | tail -3
-else
-    echo "clonando..."
-    echo "  → Clonando repositório..."
-    remote_exec "cd ${PROJECT_DIR} && git clone https://github.com/Lezinrew/alca-financas.git ." | tail -5
+echo "  → Criando diretório ${PROJECT_DIR}..."
+if ! remote_exec "mkdir -p ${PROJECT_DIR}"; then
+    log_error "Falha ao criar diretório ${PROJECT_DIR}"
 fi
+echo "  → Diretório pronto: ${PROJECT_DIR}"
+
+echo "  → Verificando repositório Git..."
+if remote_exec "test -d ${PROJECT_DIR}/.git && echo 'exists' || echo 'not_exists'" | grep -q "exists"; then
+    echo "  → Repositório existe, atualizando..."
+    echo "  → Executando: git fetch origin"
+    if ! remote_exec "cd ${PROJECT_DIR} && git fetch origin 2>&1"; then
+        log_error "Falha no git fetch"
+    fi
+    echo "  → Executando: git reset --hard origin/main"
+    if ! remote_exec "cd ${PROJECT_DIR} && git reset --hard origin/main 2>&1"; then
+        log_error "Falha no git reset"
+    fi
+else
+    echo "  → Repositório não existe, clonando..."
+    echo "  → Executando: git clone (pode demorar 1-2 min)"
+    if ! remote_exec "git clone https://github.com/Lezinrew/alca-financas.git ${PROJECT_DIR} 2>&1"; then
+        log_error "Falha ao clonar repositório"
+    fi
+fi
+
 log_success "Código atualizado"
 
 # 3. Configurar arquivo .env
