@@ -302,7 +302,7 @@ if remote_exec "cd ${PROJECT_DIR} && \
         -e VITE_API_URL=https://${DOMAIN} \
         -e VITE_SUPABASE_URL=${SUPABASE_URL_LOCAL} \
         -e VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY_LOCAL} \
-        node:20-alpine sh -c 'npm install --quiet && npm run build && cp -r dist/* /app/dist/' 2>&1"; then
+        node:20-alpine sh -c 'npm install --quiet && npm run build' 2>&1"; then
     log_success "Frontend buildado"
 else
     log_error "Falha no build do frontend"
