@@ -44,8 +44,8 @@ test_endpoint() {
             -d "$data" 2>&1)
     fi
 
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | head -n-1)
+    http_code=$(echo "$response" | tail -1)
+    body=$(echo "$response" | sed '$d')
 
     if [ "$http_code" == "$expected_status" ]; then
         echo -e "${GREEN}✅ PASSED${NC} (HTTP $http_code)"
