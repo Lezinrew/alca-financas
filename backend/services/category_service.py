@@ -18,13 +18,15 @@ class CategoryService:
     def create_category(self, user_id: str, data: Dict[str, Any], tenant_id: Optional[str] = None) -> Dict[str, Any]:
         name = data.get('name', '').strip() if data.get('name') else ''
         category_type = data.get('type', '').strip() if data.get('type') else ''
-        
+
         if not name:
             raise ValidationException('Nome da categoria é obrigatório')
         if not category_type:
             raise ValidationException('Tipo da categoria é obrigatório')
         if category_type not in ['income', 'expense']:
             raise ValidationException('Tipo deve ser income ou expense')
+        if not tenant_id:
+            raise ValidationException('Workspace não identificado. Por favor, recarregue a página ou faça login novamente.')
 
         existing = self.category_repo.find_by_name_and_type(user_id, name, category_type, tenant_id=tenant_id)
         if existing:

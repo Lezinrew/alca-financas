@@ -55,3 +55,46 @@ class TenantRepository(BaseRepository):
         result = self.find_one({"user_id": user_id, "tenant_id": tenant_id})
         return result is not None
 
+    def ensure_default_tenant(self, user_id: str) -> Optional[str]:
+        """
+        Garante que o usuário tenha pelo menos um tenant (workspace).
+        Se não tiver membership, cria um tenant pessoal e adiciona o usuário como owner.
+        Retorna o tenant_id (existente ou recém-criado) ou None em caso de erro.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        tenants = self.get_user_tenants(user_id)
+        if tenants:
+            logger.info(f"ensure_default_tenant: Usuário {user_id} já tem tenant {tenants[0].get('tenant_id')}")
+            return tenants[0].get("tenant_id")
+
+        supabase = get_supabase()
+        try:
+            # Slug único (usa user_id para garantir unicidade)
+            slug = f"personal-{user_id}"
+            # Nome amigável
+            name = "Meu espaço"
+
+            logger.info(f"ensure_default_tenant: Criando tenant para usuário {user_id} com slug {slug}")
+
+            # Cria o tenant
+            ins = supabase.table("tenants").insert({"name": name, "slug": slug}).execute()
+            if not ins.data or len(ins.data) == 0:
+                logger.error(f"ensure_default_tenant: Falha ao criar tenant - resposta vazia para usuário {user_id}")
+                return None
+
+            tenant_id = ins.data[0]["id"]
+            logger.info(f"ensure_default_tenant: Tenant {tenant_id} criado, adicionando membership para usuário {user_id}")
+
+            # Adiciona o usuário como owner
+            supabase.table("tenant_members").insert(
+                {"tenant_id": tenant_id, "user_id": user_id, "role": "owner"}
+            ).execute()
+
+            logger.info(f"ensure_default_tenant: Membership criado com sucesso para usuário {user_id} no tenant {tenant_id}")
+            return str(tenant_id)
+        except Exception as e:
+            logger.error(f"ensure_default_tenant: Erro ao criar tenant para usuário {user_id}: {str(e)}", exc_info=True)
+            return None
+

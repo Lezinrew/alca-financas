@@ -62,8 +62,18 @@ def resolve_tenant_id(
                 403,
             )
 
-    # C) Default tenant (first membership)
+    # C) Default tenant (first membership); se não existir, cria um tenant padrão
+    import logging
+    logger = logging.getLogger(__name__)
+
     default_tenant_id = repo.get_default_tenant_id(user_id)
+    if default_tenant_id is None:
+        logger.warning(f"resolve_tenant_id: Usuário {user_id} não tem tenant padrão, criando...")
+        default_tenant_id = repo.ensure_default_tenant(user_id)
+        if default_tenant_id is None:
+            logger.error(f"resolve_tenant_id: Falha ao criar tenant padrão para usuário {user_id}")
+        else:
+            logger.info(f"resolve_tenant_id: Tenant padrão {default_tenant_id} criado para usuário {user_id}")
     return default_tenant_id, None
 
 
@@ -85,7 +95,16 @@ def require_tenant(f):
         if error_response is not None:
             return error_response
 
-        # Anexa tenant_id (pode ser None para modo legado / single-tenant)
+        # Rotas que exigem tenant (ex.: criar conta) precisam de tenant_id preenchido
+        if tenant_id is None:
+            return (
+                jsonify({
+                    "error": "Nenhum workspace disponível. Não foi possível criar um workspace padrão.",
+                    "code": "tenant_required",
+                }),
+                403,
+            )
+
         setattr(request, "tenant_id", tenant_id)
         return f(*args, **kwargs)
 

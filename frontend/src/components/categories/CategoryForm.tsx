@@ -9,6 +9,7 @@ interface Category {
   type?: CategoryType;
   color?: string;
   icon?: string;
+  description?: string;
 }
 
 interface CategoryFormProps {
@@ -23,10 +24,11 @@ type FormData = {
   type: CategoryType;
   color: string;
   icon: string;
+  description: string;
 };
 
 type InputChangeEvent =
-  | React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  | React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   | { target: { name: keyof FormData; value: string } };
 
 const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, category }) => {
@@ -35,7 +37,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
     name: '',
     type: 'expense',
     color: '#6366f1',
-    icon: 'circle'
+    icon: 'circle',
+    description: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,7 +68,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
         name: category.name || '',
         type: category.type || 'expense',
         color: category.color || '#6366f1',
-        icon: category.icon || 'circle'
+        icon: category.icon || 'circle',
+        description: category.description || ''
       });
     } else if (!category && show) {
       // Reset form for new category
@@ -74,7 +78,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
         name: '',
         type: 'expense',
         color: '#6366f1',
-        icon: 'circle'
+        icon: 'circle',
+        description: ''
       });
     }
   }, [category, show]);
@@ -126,7 +131,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
         name: trimmedName,
         type: formData.type,
         color: formData.color || '#6366f1',
-        icon: formData.icon || 'circle'
+        icon: formData.icon || 'circle',
+        description: formData.description?.trim() || ''
       };
 
       console.log('CategoryForm: Enviando dados para API:', submitData);
@@ -214,6 +220,21 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
                       disabled={loading}
                       placeholder="Ex: Alimentação, Salário, etc."
                       autoComplete="category-name"
+                    />
+                  </div>
+
+                  {/* Descrição */}
+                  <div className="col-12">
+                    <label htmlFor="category-description" className="form-label">{t('categories.description') || 'Descrição'} <small className="text-muted">(opcional)</small></label>
+                    <textarea
+                      id="category-description"
+                      name="description"
+                      className="form-control"
+                      value={formData.description}
+                      onChange={handleChange}
+                      disabled={loading}
+                      placeholder="Ex: Doações recebidas, contribuições, etc."
+                      rows={3}
                     />
                   </div>
 
