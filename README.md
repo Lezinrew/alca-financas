@@ -2,6 +2,8 @@
 
 Aplicação web full-stack de controle financeiro pessoal. Stack moderno com React/TypeScript no frontend e Flask/Python no backend, utilizando Supabase (PostgreSQL) como database.
 
+[![CI/CD Pipeline](https://github.com/Lezinrew/alca-financas/actions/workflows/ci.yml/badge.svg)](https://github.com/Lezinrew/alca-financas/actions/workflows/ci.yml)
+
 ## Características Principais
 
 ### Autenticação
