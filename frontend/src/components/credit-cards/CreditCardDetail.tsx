@@ -47,6 +47,12 @@ const CreditCardDetail: React.FC = () => {
       setLoading(true);
       setError('');
 
+      if (!cardId) {
+        setError('ID do cartão não fornecido');
+        setLoading(false);
+        return;
+      }
+
       // Carrega o cartão
       const cardResponse = await accountsAPI.getById(cardId);
       const accountData = cardResponse.data;

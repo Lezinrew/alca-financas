@@ -73,7 +73,7 @@ const Accounts: React.FC = () => {
     try {
       console.log('Accounts: handleFormSubmit chamado com dados:', formData);
 
-      if (editingAccount) {
+      if (editingAccount?.id) {
         await accountsAPI.update(editingAccount.id, formData);
       } else {
         await accountsAPI.create(formData);
