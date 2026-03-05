@@ -319,7 +319,13 @@ log_success "Imagens construídas"
 # 6. Parar containers antigos
 log_info "Parando containers antigos..."
 echo "  → Executando docker-compose down..."
-remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml down 2>&1" || echo "  → Nenhum container rodando"
+remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml down --remove-orphans 2>&1" || echo "  → Nenhum container rodando"
+
+echo "  → Limpando containers órfãos..."
+remote_exec "docker ps -a --filter 'name=alca-financas' --format '{{.ID}}' | xargs -r docker rm -f 2>&1" || true
+
+echo "  → Verificando porta 8001..."
+remote_exec "lsof -ti:8001 | xargs -r kill -9 2>&1" || echo "  → Porta 8001 livre"
 
 # 7. Iniciar containers
 log_info "Iniciando containers..."
