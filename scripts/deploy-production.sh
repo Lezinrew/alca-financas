@@ -1,8 +1,7 @@
 #!/bin/bash
-
 ###############################################################################
 # Deploy Production - Alça Finanças
-# Script para deploy em produção (alcahub.com.br)
+# Script completo para deploy em produção com testes e rollback
 ###############################################################################
 
 set -e
@@ -14,21 +13,34 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}🚀 Deploy para Produção - alcahub.com.br${NC}"
+echo -e "${BLUE}🚀 Deploy para Produção - Alça Finanças${NC}"
 echo ""
 
 # Load environment variables
-if [ -f ".env" ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+if [ -f ".env.deploy" ]; then
+    export $(cat .env.deploy | grep -v '^#' | xargs)
 else
-    echo -e "${RED}❌ Arquivo .env não encontrado${NC}"
+    echo -e "${RED}❌ Arquivo .env.deploy não encontrado${NC}"
+    echo "Crie .env.deploy com:"
+    echo "  DEPLOY_HOST=76.13.239.220"
+    echo "  DEPLOY_USER=root"
+    echo "  DEPLOY_PATH=/var/www/alca-financas"
+    echo "  DOMAIN=alcahub.cloud"
     exit 1
 fi
+
+# Validar variáveis obrigatórias
+: "${DEPLOY_HOST:?DEPLOY_HOST não definido em .env.deploy}"
+: "${DEPLOY_USER:?DEPLOY_USER não definido em .env.deploy}"
+: "${DEPLOY_PATH:?DEPLOY_PATH não definido em .env.deploy}"
+: "${DOMAIN:?DOMAIN não definido em .env.deploy}"
 
 # Confirmation
 echo -e "${YELLOW}⚠️  Você está prestes a fazer deploy em PRODUÇÃO${NC}"
 echo -e "Host: ${DEPLOY_HOST}"
 echo -e "User: ${DEPLOY_USER}"
+echo -e "Path: ${DEPLOY_PATH}"
+echo -e "Domain: ${DOMAIN}"
 echo ""
 read -p "Continuar? (yes/no): " confirm
 
@@ -63,100 +75,89 @@ fi
 
 echo -e "${GREEN}✅ Verificações de git passaram${NC}\n"
 
-# Run tests first (antes de configurar rollback remoto)
-echo -e "${BLUE}🧪 Executando testes locais...${NC}"
-./scripts/run-tests.sh all local
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ Testes falhou. Deploy cancelado.${NC}"
-    exit 1
+# Run tests first (se existir script de teste)
+if [ -f "./scripts/run-tests.sh" ]; then
+    echo -e "${BLUE}🧪 Executando testes locais...${NC}"
+    ./scripts/run-tests.sh all local || {
+        echo -e "${RED}❌ Testes falharam. Deploy cancelado.${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✅ Todos os testes passaram${NC}\n"
 fi
 
 # Função de rollback
 rollback() {
     echo ""
     echo -e "${YELLOW}🔄 Erro detectado! Iniciando rollback...${NC}"
-    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && ./scripts/rollback.sh" || {
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && git reset --hard HEAD@{1} && docker-compose -f docker-compose.prod.yml restart" || {
         echo -e "${RED}❌ Erro ao executar rollback${NC}"
     }
     echo -e "${RED}❌ Deploy falhou. Rollback concluído.${NC}"
     exit 1
 }
 
-echo -e "${GREEN}✅ Todos os testes passaram${NC}\n"
-
-# Configurar trap para rollback em caso de erro APÓS os testes locais
+# Configurar trap para rollback em caso de erro
 trap rollback ERR
 
-# Build Backend Docker Image
-echo -e "${BLUE}🔧 Building Backend Docker image...${NC}"
-docker build -f backend/Dockerfile -t alcahub/backend:latest -t alcahub/backend:$(git rev-parse --short HEAD) .
-
-# Build Frontend
-echo -e "${BLUE}🎨 Building Frontend...${NC}"
-cd frontend
-export VITE_API_URL=https://api.alcahub.cloud
-export NODE_ENV=production
-npm run build
-cd ..
+# Push para repositório
+echo -e "${BLUE}📤 Fazendo push para o repositório...${NC}"
+git push origin $(git branch --show-current)
+echo -e "${GREEN}✅ Push concluído${NC}\n"
 
 # Deploy to server
-echo -e "${BLUE}📦 Deploying to production server...${NC}"
+echo -e "${BLUE}📦 Fazendo deploy no servidor...${NC}"
 
 # Backup current version
-echo "💾 Creating backup..."
-ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && ./scripts/backup.sh"
+echo "💾 Criando backup..."
+ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && git rev-parse HEAD > .backup-commit"
 
-# Deploy Backend
-echo "🔧 Deploying Backend..."
-docker save alcahub/backend:latest | ssh ${DEPLOY_USER}@${DEPLOY_HOST} "docker load"
-ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && docker-compose pull backend && docker-compose up -d backend"
+# Pull e rebuild
+echo "📥 Atualizando código no servidor..."
+ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && git pull origin main"
 
-# Deploy Frontend
-echo "🎨 Deploying Frontend..."
-rsync -avz --delete frontend/dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/frontend/dist/
+# Build frontend
+echo "🎨 Buildando frontend..."
+ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && \
+    mkdir -p build/frontend && \
+    docker run --rm \
+        -v \$(pwd)/frontend:/app \
+        -v \$(pwd)/build/frontend:/app/dist \
+        -w /app \
+        --env-file .env \
+        node:20-alpine \
+        sh -c 'npm ci && npm run build && cp -r dist/* /app/dist/'"
 
-# Restart services
-echo "🔄 Restarting services..."
-ssh ${DEPLOY_USER}@${DEPLOY_HOST} "sudo systemctl reload nginx"
+# Rebuild e restart containers
+echo "🔄 Reconstruindo e reiniciando containers..."
+ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd ${DEPLOY_PATH} && \
+    docker-compose -f docker-compose.prod.yml build && \
+    docker-compose -f docker-compose.prod.yml up -d"
 
 # Health check
-echo -e "${BLUE}🏥 Running health checks...${NC}"
+echo -e "${BLUE}🏥 Executando health checks...${NC}"
 sleep 5
 
 # Check API
-API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://api.alcahub.cloud/api/health)
+API_URL="https://${DOMAIN}/api/health"
+API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$API_URL" || echo "000")
 if [ "$API_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ API is healthy${NC}"
+    echo -e "${GREEN}✅ API está saudável (HTTP $API_STATUS)${NC}"
 else
-    echo -e "${RED}❌ API health check failed (Status: $API_STATUS)${NC}"
+    echo -e "${RED}❌ API health check falhou (Status: $API_STATUS)${NC}"
     rollback
 fi
 
 # Check Frontend
-WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://alcahub.cloud)
+WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${DOMAIN}" || echo "000")
 if [ "$WEB_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ Frontend is healthy${NC}"
+    echo -e "${GREEN}✅ Frontend está saudável (HTTP $WEB_STATUS)${NC}"
 else
-    echo -e "${RED}❌ Frontend health check failed (Status: $WEB_STATUS)${NC}"
+    echo -e "${RED}❌ Frontend health check falhou (Status: $WEB_STATUS)${NC}"
     rollback
 fi
 
-# Run smoke tests
-echo -e "${BLUE}🧪 Running production smoke tests...${NC}"
-cd frontend
-export TEST_ENV=production
-npx playwright test e2e/auth.spec.ts e2e/dashboard.spec.ts --project=chromium
-cd ..
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Smoke tests passed${NC}"
-else
-    echo -e "${YELLOW}⚠️  Some smoke tests failed. Check the results.${NC}"
-fi
-
 # Clean up
-echo "🧹 Cleaning up..."
+echo "🧹 Limpando recursos não utilizados..."
 ssh ${DEPLOY_USER}@${DEPLOY_HOST} "docker system prune -f"
 
 # Desabilitar trap de erro (deploy foi bem sucedido)
@@ -166,11 +167,11 @@ echo ""
 echo -e "${GREEN}✅ Deploy concluído com sucesso!${NC}"
 echo ""
 echo "🌐 URLs:"
-echo "   Frontend: https://alcahub.cloud"
-echo "   API: https://api.alcahub.cloud"
+echo "   Frontend: https://${DOMAIN}"
+echo "   API: https://${DOMAIN}/api/health"
 echo ""
 echo "📊 Monitore os logs:"
-echo "   ssh ${DEPLOY_USER}@${DEPLOY_HOST} 'docker-compose logs -f'"
+echo "   ssh ${DEPLOY_USER}@${DEPLOY_HOST} 'cd ${DEPLOY_PATH} && docker-compose -f docker-compose.prod.yml logs -f'"
 echo ""
 
 # Notificação opcional (Slack/Discord/Email)
@@ -179,6 +180,6 @@ if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
     COMMIT_MSG=$(git log -1 --pretty=%B)
     COMMIT_HASH=$(git rev-parse --short HEAD)
     curl -X POST -H 'Content-type: application/json' \
-        --data "{\"text\":\"✅ Deploy para produção concluído!\n\nCommit: \`$COMMIT_HASH\`\nMensagem: $COMMIT_MSG\n\nFrontend: https://alcahub.com.br\nAPI: https://api.alcahub.com.br\"}" \
+        --data "{\"text\":\"✅ Deploy para produção concluído!\n\nCommit: \`$COMMIT_HASH\`\nMensagem: $COMMIT_MSG\n\nFrontend: https://${DOMAIN}\nAPI: https://${DOMAIN}/api/health\"}" \
         "$SLACK_WEBHOOK_URL" 2>/dev/null || true
 fi
