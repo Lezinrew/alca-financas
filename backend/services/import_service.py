@@ -5,6 +5,8 @@ from typing import List, Dict, Any, Tuple
 from io import StringIO
 import xml.etree.ElementTree as ET
 
+from utils.money_utils import parse_money_value
+
 
 def detect_file_format(filename: str, content: bytes) -> str:
     """Detecta o formato do arquivo baseado na extensão e conteúdo"""
@@ -95,11 +97,9 @@ def parse_nubank_csv(content: bytes) -> List[Dict[str, Any]]:
                 except:
                     continue
                 
-                # Parse do valor
-                amount_str_clean = amount_str.replace('R$', '').replace(' ', '').replace(',', '.')
-                try:
-                    amount = float(amount_str_clean)
-                except:
+                # Parse do valor (aceita pt-BR: 1.000,50 ou 1000,50)
+                amount = parse_money_value(amount_str)
+                if amount == 0 and amount_str.strip():
                     continue
                 
                 # No formato novo: positivo = despesa, negativo = receita/pagamento
@@ -144,11 +144,9 @@ def parse_nubank_csv(content: bytes) -> List[Dict[str, Any]]:
                 except:
                     continue
                 
-                # Parse do valor (remove R$ e espaços, troca vírgula por ponto)
-                amount_str_clean = amount_str.replace('R$', '').replace(' ', '').replace(',', '.')
-                try:
-                    amount = float(amount_str_clean)
-                except:
+                # Parse do valor (aceita pt-BR: 1.000,50 ou 1000,50)
+                amount = parse_money_value(amount_str)
+                if amount == 0 and amount_str.strip():
                     continue
                 
                 # No formato antigo: negativo = despesa, positivo = receita
@@ -260,13 +258,11 @@ def parse_ofx(content: bytes) -> List[Dict[str, Any]]:
                          (name_text if name_text else '') or \
                          'Transação sem descrição'
             
-            # Valor
+            # Valor (aceita pt-BR ou en)
             if not trnamt_text:
                 continue
-            
-            try:
-                amount = float(trnamt_text.strip().replace(',', '.'))
-            except:
+            amount = parse_money_value(trnamt_text.strip())
+            if amount == 0 and trnamt_text.strip():
                 continue
             
             # Tipo (negativo = despesa, positivo = receita)
@@ -320,14 +316,12 @@ def parse_ofx_alternative(content_str: str) -> List[Dict[str, Any]]:
                          (name_match.group(1) if name_match else '') or \
                          'Transação sem descrição'
             
-            # Extrai TRNAMT
+            # Extrai TRNAMT (aceita pt-BR ou en)
             trnamt_match = re.search(r'<TRNAMT[^>]*>([^<]+)', match, re.IGNORECASE)
             if not trnamt_match:
                 continue
-            
-            try:
-                amount = float(trnamt_match.group(1).strip().replace(',', '.'))
-            except:
+            amount = parse_money_value(trnamt_match.group(1).strip())
+            if amount == 0 and trnamt_match.group(1).strip():
                 continue
             
             transaction_type = 'expense' if amount < 0 else 'income'
@@ -371,10 +365,9 @@ def parse_standard_csv(content: bytes) -> List[Dict[str, Any]]:
             except:
                 continue
             
-            # Parse do valor
-            try:
-                amount = float(amount_str)
-            except:
+            # Parse do valor (aceita pt-BR ou número)
+            amount = parse_money_value(amount_str)
+            if amount == 0 and (amount_str or '').strip():
                 continue
             
             if transaction_type not in ['income', 'expense']:

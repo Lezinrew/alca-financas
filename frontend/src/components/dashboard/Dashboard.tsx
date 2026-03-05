@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { KPICard } from './KPICard';
@@ -65,6 +65,19 @@ const iconMap = {
 
 const variantMap = ['primary', 'success', 'danger', 'warning'] as const;
 
+// Cache curto (30s) para evitar requisições duplicadas ao trocar de aba ou por Strict Mode
+const CACHE_TTL_MS = 30_000;
+function getCachedDashboard(month: number, year: number): any {
+  const c = (window as any).__dashboardCache;
+  if (!c) return null;
+  if (c.key !== `${year}-${month}`) return null;
+  if (Date.now() - c.ts > CACHE_TTL_MS) return null;
+  return c.data;
+}
+function setCachedDashboard(month: number, year: number, data: any) {
+  (window as any).__dashboardCache = { key: `${year}-${month}`, data, ts: Date.now() };
+}
+
 // Tipos locais
 interface FinanceKPI {
   title: string;
@@ -100,27 +113,50 @@ const Dashboard: React.FC = () => {
     categories: CategoryExpense[];
     recentTransactions: any[];
   } | null>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      loadDashboardData();
+    if (!isAuthenticated || authLoading) return;
+
+    cancelledRef.current = false;
+    const month = new Date().getMonth() + 1;
+    const year = new Date().getFullYear();
+
+    // Usa cache se tiver dados recentes (evita duplicar requisições no Strict Mode / navegação)
+    const cached = getCachedDashboard(month, year);
+    if (cached) {
+      setFinanceData(cached);
+      setLoading(false);
+      setError('');
+      return;
     }
+
+    const controller = new AbortController();
+    loadDashboardData(month, year, controller.signal, () => cancelledRef.current);
+
+    return () => {
+      cancelledRef.current = true;
+      controller.abort();
+    };
   }, [isAuthenticated, authLoading]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (
+    month: number,
+    year: number,
+    signal: AbortSignal,
+    isCancelled: () => boolean
+  ) => {
     try {
       setLoading(true);
       setError('');
 
-      const currentDate = new Date();
-      const month = currentDate.getMonth() + 1;
-      const year = currentDate.getFullYear();
-
-      // Busca dados do dashboard avançado (inclui evolução mensal)
+      // Busca dados do dashboard avançado (inclui evolução mensal); signal cancela se sair da tela
       const [dashboardRes, accountsRes] = await Promise.all([
-        dashboardAPI.getAdvanced(month.toString(), year.toString(), true),
-        accountsAPI.getAll().then(res => res.data).catch(() => [])
+        dashboardAPI.getAdvanced(month.toString(), year.toString(), true, { signal }),
+        accountsAPI.getAll({ signal }).then(res => res.data).catch(() => [])
       ]);
+
+      if (isCancelled()) return;
 
       const dashboardData = dashboardRes.data;
       const accounts = Array.isArray(accountsRes) ? accountsRes : [];
@@ -206,14 +242,18 @@ const Dashboard: React.FC = () => {
         date: tx.date,
       }));
 
-      setFinanceData({
-        kpis,
-        monthlyData,
-        categories,
-        recentTransactions,
-      });
+      const nextData = { kpis, monthlyData, categories, recentTransactions };
+      if (isCancelled()) return;
+      setCachedDashboard(month, year, nextData);
+      setFinanceData(nextData);
     } catch (err: any) {
+      if (isCancelled()) return;
+      // Ignora erro de cancelamento (navegação ou Strict Mode)
+      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
+      const url = err?.config?.url ?? err?.request?.responseURL ?? '?';
+      const status = err?.response?.status;
       console.error('Load dashboard error:', err);
+      if (url !== '?') console.warn(`[Dashboard] Requisição falhou (${status ?? 'network'}):`, url);
       setError('Erro ao carregar dados do dashboard');
 
       // Define dados vazios em caso de erro
@@ -229,7 +269,7 @@ const Dashboard: React.FC = () => {
         recentTransactions: [],
       });
     } finally {
-      setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
   };
 

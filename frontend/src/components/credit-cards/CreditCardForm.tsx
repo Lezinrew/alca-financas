@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import CurrencyInput from '../ui/CurrencyInput';
-import { parseCurrencyString } from '../../lib/utils';
+import { parseCurrencyString, formatNumberToBR } from '../../lib/utils';
 import { CreditCard, CreditCardPayload } from '../../types/credit-card';
 import { accountsAPI } from '../../utils/api';
 
@@ -78,18 +78,9 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
   // Preenche o formulário se estiver editando
   useEffect(() => {
     if (card && show) {
-      // Formata o limite com vírgula decimal
-      const formatLimit = (limit?: number): string => {
-        if (!limit && limit !== 0) return '';
-        return limit.toLocaleString('pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-      };
-
       setFormData({
         name: card.name || '',
-        limit: formatLimit(card.limit),
+        limit: formatNumberToBR(card.limit),
         closingDay: card.closingDay?.toString() || '1',
         dueDay: card.dueDay?.toString() || '5',
         color: card.color || '#6366f1',

@@ -86,8 +86,11 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
     setError('');
 
     try {
+      // Parse do valor de renda mensal
+      const monthlyIncomeValue = parseCurrencyString(formData.monthly_income);
+
       if (step === 1) {
-      if (monthlyIncomeValue <= 0) {
+        if (monthlyIncomeValue <= 0) {
           throw new Error('A renda mensal deve ser maior que zero');
         }
         setStep(2);
@@ -112,6 +115,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
     }
   };
 
+  // Cálculos para exibição
   const monthlyIncomeValue = parseCurrencyString(formData.monthly_income);
   const monthlyBudget = monthlyIncomeValue * (1 - formData.savings_percentage / 100);
   const monthlySavings = (monthlyIncomeValue * formData.savings_percentage) / 100;

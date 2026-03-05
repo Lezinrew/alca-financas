@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
 from utils.exceptions import ValidationException, NotFoundException
+from utils.money_utils import parse_money_value
 
 
 def _category_for(categories_repo, category_id):
@@ -78,12 +79,15 @@ class TransactionService:
 
         new_id = str(uuid.uuid4())
         date_val = date.strftime('%Y-%m-%d') if isinstance(date, datetime) else date
+        amount_val = parse_money_value(data.get('amount'))
+        if amount_val <= 0:
+            raise ValidationException('Valor da transação deve ser maior que zero')
         transaction_data = {
             'id': new_id,
             'user_id': user_id,
             'tenant_id': tenant_id,
             'description': data['description'],
-            'amount': float(data['amount']),
+            'amount': amount_val,
             'type': data.get('type', 'expense'),
             'category_id': data.get('category_id'),
             'account_id': account_id,
@@ -142,7 +146,7 @@ class TransactionService:
                     except (ValueError, TypeError):
                         raise ValidationException('Data inválida')
                 elif field == 'amount':
-                    update_data[field] = float(data[field])
+                    update_data[field] = parse_money_value(data[field])
                 else:
                     update_data[field] = data[field]
 
@@ -180,7 +184,9 @@ class TransactionService:
     def _create_installments(self, data: Dict[str, Any], user_id: str, base_date: datetime, account_id: Optional[str]) -> Dict[str, Any]:
         installments = int(data.get('installments', 1))
         status = data.get('status', 'pending')
-        total_amount = float(data['amount'])
+        total_amount = parse_money_value(data.get('amount'))
+        if total_amount <= 0:
+            raise ValidationException('Valor da transação deve ser maior que zero')
         installment_amount = total_amount / installments
         
         to_create = []

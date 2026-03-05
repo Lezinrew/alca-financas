@@ -94,7 +94,7 @@ export const categoriesAPI = {
 
 // Funções de contas
 export const accountsAPI = {
-  getAll: () => api.get('/accounts'),
+  getAll: (config?: { signal?: AbortSignal }) => api.get('/accounts', config),
   getById: (id: string) => api.get(`/accounts/${id}`),
   create: (accountData: any) => api.post('/accounts', accountData),
   update: (id: string, accountData: any) => api.put(`/accounts/${id}`, accountData),
@@ -208,12 +208,12 @@ export const dashboardAPI = {
     if (year) params.append('year', year);
     return api.get(`/dashboard?${params.toString()}`);
   },
-  getAdvanced: (month?: string, year?: string, showEvolution = true) => {
+  getAdvanced: (month?: string, year?: string, showEvolution = true, config?: { signal?: AbortSignal }) => {
     const params = new URLSearchParams();
     if (month) params.append('month', month);
     if (year) params.append('year', year);
     if (showEvolution) params.append('show_evolution', 'true');
-    return api.get(`/dashboard-advanced?${params.toString()}`);
+    return api.get(`/dashboard-advanced?${params.toString()}`, config);
   },
 };
 
