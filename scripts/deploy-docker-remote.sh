@@ -88,32 +88,63 @@ fi
 
 SSH_CMD="$SSH_CMD ${SERVER_USER}@${SERVER_HOST}"
 
-# Função para executar comandos remotos
+# Função para executar comandos remotos (com output visível)
 remote_exec() {
-    eval "$SSH_CMD \"$1\"" 2>&1 | grep -v "Warning: Permanently added"
+    eval "$SSH_CMD \"$1\"" 2>&1 | grep -v "Warning: Permanently added" | grep -v "^$"
+}
+
+# Função para executar comandos remotos silenciosos (para testes)
+remote_exec_silent() {
+    eval "$SSH_CMD \"$1\"" > /dev/null 2>&1
 }
 
 # Testar conexão
 log_info "Testando conexão SSH..."
-if ! remote_exec "echo 'OK'" > /dev/null 2>&1; then
+if ! remote_exec_silent "echo 'OK'"; then
     log_error "Não foi possível conectar ao servidor via SSH. Verifique credenciais."
 fi
 log_success "Conexão SSH estabelecida"
 
 # 1. Verificar/Instalar dependências
 log_info "Verificando dependências no servidor..."
-remote_exec "command -v docker > /dev/null 2>&1 || curl -fsSL https://get.docker.com | sh"
-remote_exec "command -v docker-compose > /dev/null 2>&1 || (curl -L \"https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)\" -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose)"
-log_success "Docker e Docker Compose instalados"
+
+echo -n "  → Verificando Docker... "
+if remote_exec_silent "command -v docker"; then
+    echo "✓ já instalado"
+else
+    echo "instalando..."
+    remote_exec "curl -fsSL https://get.docker.com | sh" | tail -5
+    log_success "Docker instalado"
+fi
+
+echo -n "  → Verificando Docker Compose... "
+if remote_exec_silent "command -v docker-compose"; then
+    echo "✓ já instalado"
+else
+    echo "instalando..."
+    remote_exec "curl -L \"https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)\" -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose"
+    log_success "Docker Compose instalado"
+fi
+
+log_success "Docker e Docker Compose prontos"
 
 # 2. Criar/atualizar diretório do projeto
 log_info "Preparando diretório do projeto..."
-remote_exec "mkdir -p ${PROJECT_DIR} && cd ${PROJECT_DIR} && \
-    if [ -d '.git' ]; then \
-        git fetch origin && git reset --hard origin/main; \
-    else \
-        git clone https://github.com/Lezinrew/alca-financas.git .; \
-    fi"
+remote_exec "mkdir -p ${PROJECT_DIR}"
+echo "  → Diretório criado: ${PROJECT_DIR}"
+
+echo -n "  → Verificando repositório Git... "
+if remote_exec_silent "cd ${PROJECT_DIR} && test -d .git"; then
+    echo "existe, atualizando..."
+    echo "  → Git fetch origin..."
+    remote_exec "cd ${PROJECT_DIR} && git fetch origin" | tail -3
+    echo "  → Git reset --hard origin/main..."
+    remote_exec "cd ${PROJECT_DIR} && git reset --hard origin/main" | tail -3
+else
+    echo "clonando..."
+    echo "  → Clonando repositório..."
+    remote_exec "cd ${PROJECT_DIR} && git clone https://github.com/Lezinrew/alca-financas.git ." | tail -5
+fi
 log_success "Código atualizado"
 
 # 3. Configurar arquivo .env
@@ -220,28 +251,36 @@ fi
 
 # 4. Build do frontend com configurações de produção
 log_info "Fazendo build do frontend..."
+echo "  → Criando diretório build/frontend..."
+remote_exec "cd ${PROJECT_DIR} && mkdir -p build/frontend"
+echo "  → Iniciando build do frontend (pode demorar 2-3 minutos)..."
+echo "  → Executando: npm ci && npm run build"
 remote_exec "cd ${PROJECT_DIR} && \
-    mkdir -p build/frontend && \
     docker run --rm -v \$(pwd)/frontend:/app -v \$(pwd)/build/frontend:/app/dist -w /app \
-        -e VITE_API_URL=\${VITE_API_URL} \
+        -e VITE_API_URL=\${VITE_API_URL:-https://${DOMAIN}} \
         -e VITE_SUPABASE_URL=\${VITE_SUPABASE_URL} \
         -e VITE_SUPABASE_ANON_KEY=\${VITE_SUPABASE_ANON_KEY} \
         --env-file .env \
-        node:20-alpine sh -c 'npm ci && npm run build && cp -r dist/* /app/dist/'"
+        node:20-alpine sh -c 'npm ci --quiet && npm run build && cp -r dist/* /app/dist/' 2>&1 | grep -E '(✓|built|error|ERROR|WARN)' || true"
 log_success "Frontend buildado"
 
 # 5. Build das imagens Docker
 log_info "Construindo imagens Docker..."
-remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml build"
+echo "  → Building backend image..."
+remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml build backend" 2>&1 | grep -E '(Step|Successfully|ERROR|error)' | tail -10 || true
+echo "  → Building frontend image..."
+remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml build frontend" 2>&1 | grep -E '(Step|Successfully|ERROR|error)' | tail -10 || true
 log_success "Imagens construídas"
 
 # 6. Parar containers antigos
 log_info "Parando containers antigos..."
-remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml down" || true
+echo "  → Executando docker-compose down..."
+remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml down 2>&1" || echo "  → Nenhum container rodando"
 
 # 7. Iniciar containers
 log_info "Iniciando containers..."
-remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml up -d"
+echo "  → Executando docker-compose up -d..."
+remote_exec "cd ${PROJECT_DIR} && docker-compose -f docker-compose.prod.yml up -d 2>&1"
 log_success "Containers iniciados"
 
 # 8. Aguardar backend inicializar
