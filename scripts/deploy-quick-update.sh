@@ -18,6 +18,7 @@ NC='\033[0m'
 SERVER_HOST="${SERVER_HOST:-}"
 SERVER_USER="${SERVER_USER:-root}"
 SERVER_SSH_KEY="${SERVER_SSH_KEY:-}"
+SERVER_PASSWORD="${SERVER_PASSWORD:-}"
 PROJECT_DIR="${PROJECT_DIR:-/var/www/alca-financas}"
 
 # Funções de log
@@ -34,16 +35,32 @@ if [ -z "$SERVER_HOST" ]; then
     [ -z "$SERVER_HOST" ] && log_error "Hostname é obrigatório"
 fi
 
-# Construir comando SSH
-SSH_CMD="ssh"
+# Configurar autenticação SSH
+SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+
 if [ -n "$SERVER_SSH_KEY" ]; then
+    # Usar chave SSH se fornecida
     SSH_CMD="$SSH_CMD -i $SERVER_SSH_KEY"
+else
+    # Pedir senha uma única vez
+    if [ -z "$SERVER_PASSWORD" ]; then
+        read -sp "Digite a senha SSH para ${SERVER_USER}@${SERVER_HOST}: " SERVER_PASSWORD
+        echo ""
+    fi
+
+    # Verificar se sshpass está instalado
+    if ! command -v sshpass &> /dev/null; then
+        log_error "sshpass não encontrado. Instale: brew install hudochenkov/sshpass/sshpass (macOS) ou sudo apt-get install sshpass (Linux)"
+    fi
+
+    SSH_CMD="sshpass -p '$SERVER_PASSWORD' $SSH_CMD"
 fi
-SSH_CMD="$SSH_CMD -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST}"
+
+SSH_CMD="$SSH_CMD ${SERVER_USER}@${SERVER_HOST}"
 
 # Função para executar comandos remotos
 remote_exec() {
-    $SSH_CMD "$1"
+    eval "$SSH_CMD \"$1\"" 2>&1 | grep -v "Warning: Permanently added"
 }
 
 # 1. Git pull
