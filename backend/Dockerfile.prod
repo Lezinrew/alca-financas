@@ -1,0 +1,84 @@
+# ============================================
+# Multi-stage build for optimized production image
+# ============================================
+
+# Stage 1: Builder
+FROM python:3.12-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    make \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# ============================================
+# Stage 2: Production
+FROM python:3.12-slim
+
+# Metadata
+LABEL maintainer="Alça Finanças <contato@alcahub.cloud>"
+LABEL description="Backend API - Flask + Gunicorn"
+LABEL version="1.0.0"
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/root/.local/bin:$PATH"
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose port
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8001/api/health || exit 1
+
+# Start application with Gunicorn
+CMD ["gunicorn", \
+     "--bind", "0.0.0.0:8001", \
+     "--workers", "4", \
+     "--threads", "2", \
+     "--timeout", "30", \
+     "--access-logfile", "/app/logs/access.log", \
+     "--error-logfile", "/app/logs/error.log", \
+     "--log-level", "info", \
+     "--worker-class", "sync", \
+     "--worker-tmp-dir", "/dev/shm", \
+     "--preload", \
+     "app:app"]
