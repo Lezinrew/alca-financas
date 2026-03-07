@@ -1,6 +1,7 @@
-# Environment files
+# Environment files (nunca commitar arquivos com segredos)
 .env
 .env.*
+.env.backup*
 backend/.env*
 frontend/.env*
 mobile/.env*
