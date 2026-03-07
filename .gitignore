@@ -2,7 +2,9 @@
 .env
 .env.*
 .env.backup*
+!.env.example
 backend/.env*
+!backend/.env.example
 frontend/.env*
 mobile/.env*
 services/openclaw/.env
