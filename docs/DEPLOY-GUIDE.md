@@ -3,9 +3,12 @@
 ## 📋 Índice
 
 1. [Scripts Disponíveis](#scripts-disponíveis)
-2. [Deploy Completo (Primeira Vez)](#deploy-completo-primeira-vez)
-3. [Update Rápido](#update-rápido)
-4. [Troubleshooting](#troubleshooting)
+2. [Deploy do Zero (servidor novo)](#deploy-do-zero-servidor-novo)
+3. [Deploy Completo (Primeira Vez)](#deploy-completo-primeira-vez)
+4. [Update Rápido](#update-rápido)
+5. [Troubleshooting](#troubleshooting)
+
+**Servidor novo?** Use o guia **[Deploy do Zero](DEPLOY-DO-ZERO.md)** (comandos em sequência + envio do `.env` com pscp/scp).
 
 ---
 
@@ -20,11 +23,15 @@
 
 ### ⚠️ Scripts Legados (NÃO Usar)
 
-| Script | Status | Problema |
-|--------|--------|----------|
-| `deploy-vps.sh` | ⚠️ Desatualizado | Não usa Docker, configuração antiga |
-| `deploy-remote.sh` | ❌ Inseguro | Credenciais hardcoded, MongoDB antigo |
-| `deploy-remote.py` | ❌ Inseguro | Credenciais hardcoded, MongoDB antigo |
+Scripts e docs antigos foram movidos para a pasta **`legacy/`** (ignorada pelo Git). Não use: `deploy-vps.sh`, `deploy-remote.sh`, `deploy-remote.py`, `deploy-cors-fix.sh`, `deploy-hostinger.sh`, etc.
+
+---
+
+## Deploy do Zero (servidor novo)
+
+Servidor novo e primeiro deploy em sequência (inclui envio do `.env` com **pscp** ou **scp**, sem depender do GitHub):
+
+→ **[docs/DEPLOY-DO-ZERO.md](DEPLOY-DO-ZERO.md)**
 
 ---
 

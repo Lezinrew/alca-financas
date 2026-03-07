@@ -49,12 +49,41 @@ def admin_required_supabase(f):
     def decorated(*args, **kwargs):
         if not hasattr(request, 'user'):
             return jsonify({'error': 'Autenticação necessária'}), 401
-        
+
         if not request.user.get('is_admin', False):
             return jsonify({'error': 'Acesso negado. Requer privilégios de administrador.'}), 403
-        
+
         return f(*args, **kwargs)
-    
+
+    return decorated
+
+
+def token_required(f):
+    """
+    Decorator para rotas que requerem autenticação via Supabase Auth
+    Passa current_user como primeiro argumento para a função decorada
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Token de autorização necessário'}), 401
+
+        access_token = auth_header[7:]  # Remove 'Bearer '
+
+        try:
+            auth_service = SupabaseAuthService()
+            user = auth_service.get_user(access_token)
+
+            if not user:
+                return jsonify({'error': 'Token inválido ou expirado'}), 401
+
+            # Passar user como primeiro argumento
+            return f(user, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Erro ao verificar autenticação: {e}")
+            return jsonify({'error': 'Erro ao verificar autenticação'}), 401
+
     return decorated
 
 

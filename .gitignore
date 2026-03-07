@@ -1,3 +1,6 @@
+# Legacy (scripts/docs antigos de deploy - mantidos só localmente)
+legacy/
+
 # Environment files (nunca commitar arquivos com segredos)
 .env
 .env.*
