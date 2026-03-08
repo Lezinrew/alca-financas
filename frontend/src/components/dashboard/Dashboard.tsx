@@ -323,7 +323,12 @@ const Dashboard: React.FC = () => {
           <i className="bi bi-exclamation-triangle text-4xl text-red-500 mb-3 block"></i>
           <p className="text-red-600 dark:text-red-400">{error}</p>
           <button
-            onClick={loadDashboardData}
+            onClick={() => {
+              const currentMonth = new Date().getMonth() + 1;
+              const currentYear = new Date().getFullYear();
+              const controller = new AbortController();
+              loadDashboardData(currentMonth, currentYear, controller.signal, () => false);
+            }}
             className="mt-4 btn-base bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg"
           >
             Tentar novamente
