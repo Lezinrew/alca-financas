@@ -45,8 +45,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Save image
-        run: docker save alcahub-backend:latest | gzip > backend-image.tar.gz
+      - name: Build OpenClaw Bridge image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/openclaw_bridge/Dockerfile
+          push: false
+          load: true
+          tags: alcahub-openclaw-bridge:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save images
+        run: docker save alcahub-backend:latest alcahub-openclaw-bridge:latest | gzip > backend-images.tar.gz
 
       - name: Copy image to server
         uses: appleboy/scp-action@v0.1.4
@@ -54,7 +65,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          source: "backend-image.tar.gz"
+          source: "backend-images.tar.gz"
           target: "/tmp/"
 
       - name: Deploy to production server
@@ -64,10 +75,10 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            gunzip -c /tmp/backend-image.tar.gz | docker load
-            rm /tmp/backend-image.tar.gz
+            gunzip -c /tmp/backend-images.tar.gz | docker load
+            rm /tmp/backend-images.tar.gz
             cd /var/www/alcahub
-            docker-compose up -d backend
+            docker-compose -f docker-compose.prod.yml up -d openclaw-bridge backend
             docker system prune -f
 
   deploy-frontend:

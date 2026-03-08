@@ -16,6 +16,7 @@ services:
       BACKEND_PORT: ${BACKEND_PORT:-8001}
       HOST: 0.0.0.0
       FLASK_ENV: production
+      OPENCLAW_BRIDGE_URL: http://openclaw-bridge:8089
     ports:
       - "${BACKEND_PORT:-8001}:${BACKEND_PORT:-8001}"
     restart: always
@@ -48,7 +49,7 @@ services:
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
-    command: ["--bind", "auto", "--port", "18789", "--allow-unconfigured"]
+    command: [ "--bind", "auto", "--port", "18789", "--allow-unconfigured" ]
     volumes:
       - openclaw_config:/home/node/.openclaw
       - openclaw_workspace:/home/node/.openclaw/workspace
@@ -69,7 +70,22 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-      test: ["CMD-SHELL", "node dist/index.js health --token \"$$OPENCLAW_GATEWAY_TOKEN\" || exit 1"]
+      test: [ "CMD-SHELL", "node dist/index.js health --token \"$$OPENCLAW_GATEWAY_TOKEN\" || exit 1" ]
+
+  openclaw-bridge:
+    build:
+      context: .
+      dockerfile: services/openclaw_bridge/Dockerfile
+    container_name: openclaw-bridge
+    environment:
+      OPENCLAW_BIN: openclaw
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
+      OPENCLAW_TIMEOUT: "90"
+    depends_on:
+      - openclaw-gateway
+    networks:
+      - default
+    restart: always
 
   openclaw-cli:
     image: openclaw-gateway:local
@@ -96,12 +112,13 @@ services:
     cap_drop:
       - ALL
     user: "1000:1000"
-    entrypoint: ["node", "dist/index.js"]
-    command: ["--help"]
+    entrypoint: [ "node", "dist/index.js" ]
+    command: [ "--help" ]
 
 volumes:
   openclaw_config:
   openclaw_workspace:
+
 
 networks:
   default:
