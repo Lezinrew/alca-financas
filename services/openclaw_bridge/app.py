@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-OPENCLAW_BIN = os.getenv("OPENCLAW_BIN", "node /usr/lib/node_modules/@alca/openclaw-cli/dist/index.js")
+# Binário do CLI: "openclaw" (npm install -g openclaw) ou path customizado via env
+OPENCLAW_BIN = os.getenv("OPENCLAW_BIN", "openclaw")
 OPENCLAW_GATEWAY_URL = os.getenv("OPENCLAW_GATEWAY_URL", "http://openclaw-gateway:18789")
 OPENCLAW_TIMEOUT = int(os.getenv("OPENCLAW_TIMEOUT", "90"))
 
