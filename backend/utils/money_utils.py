@@ -5,7 +5,7 @@ Utilitários para valores monetários.
 - Uso em serviços que recebem amount, balance, limit, initial_balance, etc.
 """
 from typing import Union
-
+from utils.exceptions import ValidationException
 
 def parse_money_value(value: Union[str, int, float, None]) -> float:
     """
@@ -15,17 +15,21 @@ def parse_money_value(value: Union[str, int, float, None]) -> float:
     - Número: int/float retornado como float.
     - String pt-BR: "1.000,50", "68.099", "100,00", "R$ 1.234,56".
     - String en: "1000.50", "1000".
-    - None ou vazio: retorna 0.0.
+    
+    Levanta ValidationException para valores vazios, zerados, negativos ou inválidos.
     """
-    if value is None:
-        return 0.0
+    if value is None or value == "":
+        raise ValidationException("Valor financeiro não fornecido ou vazio.")
+    
     if isinstance(value, (int, float)):
-        if isinstance(value, int):
-            return float(value)
-        return value
+        val = float(value)
+        if val <= 0:
+            raise ValidationException("Valor da transação deve ser maior que zero.")
+        return val
+        
     s = str(value).strip().replace("R$", "").replace(" ", "")
     if not s:
-        return 0.0
+        raise ValidationException("Valor financeiro não fornecido ou vazio.")
     # pt-BR: vírgula = decimal, ponto = milhares
     if "," in s:
         s = s.replace(".", "").replace(",", ".")
@@ -37,6 +41,9 @@ def parse_money_value(value: Union[str, int, float, None]) -> float:
             s = s.replace(".", "")
         # senão mantém como está (decimal en: "1.5" → 1.5)
     try:
-        return float(s)
+        val = float(s)
+        if val <= 0:
+            raise ValidationException("Valor da transação deve ser maior que zero.")
+        return val
     except ValueError:
-        return 0.0
+        raise ValidationException(f"Formato de valor financeiro não reconhecido: '{value}'.")
