@@ -33,6 +33,15 @@ mkdir -p /var/www/alca-financas
 exit
 ```
 
+**Nota:** O script de deploy faz o clone automaticamente usando `git clone .` para evitar criar subpastas. Se você for clonar manualmente, use:
+
+```bash
+cd /var/www/alca-financas
+git clone https://github.com/Lezinrew/alca-financas.git .
+```
+
+(O ponto `.` no final clona direto no diretório atual, evitando `/var/www/alca-financas/alca-financas`)
+
 O script de deploy instala Docker e Docker Compose no servidor; não é obrigatório instalar antes.
 
 ---
@@ -41,10 +50,22 @@ O script de deploy instala Docker e Docker Compose no servidor; não é obrigat�
 
 Na raiz do repositório:
 
+**Opção A – Script auxiliar (recomendado)**
+
 ```bash
 cd /caminho/para/alca-financas
+./scripts/setup-env.sh
+```
 
-# Copiar o template e editar com suas credenciais
+O script cria o `.env` a partir de `.env.example` (se não existir), pode gerar `SECRET_KEY` e `JWT_SECRET` com `openssl`, e oferece:
+1. Preenchimento interativo das credenciais **Supabase** (URL + service_role + anon)
+2. Abrir o `.env` no editor para preencher o restante manualmente
+
+Para só abrir o `.env` no editor: `./scripts/setup-env.sh --editor-only`
+
+**Opção B – Manual**
+
+```bash
 cp .env.example .env
 # Edite .env com: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY,
 # SECRET_KEY, JWT_SECRET (openssl rand -hex 32), CORS_ORIGINS, DOMAIN, etc.

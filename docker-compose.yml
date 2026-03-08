@@ -18,6 +18,7 @@ services:
       # OpenClaw (rede interna; só existe se o serviço openclaw-gateway estiver no mesmo compose)
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_BRIDGE_URL: http://openclaw-bridge:8089
     ports:
       - "${BACKEND_PORT:-8001}:${BACKEND_PORT:-8001}"
     volumes:
@@ -77,7 +78,22 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-      test: ["CMD-SHELL", "node dist/index.js health --token \"$$OPENCLAW_GATEWAY_TOKEN\" || exit 1"]
+      test: [ "CMD-SHELL", "node dist/index.js health --token \"$$OPENCLAW_GATEWAY_TOKEN\" || exit 1" ]
+
+  openclaw-bridge:
+    build:
+      context: .
+      dockerfile: services/openclaw_bridge/Dockerfile
+    container_name: openclaw-bridge
+    environment:
+      OPENCLAW_BIN: openclaw
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
+      OPENCLAW_TIMEOUT: "90"
+    depends_on:
+      - openclaw-gateway
+    networks:
+      - default
+    restart: unless-stopped
 
   # OpenClaw CLI: onboarding, dashboard, canais, dispositivos (rode sob demanda)
   openclaw-cli:
@@ -105,8 +121,8 @@ services:
     cap_drop:
       - ALL
     user: "1000:1000"
-    entrypoint: ["node", "dist/index.js"]
-    command: ["--help"]
+    entrypoint: [ "node", "dist/index.js" ]
+    command: [ "--help" ]
 
 # Note: Supabase is a managed service, so no database container is needed.
 # Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file.
@@ -121,6 +137,7 @@ services:
 volumes:
   openclaw_config:
   openclaw_workspace:
+
 
 networks:
   default:

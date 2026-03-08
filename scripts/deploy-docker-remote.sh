@@ -179,7 +179,8 @@ if remote_exec "test -d ${PROJECT_DIR}/.git && echo 'exists' || echo 'not_exists
 else
     echo "  → Repositório não existe, clonando..."
     echo "  → Executando: git clone (pode demorar 1-2 min)"
-    if ! remote_exec "git clone https://github.com/Lezinrew/alca-financas.git ${PROJECT_DIR} 2>&1"; then
+    # Clonar direto no diretório atual (.) para evitar subpasta
+    if ! remote_exec "cd ${PROJECT_DIR} && git clone https://github.com/Lezinrew/alca-financas.git . 2>&1"; then
         log_error "Falha ao clonar repositório"
     fi
 fi
