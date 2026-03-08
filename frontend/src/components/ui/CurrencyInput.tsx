@@ -31,18 +31,6 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
     const [displayValue, setDisplayValue] = React.useState<string>('0,00');
     const [isFocused, setIsFocused] = React.useState(false);
 
-    // Converte string formatada para centavos
-    const parseToCentavos = (str: string | undefined): number => {
-      if (!str) return 0;
-
-      // Remove tudo exceto dígitos
-      const digitsOnly = str.replace(/\D/g, '');
-      if (!digitsOnly) return 0;
-
-      const num = parseInt(digitsOnly, 10);
-      return isNaN(num) ? 0 : num;
-    };
-
     // Formata centavos para exibição (1000 = "10,00", 123456 = "1.234,56")
     const formatFromCentavos = (cents: number): string => {
       const reais = Math.floor(cents / 100);
