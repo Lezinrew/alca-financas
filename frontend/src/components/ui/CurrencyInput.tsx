@@ -8,10 +8,17 @@ export interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLI
 }
 
 /**
- * CurrencyInput com comportamento de banco brasileiro
- * - Digita da direita para esquerda (últimos 2 dígitos são centavos)
- * - Exemplo: digitar "1000" = R$ 10,00
- * - Exemplo: digitar "123456" = R$ 1.234,56
+ * CurrencyInput - Comportamento igual Nubank/Inter/Itaú
+ *
+ * ✅ Digite normalmente: "5000" ou "5000,50"
+ * ✅ Formata automaticamente ao perder foco
+ * ✅ Aceita vírgula ou ponto como decimal
+ * ✅ Remove formatação ao focar (para edição fácil)
+ *
+ * Exemplos:
+ * - Digitar "5000" → Exibe "5.000,00"
+ * - Digitar "5000,50" → Exibe "5.000,50"
+ * - Digitar "350.5" → Exibe "350,50"
  */
 export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
   (
@@ -26,137 +33,169 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
     },
     ref
   ) => {
-    // Estado interno para controlar o valor em centavos
-    const [centavos, setCentavos] = React.useState<number>(0);
-    const [displayValue, setDisplayValue] = React.useState<string>('0,00');
+    const [displayValue, setDisplayValue] = React.useState<string>('');
     const [isFocused, setIsFocused] = React.useState(false);
+    const inputRef = React.useRef<HTMLInputElement>(null);
 
-    // Formata centavos para exibição (1000 = "10,00", 123456 = "1.234,56")
-    const formatFromCentavos = (cents: number): string => {
-      const reais = Math.floor(cents / 100);
-      const centavosResto = cents % 100;
+    // Combina refs (externa e interna)
+    React.useImperativeHandle(ref, () => inputRef.current!);
 
-      // Formata os reais com separador de milhares
-      const reaisFormatted = reais.toLocaleString('pt-BR');
-
-      // Garante 2 dígitos nos centavos
-      const centavosFormatted = centavosResto.toString().padStart(2, '0');
-
-      return `${reaisFormatted},${centavosFormatted}`;
+    /**
+     * Formata número para exibição: 5000.5 → "5.000,50"
+     */
+    const formatCurrency = (val: number): string => {
+      const formatted = val.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return formatted;
     };
 
-    // Converte centavos para string decimal no formato BR (1000 = "10,00" para API)
-    const centavosToDecimalString = (cents: number): string => {
-      const decimal = cents / 100;
-      // Retorna no formato BR com vírgula (não ponto)
-      return decimal.toFixed(2).replace('.', ',');
+    /**
+     * Remove formatação: "5.000,50" → "5000.50"
+     */
+    const unformatCurrency = (formatted: string): string => {
+      // Remove pontos de milhar e substitui vírgula por ponto
+      return formatted.replace(/\./g, '').replace(',', '.');
     };
 
-    // Sincroniza com prop value externa
+    /**
+     * Parse string para número decimal
+     */
+    const parseToDecimal = (str: string): number => {
+      if (!str || str.trim() === '') return 0;
+
+      // Remove tudo exceto dígitos, vírgula e ponto
+      let clean = str.replace(/[^\d,.-]/g, '');
+
+      // Se tem vírgula e ponto, assume formato BR (1.000,50)
+      if (clean.includes(',') && clean.includes('.')) {
+        clean = clean.replace(/\./g, '').replace(',', '.');
+      }
+      // Se só tem vírgula, substitui por ponto
+      else if (clean.includes(',')) {
+        clean = clean.replace(',', '.');
+      }
+      // Se só tem ponto, mantém (pode ser milhar ou decimal)
+      // Para desambiguar: se tem apenas 1 ponto e <= 2 dígitos após, é decimal
+      // Caso contrário, remove pontos (milhares)
+      else if (clean.includes('.')) {
+        const parts = clean.split('.');
+        if (parts.length === 2 && parts[1].length <= 2) {
+          // É decimal: 100.50
+          clean = clean;
+        } else {
+          // É milhar: 1.000 ou 1.000.000
+          clean = clean.replace(/\./g, '');
+        }
+      }
+
+      const num = parseFloat(clean);
+      return isNaN(num) ? 0 : num;
+    };
+
+    /**
+     * Converte número para string no formato BR para API: 5000.5 → "5000,50"
+     */
+    const toApiFormat = (num: number): string => {
+      return num.toFixed(2).replace('.', ',');
+    };
+
+    // Sincroniza com prop value externa (quando componente pai atualiza)
     React.useEffect(() => {
+      // Não atualizar se estiver focado (usuário editando)
+      if (isFocused) return;
+
       if (value === undefined || value === null || value === '') {
-        setCentavos(0);
-        setDisplayValue('0,00');
+        setDisplayValue('');
         return;
       }
 
-      // Se já está em formato de centavos brutos (apenas dígitos)
-      if (/^\d+$/.test(value)) {
-        const cents = parseInt(value, 10);
-        setCentavos(cents);
-        setDisplayValue(formatFromCentavos(cents));
-        return;
-      }
+      const num = parseToDecimal(value);
+      setDisplayValue(formatCurrency(num));
+    }, [value, isFocused]);
 
-      // Parse de formato monetário (pode ter vírgula, ponto, R$, etc)
-      const cleanValue = value.toString().replace(/[^\d,.-]/g, '');
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const input = e.target.value;
 
-      // Converte para número decimal
-      let decimalValue: number;
-      if (cleanValue.includes(',')) {
-        // Formato BR: 1.234,56
-        const normalized = cleanValue.replace(/\./g, '').replace(',', '.');
-        decimalValue = parseFloat(normalized);
-      } else if (cleanValue.includes('.')) {
-        // Formato US ou decimal: 1234.56
-        decimalValue = parseFloat(cleanValue);
-      } else {
-        // Apenas dígitos
-        decimalValue = parseFloat(cleanValue);
-      }
+      // Permite apenas dígitos, vírgula e ponto
+      const filtered = input.replace(/[^\d,.-]/g, '');
 
-      if (!isNaN(decimalValue)) {
-        const cents = Math.round(decimalValue * 100);
-        setCentavos(cents);
-        setDisplayValue(formatFromCentavos(cents));
-      } else {
-        setCentavos(0);
-        setDisplayValue('0,00');
-      }
-    }, [value]);
+      setDisplayValue(filtered);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // Permite: backspace, delete, tab, escape, enter
-      if ([8, 9, 27, 13, 46].includes(e.keyCode)) {
-        if (e.keyCode === 8 || e.keyCode === 46) { // Backspace ou Delete
-          e.preventDefault();
-          // Remove o último dígito (divide por 10)
-          const newCentavos = Math.floor(centavos / 10);
-          setCentavos(newCentavos);
-          setDisplayValue(formatFromCentavos(newCentavos));
-
-          const decimalString = centavosToDecimalString(newCentavos);
-          onValueChange?.(decimalString, name);
-        }
-        return;
-      }
-
-      // Permite apenas números
-      if (e.key >= '0' && e.key <= '9') {
-        e.preventDefault();
-        // Adiciona o dígito à direita
-        const newCentavos = centavos * 10 + parseInt(e.key, 10);
-
-        // Limita a 9 dígitos (99.999.999,99 = 9.999.999.999 centavos)
-        if (newCentavos <= 9999999999) {
-          setCentavos(newCentavos);
-          setDisplayValue(formatFromCentavos(newCentavos));
-
-          const decimalString = centavosToDecimalString(newCentavos);
-          onValueChange?.(decimalString, name);
-        }
-      } else {
-        // Bloqueia qualquer outra tecla
-        e.preventDefault();
-      }
+      // Envia para o pai o valor parseado em formato BR
+      const num = parseToDecimal(filtered);
+      const apiValue = toApiFormat(num);
+      onValueChange?.(apiValue, name);
     };
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
-      // Seleciona todo o texto ao focar
-      e.target.select();
+
+      // Remove formatação para facilitar edição
+      if (displayValue) {
+        const unformatted = unformatCurrency(displayValue);
+        setDisplayValue(unformatted);
+
+        // Seleciona todo o texto após um micro-delay (para funcionar corretamente)
+        setTimeout(() => {
+          e.target.select();
+        }, 10);
+      }
     };
 
     const handleBlur = () => {
       setIsFocused(false);
-      // Ao perder o foco, garante que o valor seja atualizado
-      const decimalString = centavosToDecimalString(centavos);
-      onValueChange?.(decimalString, name);
+
+      // Formata o valor ao perder foco
+      if (displayValue) {
+        const num = parseToDecimal(displayValue);
+        const formatted = formatCurrency(num);
+        setDisplayValue(formatted);
+
+        // Envia valor final para o pai
+        const apiValue = toApiFormat(num);
+        onValueChange?.(apiValue, name);
+      } else {
+        // Se vazio, zera
+        setDisplayValue('');
+        onValueChange?.('0,00', name);
+      }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Permite: números, backspace, delete, tab, escape, enter, setas
+      const allowedKeys = [
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        ',', '.'
+      ];
+
+      // Permite Ctrl/Cmd + A/C/V/X (select all, copy, paste, cut)
+      if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
+        return;
+      }
+
+      if (!allowedKeys.includes(e.key)) {
+        e.preventDefault();
+      }
     };
 
     return (
       <input
         {...props}
-        ref={ref}
+        ref={inputRef}
         type="text"
         name={name}
         value={displayValue}
-        onKeyDown={handleKeyDown}
+        onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        inputMode="numeric"
+        inputMode="decimal"
         autoComplete="off"
         className={cn(
           'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
