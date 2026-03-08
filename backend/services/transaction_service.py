@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid
 from utils.exceptions import ValidationException, NotFoundException
 from utils.money_utils import parse_money_value
+from utils.date_utils import parse_date_value
 
 
 def _category_for(categories_repo, category_id):
@@ -66,10 +67,7 @@ class TransactionService:
         if data.get('type') and data['type'] not in ['income', 'expense']:
             raise ValidationException('Tipo de transação inválido. Use "income" ou "expense"')
         
-        try:
-            date = datetime.strptime(data['date'], '%Y-%m-%d')
-        except ValueError:
-            raise ValidationException('Data inválida. Use o formato YYYY-MM-DD')
+        date = parse_date_value(data['date'])
 
         account_id = data.get('account_id')
         if account_id:
@@ -90,8 +88,6 @@ class TransactionService:
         new_id = str(uuid.uuid4())
         date_val = date.strftime('%Y-%m-%d') if isinstance(date, datetime) else date
         amount_val = parse_money_value(data.get('amount'))
-        if amount_val <= 0:
-            raise ValidationException('Valor da transação deve ser maior que zero')
         transaction_data = {
             'id': new_id,
             'user_id': user_id,
@@ -107,9 +103,12 @@ class TransactionService:
             'responsible_person': data.get('responsible_person'),
             'installment_info': None,
         }
-        created_id = self.transaction_repo.create(transaction_data)
-        if created_id:
-            transaction_data['id'] = created_id
+        try:
+            created_id = self.transaction_repo.create(transaction_data)
+            if created_id:
+                transaction_data['id'] = created_id
+        except Exception as e:
+            raise ValidationException(f'Erro ao salvar no banco de dados. Detalhe: {str(e)}')
         
         if account_id and transaction_data['status'] == 'paid':
             self._update_account_balance(account_id, transaction_data['amount'], transaction_data['type'])
@@ -146,15 +145,8 @@ class TransactionService:
         for field in allowed_fields:
             if field in data:
                 if field == 'date':
-                    try:
-                        if isinstance(data[field], str):
-                            update_data[field] = data[field]  # keep as YYYY-MM-DD for Supabase
-                        elif isinstance(data[field], datetime):
-                            update_data[field] = data[field].strftime('%Y-%m-%d')
-                        else:
-                            update_data[field] = data[field]
-                    except (ValueError, TypeError):
-                        raise ValidationException('Data inválida')
+                    parsed_date = parse_date_value(data[field])
+                    update_data[field] = parsed_date.strftime('%Y-%m-%d')
                 elif field == 'amount':
                     update_data[field] = parse_money_value(data[field])
                 else:
@@ -168,7 +160,11 @@ class TransactionService:
         # For now, let's keep it simple and just update the transaction
         # TODO: Implement balance reconciliation on update
         
-        self.transaction_repo.update(transaction_id, update_data)
+        try:
+            self.transaction_repo.update(transaction_id, update_data)
+        except Exception as e:
+            raise ValidationException(f'Erro ao atualizar no banco de dados. Detalhe: {str(e)}')
+            
         return {'message': 'Transação atualizada com sucesso'}
 
     def delete_transaction(self, user_id: str, transaction_id: str) -> bool:
@@ -195,8 +191,6 @@ class TransactionService:
         installments = int(data.get('installments', 1))
         status = data.get('status', 'pending')
         total_amount = parse_money_value(data.get('amount'))
-        if total_amount <= 0:
-            raise ValidationException('Valor da transação deve ser maior que zero')
         installment_amount = total_amount / installments
 
         to_create = []
@@ -227,7 +221,10 @@ class TransactionService:
             }
             to_create.append(tx)
 
-        self.transaction_repo.create_many(to_create)
+        try:
+            self.transaction_repo.create_many(to_create)
+        except Exception as e:
+            raise ValidationException(f'Erro ao salvar parcelamentos no banco de dados. Detalhe: {str(e)}')
         
         # Update balance for paid installments (usually only the first one if status is paid, or all? 
         # Usually installments are future, so maybe only first is paid? 
