@@ -1,0 +1,11 @@
+{
+  "gateway": {
+    "controlUi": {
+      "allowedOrigins": [
+        "https://alcahub.cloud",
+        "https://www.alcahub.cloud",
+        "https://app-staging.alcahub.cloud"
+      ]
+    }
+  }
+}

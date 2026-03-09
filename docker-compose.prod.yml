@@ -43,16 +43,17 @@ services:
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      OPENCLAW_GATEWAY_BIND: "auto"
+      OPENCLAW_GATEWAY_BIND: "lan"
       OPENCLAW_GATEWAY_PORT: "18789"
       OPENCLAW_GATEWAY_MODE: "local"
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
-    command: [ "--bind", "auto", "--port", "18789", "--allow-unconfigured" ]
+    command: [ "--bind", "lan", "--port", "18789", "--allow-unconfigured" ]
     volumes:
       - openclaw_config:/home/node/.openclaw
       - openclaw_workspace:/home/node/.openclaw/workspace
+      - ./services/openclaw/openclaw.json:/home/node/.openclaw/openclaw.json:ro
     networks:
       - default
     restart: always
@@ -102,6 +103,7 @@ services:
     volumes:
       - openclaw_config:/home/node/.openclaw
       - openclaw_workspace:/home/node/.openclaw/workspace
+      - ./services/openclaw/openclaw.json:/home/node/.openclaw/openclaw.json:ro
     networks:
       - default
     profiles:
