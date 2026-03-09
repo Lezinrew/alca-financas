@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import uuid
 from typing import Optional
 
 import requests
@@ -21,7 +22,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 
-def run_openclaw_agent(message: str) -> dict:
+def run_openclaw_agent(message: str, session_id: str) -> dict:
     """
     Ajuste o comando final conforme a saída de:
       openclaw agent --help
@@ -32,11 +33,13 @@ def run_openclaw_agent(message: str) -> dict:
     if not message or not message.strip():
         return {"message": "Mensagem vazia."}
 
-    # Split the bin in case it's a command with arguments like "node dist/index.js"
+    # Split the bin in case it's a command com argumentos como \"node dist/index.js\"
     bin_parts = OPENCLAW_BIN.split()
-    
+
     cmd = bin_parts + [
         "agent",
+        "--session-id",
+        session_id,
         "--message",
         message.strip(),
         "--json",
@@ -93,12 +96,17 @@ def health():
 
 @app.post("/chat")
 def chat(req: ChatRequest):
+    """
+    Usa conversation_id como session-id se existir; caso contrário gera um novo
+    UUID e o devolve como conversation_id para o cliente reutilizar.
+    """
     try:
-        data = run_openclaw_agent(req.message)
+        session_id = req.conversation_id or str(uuid.uuid4())
+        data = run_openclaw_agent(req.message, session_id=session_id)
 
         return {
             "message": data.get("message") or data.get("response") or data.get("raw") or "",
-            "conversation_id": req.conversation_id,
+            "conversation_id": session_id,
             "metadata": data,
         }
     except subprocess.TimeoutExpired:
