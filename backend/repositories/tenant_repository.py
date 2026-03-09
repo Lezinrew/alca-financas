@@ -16,27 +16,32 @@ class TenantRepository(BaseRepository):
         """
         Retorna lista de tenants do usuário com role.
         """
-        supabase = get_supabase()
-        # Usa join implícito: tenant_members + tenants
-        response = (
-            supabase.table("tenant_members")
-            .select("tenant_id, role, tenants!inner(id, name, slug)")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        data = response.data or []
-        results: List[Dict[str, Any]] = []
-        for row in data:
-            tenant = row.get("tenants") or {}
-            results.append(
-                {
-                    "tenant_id": row.get("tenant_id") or tenant.get("id"),
-                    "role": row.get("role"),
-                    "name": tenant.get("name"),
-                    "slug": tenant.get("slug"),
-                }
+        try:
+            supabase = get_supabase()
+            # Usa join implícito: tenant_members + tenants
+            response = (
+                supabase.table("tenant_members")
+                .select("tenant_id, role, tenants!inner(id, name, slug)")
+                .eq("user_id", user_id)
+                .execute()
             )
-        return results
+            data = response.data or []
+            results: List[Dict[str, Any]] = []
+            for row in data:
+                tenant = row.get("tenants") or {}
+                results.append(
+                    {
+                        "tenant_id": row.get("tenant_id") or tenant.get("id"),
+                        "role": row.get("role"),
+                        "name": tenant.get("name"),
+                        "slug": tenant.get("slug"),
+                    }
+                )
+            return results
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao buscar tenants para o usuário {user_id}: {e}")
+            return []
 
     def get_default_tenant_id(self, user_id: str) -> Optional[str]:
         """
