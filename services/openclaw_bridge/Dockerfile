@@ -14,7 +14,11 @@ RUN apt-get update && apt-get install -y \
 # CLI oficial OpenClaw (pacote público no npm)
 # --unsafe-perm: necessário para scripts de compilação quando roda como root no Docker
 # --max-logs=0: evita exit 254 em ambientes com filesystem restrito (npm 8.6+)
-RUN npm install -g openclaw@2026.3.8 --unsafe-perm=true --allow-root --max-logs=0
+# IMPORTANTE: se a instalação falhar (por ex. ambiente de CI sem dependências nativas),
+# não quebramos o build. O bridge ficará sem CLI e o health check do chatbot indicará indisponibilidade,
+# mas o resto da aplicação continua funcionando.
+RUN npm install -g openclaw@2026.3.8 --unsafe-perm=true --allow-root --max-logs=0 || \
+    echo 'WARNING: OpenClaw CLI install failed; chatbot bridge will be disabled in this image.'
 
 COPY services/openclaw_bridge/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

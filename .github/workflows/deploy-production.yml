@@ -64,7 +64,6 @@ jobs:
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
-          password: ${{ secrets.PROD_PASSWORD }}
           key: ${{ secrets.PROD_SSH_KEY }}
           source: "backend-images.tar.gz"
           target: "/tmp/"
@@ -74,7 +73,6 @@ jobs:
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
-          password: ${{ secrets.PROD_PASSWORD }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             gunzip -c /tmp/backend-images.tar.gz | docker load
@@ -115,7 +113,6 @@ jobs:
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
-          password: ${{ secrets.PROD_PASSWORD }}
           key: ${{ secrets.PROD_SSH_KEY }}
           source: "frontend/dist/*"
           target: "/var/www/alcahub/frontend"
@@ -126,7 +123,6 @@ jobs:
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
-          password: ${{ secrets.PROD_PASSWORD }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             sudo systemctl reload nginx
