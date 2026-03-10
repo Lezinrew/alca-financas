@@ -1,14 +1,22 @@
 """
 Rotas para o Chatbot OpenClaw
 """
+import time
+import logging
 from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils_supabase import token_required
 from services.openclaw_service import OpenClawService
 from repositories.chatbot_repository import ChatbotRepository
 from extensions import limiter
-import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _truncate_user_id(user_id: str, length: int = 8) -> str:
+    """Trunca user_id para logs (nunca logar conteúdo sensível)."""
+    if not user_id or len(user_id) <= length:
+        return (user_id or "")[:length]
+    return f"{user_id[:length]}..."
 
 bp = Blueprint('chatbot', __name__, url_prefix='/api/chatbot')
 
@@ -37,32 +45,55 @@ def chat(current_user):
             "metadata": {}
         }
     """
+    t0 = time.perf_counter()
+    user_id = current_user.get('id') or ''
+    user_id_trunc = _truncate_user_id(user_id)
+
     try:
         data = request.get_json()
 
         if not data or 'message' not in data:
+            logger.info(
+                "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=0 outcome=validation_fail",
+                user_id_trunc, None
+            )
             return jsonify({
                 'error': 'Mensagem é obrigatória'
             }), 400
 
         message = data['message'].strip()
         if not message:
+            logger.info(
+                "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=0 outcome=validation_fail",
+                user_id_trunc, None
+            )
             return jsonify({
                 'error': 'Mensagem não pode estar vazia'
             }), 400
 
         if len(message) > 1000:
+            logger.info(
+                "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=%s outcome=validation_fail",
+                user_id_trunc, None, len(message)
+            )
             return jsonify({
                 'error': 'Mensagem muito longa (máximo 1000 caracteres)'
             }), 400
 
         conversation_id = data.get('conversation_id')
-        user_id = current_user['id']
+
+        logger.info(
+            "chatbot_request_start user_id_trunc=%s conversation_id=%s message_len=%s",
+            user_id_trunc, conversation_id, len(message)
+        )
 
         # Validar ownership se conversation_id for fornecido
         if conversation_id:
             if not chatbot_repo.validate_ownership(conversation_id, user_id):
-                logger.warning(f"🚨 Unauthorized conversation access attempt - User: {user_id[:8]}... Conv: {conversation_id}")
+                logger.warning(
+                    "chatbot_ownership_validation_failure user_id_trunc=%s conversation_id=%s",
+                    user_id_trunc, conversation_id
+                )
                 return jsonify({
                     'error': 'Conversa não encontrada ou não autorizada'
                 }), 403
@@ -72,6 +103,14 @@ def chat(current_user):
             message=message,
             user_id=user_id,
             conversation_id=conversation_id
+        )
+
+        elapsed_ms = round((time.perf_counter() - t0) * 1000)
+        outcome = "success" if result.get('success') else "bridge_error"
+
+        logger.info(
+            "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=%s elapsed_ms=%s outcome=%s",
+            user_id_trunc, conversation_id, len(message), elapsed_ms, outcome
         )
 
         if result['success']:
@@ -86,14 +125,18 @@ def chat(current_user):
                     )
                 except Exception as e:
                     # Não falhar se houver erro ao salvar
-                    logger.error(f"Error saving conversation: {e}")
+                    logger.error("chatbot_conversation_save_failed conversation_id=%s error=%s", new_conversation_id, e)
 
             return jsonify(result), 200
         else:
             return jsonify(result), 500
 
     except Exception as e:
-        logger.error(f"Error in chatbot endpoint: {e}")
+        elapsed_ms = round((time.perf_counter() - t0) * 1000)
+        logger.exception(
+            "chatbot_unexpected_exception user_id_trunc=%s elapsed_ms=%s error=%s",
+            user_id_trunc, elapsed_ms, e
+        )
         return jsonify({
             'error': 'Erro ao processar mensagem',
             'message': 'Ocorreu um erro inesperado. Tente novamente.'
