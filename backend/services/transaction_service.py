@@ -139,9 +139,16 @@ class TransactionService:
         if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
 
-        update_data = {}
-        allowed_fields = ['description', 'amount', 'category_id', 'date', 'status', 'responsible_person', 'account_id']
-        
+        # Valores antigos para reconciliação de saldo
+        old_account_id = transaction.get('account_id')
+        old_amount = float(transaction.get('amount', 0) or 0)
+        old_type = transaction.get('type', 'expense')
+        old_status = transaction.get('status', 'pending')
+
+        update_data: Dict[str, Any] = {}
+        # Inclui 'type' para permitir correções, mantendo mesma validação de create_transaction
+        allowed_fields = ['description', 'amount', 'category_id', 'date', 'status', 'responsible_person', 'account_id', 'type']
+
         for field in allowed_fields:
             if field in data:
                 if field == 'date':
@@ -149,22 +156,52 @@ class TransactionService:
                     update_data[field] = parsed_date.strftime('%Y-%m-%d')
                 elif field == 'amount':
                     update_data[field] = parse_money_value(data[field])
+                elif field == 'type':
+                    if data['type'] not in ['income', 'expense']:
+                        raise ValidationException('Tipo de transação inválido. Use "income" ou "expense"')
+                    update_data[field] = data['type']
                 else:
                     update_data[field] = data[field]
 
         if not update_data:
             return {'message': 'Nenhum dado para atualizar'}
 
-        # Handle balance update if amount or status changed
-        # This is complex because we need to revert old balance and apply new
-        # For now, let's keep it simple and just update the transaction
-        # TODO: Implement balance reconciliation on update
-        
+        # Calcula novos valores efetivos (após update) para reconciliação
+        new_status = update_data.get('status', old_status)
+        new_type = update_data.get('type', old_type)
+        new_amount = float(update_data.get('amount', old_amount) or old_amount)
+        new_account_id = update_data.get('account_id', old_account_id)
+
+        # Valida conta, se tiver sido alterada
+        if 'account_id' in update_data and new_account_id:
+            account = _account_for(self.accounts_repo, new_account_id, user_id)
+            if not account:
+                raise ValidationException('Conta não encontrada')
+
+        # Valida categoria, se tiver sido alterada
+        if 'category_id' in update_data and update_data.get('category_id'):
+            category = _category_for(self.categories_repo, update_data['category_id'])
+            if not category:
+                raise ValidationException('Categoria não encontrada')
+
+        # Reconciliação de saldo:
+        # 1) Reverte impacto antigo (se transação antiga era paga e tinha conta)
+        # 2) Aplica impacto novo (se transação nova é paga e tem conta)
         try:
+            # Passo 1: reverter saldo antigo
+            if old_account_id and old_status == 'paid' and old_amount:
+                # Usa amount negativo com o mesmo tipo para inverter o sinal
+                self._update_account_balance(old_account_id, -old_amount, old_type)
+
+            # Atualiza transação no repositório
             self.transaction_repo.update(transaction_id, update_data)
+
+            # Passo 2: aplicar saldo novo
+            if new_account_id and new_status == 'paid' and new_amount:
+                self._update_account_balance(new_account_id, new_amount, new_type)
         except Exception as e:
             raise ValidationException(f'Erro ao atualizar no banco de dados. Detalhe: {str(e)}')
-            
+
         return {'message': 'Transação atualizada com sucesso'}
 
     def delete_transaction(self, user_id: str, transaction_id: str) -> bool:
