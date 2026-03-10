@@ -2,6 +2,44 @@
 
 Passo a passo completo para fazer deploy do chatbot em produção com todas as proteções de segurança implementadas.
 
+## Runtime flow and health
+
+### Fluxo de requisição (API LLM)
+
+1. **Cliente** → `POST /api/chatbot/chat` (Backend Flask) com `Authorization: Bearer <token>`.
+2. **Backend** (`backend/routes/chatbot.py`) valida token, rate limit, ownership de `conversation_id` e chama `OpenClawService.chat()`.
+3. **OpenClawService** (`backend/services/openclaw_service.py`) chama o **bridge** em `OPENCLAW_BRIDGE_URL` (ex.: `http://openclaw-bridge:8089/chat`).
+4. **Bridge** (`services/openclaw_bridge/app.py`) executa o CLI OpenClaw com `OPENCLAW_GATEWAY_URL` (ex.: `http://openclaw-gateway:18789`).
+5. **Gateway** (container `openclaw-gateway`, `services/openclaw/`) fala com o provedor LLM (Claude). A resposta volta na mesma cadeia.
+
+### Variáveis de ambiente obrigatórias
+
+| Componente      | Variável                 | Descrição / default |
+|-----------------|--------------------------|----------------------|
+| Backend         | `OPENCLAW_BRIDGE_URL`    | URL do bridge (ex.: `http://openclaw-bridge:8089`). Default: `http://openclaw-bridge:8089`. |
+| Backend         | `OPENCLAW_TIMEOUT`       | Timeout em segundos para chamada ao bridge (10–300). Default: `60`. |
+| openclaw-bridge | `OPENCLAW_GATEWAY_URL`   | URL do gateway (ex.: `http://openclaw-gateway:18789`). Default: `http://openclaw-gateway:18789`. |
+| openclaw-bridge | `OPENCLAW_BIN`           | Comando do CLI (ex.: `openclaw`). Default: `openclaw`. |
+| openclaw-bridge | `OPENCLAW_TIMEOUT`       | Timeout do subprocess do CLI em segundos (30–300). Default: `90`. |
+| openclaw-gateway| `OPENCLAW_GATEWAY_TOKEN` | Token do gateway (obrigatório em produção). |
+
+### Endpoints de health
+
+| Endpoint | Quem chama | Significado |
+|----------|------------|-------------|
+| `GET /api/health` | Load balancer / operador | Backend Flask está de pé. |
+| `GET /api/chatbot/health` | Operador / monitor | Backend consegue falar com o bridge; o bridge verifica o gateway. Retorna `200` com `{"available": true}` ou `503` com `{"available": false}`. |
+| `GET {OPENCLAW_BRIDGE_URL}/health` | Backend (para `/api/chatbot/health`) | Bridge está de pé e gateway está ok. Resposta: `{"ok": true, "gateway": {...}}` ou `{"ok": false, ...}`. |
+
+### Validação mínima em produção
+
+1. `curl -s -o /dev/null -w "%{http_code}" https://<API>/api/health` → `200`.
+2. `curl -s https://<API>/api/chatbot/health` → `200` e `"available": true` (ou `503` se bridge/gateway estiverem fora).
+3. Enviar uma mensagem de teste via UI ou `POST /api/chatbot/chat` com token válido e `{"message": "Olá"}` → `200` e resposta com `message` e `conversation_id`.
+4. Verificar logs do backend por linhas estruturadas: `chatbot_request_start`, `chatbot_request_end`, `bridge_request_start`, `bridge_request_end` (ou `bridge_timeout` / `gateway_health_failure` em falhas).
+
+---
+
 ## ✅ Checklist Pré-Deploy
 
 Antes de fazer deploy, confirme que você tem:

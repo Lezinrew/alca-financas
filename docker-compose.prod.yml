@@ -16,7 +16,9 @@ services:
       BACKEND_PORT: ${BACKEND_PORT:-8001}
       HOST: 0.0.0.0
       FLASK_ENV: production
+      # Chatbot: bridge URL e timeout (backend usa para /api/chatbot/*)
       OPENCLAW_BRIDGE_URL: http://openclaw-bridge:8089
+      OPENCLAW_TIMEOUT: ${OPENCLAW_TIMEOUT:-60}
     ports:
       - "${BACKEND_PORT:-8001}:${BACKEND_PORT:-8001}"
     restart: always
@@ -79,14 +81,20 @@ services:
       dockerfile: services/openclaw_bridge/Dockerfile
     container_name: openclaw-bridge
     environment:
-      OPENCLAW_BIN: openclaw
+      OPENCLAW_BIN: ${OPENCLAW_BIN:-openclaw}
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
-      OPENCLAW_TIMEOUT: "90"
+      OPENCLAW_TIMEOUT: ${OPENCLAW_TIMEOUT:-90}
     depends_on:
       - openclaw-gateway
     networks:
       - default
     restart: always
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8089/health || exit 1"]
 
   openclaw-cli:
     image: openclaw-gateway:local
