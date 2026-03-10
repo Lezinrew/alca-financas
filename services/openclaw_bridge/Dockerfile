@@ -11,9 +11,10 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# CLI oficial OpenClaw (pacote público; @alca/openclaw-cli não existe no npm)
-# --unsafe-perm é necessário pois alguns scripts de compilação falham quando roda como root no docker
-RUN npm install -g openclaw@latest --unsafe-perm=true --allow-root
+# CLI oficial OpenClaw (pacote público no npm)
+# --unsafe-perm: necessário para scripts de compilação quando roda como root no Docker
+# --max-logs=0: evita exit 254 em ambientes com filesystem restrito (npm 8.6+)
+RUN npm install -g openclaw@2026.3.8 --unsafe-perm=true --allow-root --max-logs=0
 
 COPY services/openclaw_bridge/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

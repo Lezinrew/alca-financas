@@ -80,15 +80,14 @@ def run_openclaw_agent(message: str, session_id: str) -> dict:
     elapsed_ms = round((time.perf_counter() - t0) * 1000)
 
     if result.returncode != 0:
-        error_msg = result.stderr.strip() or result.stdout.strip() or "OpenClaw agent failed"
         logger.warning(
             "bridge_agent_end session_id=%s message_len=%s elapsed_ms=%s returncode=%s outcome=cli_error",
             session_id, msg_len, elapsed_ms, result.returncode
         )
-        return {
-            "message": f"Erro interno no bot: {error_msg}",
-            "raw": result.stdout.strip()
-        }
+        raise HTTPException(
+            status_code=500,
+            detail="O assistente está temporariamente indisponível. Tente novamente."
+        )
 
     logger.info(
         "bridge_agent_end session_id=%s message_len=%s elapsed_ms=%s returncode=0 outcome=success",
@@ -155,7 +154,10 @@ def chat(req: ChatRequest):
         raise
     except Exception as e:
         logger.exception("bridge_unexpected_error chat endpoint error=%s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Ocorreu um erro inesperado. Tente novamente."
+        )
 
 
 @app.get("/conversations/{conversation_id}")
