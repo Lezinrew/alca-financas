@@ -13,6 +13,28 @@ logger = logging.getLogger(__name__)
 DEFAULT_BRIDGE_URL = "http://openclaw-bridge:8089"
 DEFAULT_TIMEOUT = 60
 
+# Tipos de erro padronizados (não vazar erros brutos do CLI/gateway)
+ERROR_TYPE_BRIDGE_TIMEOUT = "bridge_timeout"
+ERROR_TYPE_BRIDGE_UNAVAILABLE = "bridge_unavailable"
+ERROR_TYPE_GATEWAY_UNAVAILABLE = "gateway_unavailable"
+ERROR_TYPE_LLM_AUTH_ERROR = "llm_auth_error"
+ERROR_TYPE_LLM_FAILURE = "llm_failure"
+ERROR_TYPE_INTERNAL = "internal_error"
+
+
+def _error_response(error_type: str, message: str, retryable: bool) -> Dict[str, Any]:
+    """Resposta de erro padronizada para o pipeline do chatbot. Inclui message no top-level e detail para compatibilidade com clientes."""
+    return {
+        "success": False,
+        "error": {
+            "type": error_type,
+            "message": message,
+            "retryable": retryable,
+        },
+        "message": message,
+        "detail": message,
+    }
+
 
 def _truncate_user_id(user_id: str, length: int = 8) -> str:
     """Trunca user_id para logs (nunca logar conteúdo sensível)."""
@@ -96,11 +118,35 @@ class OpenClawService:
                 "bridge_request_end user_id_trunc=%s conversation_id=%s message_len=%s elapsed_ms=%s status_code=%s outcome=bridge_error",
                 user_id_trunc, conversation_id, message_len, elapsed_ms, response.status_code
             )
-            return {
-                "success": False,
-                "error": f"Erro {response.status_code}",
-                "message": "Desculpe, houve um erro ao processar sua mensagem.",
-            }
+            if response.status_code == 504:
+                return _error_response(
+                    ERROR_TYPE_BRIDGE_TIMEOUT,
+                    "O chatbot demorou muito para responder. Tente novamente.",
+                    retryable=True,
+                )
+            if response.status_code in (401, 403):
+                return _error_response(
+                    ERROR_TYPE_LLM_AUTH_ERROR,
+                    "Erro de autorização do assistente. Tente fazer login novamente.",
+                    retryable=False,
+                )
+            if response.status_code == 503:
+                return _error_response(
+                    ERROR_TYPE_GATEWAY_UNAVAILABLE,
+                    "O assistente está temporariamente indisponível. Tente novamente em instantes.",
+                    retryable=True,
+                )
+            if response.status_code in (502,):
+                return _error_response(
+                    ERROR_TYPE_BRIDGE_UNAVAILABLE,
+                    "Erro ao conectar com o chatbot. Tente novamente mais tarde.",
+                    retryable=True,
+                )
+            return _error_response(
+                ERROR_TYPE_LLM_FAILURE,
+                "Desculpe, houve um erro ao processar sua mensagem. Tente novamente.",
+                retryable=True,
+            )
 
         except requests.exceptions.Timeout:
             elapsed_ms = round((time.perf_counter() - t0) * 1000)
@@ -108,33 +154,33 @@ class OpenClawService:
                 "bridge_timeout user_id_trunc=%s conversation_id=%s message_len=%s elapsed_ms=%s",
                 user_id_trunc, conversation_id, message_len, elapsed_ms
             )
-            return {
-                "success": False,
-                "error": "Timeout",
-                "message": "O chatbot demorou muito para responder. Tente novamente.",
-            }
+            return _error_response(
+                ERROR_TYPE_BRIDGE_TIMEOUT,
+                "O chatbot demorou muito para responder. Tente novamente.",
+                retryable=True,
+            )
         except requests.exceptions.RequestException as e:
             elapsed_ms = round((time.perf_counter() - t0) * 1000)
             logger.error(
                 "bridge_request_error user_id_trunc=%s conversation_id=%s message_len=%s elapsed_ms=%s error=%s",
                 user_id_trunc, conversation_id, message_len, elapsed_ms, e
             )
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Erro ao conectar com o chatbot. Tente novamente mais tarde.",
-            }
+            return _error_response(
+                ERROR_TYPE_BRIDGE_UNAVAILABLE,
+                "Erro ao conectar com o chatbot. Tente novamente mais tarde.",
+                retryable=True,
+            )
         except Exception as e:
             elapsed_ms = round((time.perf_counter() - t0) * 1000)
             logger.exception(
                 "openclaw_unexpected_error user_id_trunc=%s conversation_id=%s message_len=%s elapsed_ms=%s error=%s",
                 user_id_trunc, conversation_id, message_len, elapsed_ms, e
             )
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Erro inesperado. Tente novamente.",
-            }
+            return _error_response(
+                ERROR_TYPE_INTERNAL,
+                "Erro inesperado. Tente novamente.",
+                retryable=True,
+            )
 
     def get_conversation_history(self, conversation_id: str) -> Dict[str, Any]:
         try:

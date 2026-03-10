@@ -7,9 +7,14 @@ from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils_supabase import token_required
 from services.openclaw_service import OpenClawService
 from repositories.chatbot_repository import ChatbotRepository
+from chatbot.router import route_message
 from extensions import limiter
 
 logger = logging.getLogger(__name__)
+
+# Tipo de erro padronizado para erros da rota (validação, ownership, exceção)
+ERROR_TYPE_INVALID_REQUEST = "invalid_request"
+ERROR_TYPE_INTERNAL = "internal_error"
 
 
 def _truncate_user_id(user_id: str, length: int = 8) -> str:
@@ -17,6 +22,21 @@ def _truncate_user_id(user_id: str, length: int = 8) -> str:
     if not user_id or len(user_id) <= length:
         return (user_id or "")[:length]
     return f"{user_id[:length]}..."
+
+
+def _error_response(error_type: str, message: str, retryable: bool):
+    """Resposta de erro padronizada: { success: false, error: { type, message, retryable }, message }. Inclui detail para compatibilidade com clientes que leem error.response.data.detail."""
+    return {
+        "success": False,
+        "error": {
+            "type": error_type,
+            "message": message,
+            "retryable": retryable,
+        },
+        "message": message,
+        "detail": message,
+    }
+
 
 bp = Blueprint('chatbot', __name__, url_prefix='/api/chatbot')
 
@@ -57,9 +77,11 @@ def chat(current_user):
                 "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=0 outcome=validation_fail",
                 user_id_trunc, None
             )
-            return jsonify({
-                'error': 'Mensagem é obrigatória'
-            }), 400
+            return jsonify(_error_response(
+                ERROR_TYPE_INVALID_REQUEST,
+                "Mensagem é obrigatória",
+                retryable=False,
+            )), 400
 
         message = data['message'].strip()
         if not message:
@@ -67,18 +89,22 @@ def chat(current_user):
                 "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=0 outcome=validation_fail",
                 user_id_trunc, None
             )
-            return jsonify({
-                'error': 'Mensagem não pode estar vazia'
-            }), 400
+            return jsonify(_error_response(
+                ERROR_TYPE_INVALID_REQUEST,
+                "Mensagem não pode estar vazia",
+                retryable=False,
+            )), 400
 
         if len(message) > 1000:
             logger.info(
                 "chatbot_request_end user_id_trunc=%s conversation_id=%s message_len=%s outcome=validation_fail",
                 user_id_trunc, None, len(message)
             )
-            return jsonify({
-                'error': 'Mensagem muito longa (máximo 1000 caracteres)'
-            }), 400
+            return jsonify(_error_response(
+                ERROR_TYPE_INVALID_REQUEST,
+                "Mensagem muito longa (máximo 1000 caracteres)",
+                retryable=False,
+            )), 400
 
         conversation_id = data.get('conversation_id')
 
@@ -94,15 +120,18 @@ def chat(current_user):
                     "chatbot_ownership_validation_failure user_id_trunc=%s conversation_id=%s",
                     user_id_trunc, conversation_id
                 )
-                return jsonify({
-                    'error': 'Conversa não encontrada ou não autorizada'
-                }), 403
+                return jsonify(_error_response(
+                    ERROR_TYPE_INVALID_REQUEST,
+                    "Conversa não encontrada ou não autorizada",
+                    retryable=False,
+                )), 403
 
-        # Enviar mensagem para o OpenClaw
-        result = openclaw_service.chat(
-            message=message,
+        # Roteador: FAQ / cache / finance / LLM (reduz custo de LLM)
+        result = route_message(
             user_id=user_id,
-            conversation_id=conversation_id
+            message=message,
+            conversation_id=conversation_id,
+            openclaw_service=openclaw_service,
         )
 
         elapsed_ms = round((time.perf_counter() - t0) * 1000)
@@ -129,6 +158,7 @@ def chat(current_user):
 
             return jsonify(result), 200
         else:
+            # result já no formato padronizado (success, error: { type, message, retryable }, message)
             return jsonify(result), 500
 
     except Exception as e:
@@ -137,10 +167,11 @@ def chat(current_user):
             "chatbot_unexpected_exception user_id_trunc=%s elapsed_ms=%s error=%s",
             user_id_trunc, elapsed_ms, e
         )
-        return jsonify({
-            'error': 'Erro ao processar mensagem',
-            'message': 'Ocorreu um erro inesperado. Tente novamente.'
-        }), 500
+        return jsonify(_error_response(
+            ERROR_TYPE_INTERNAL,
+            "Ocorreu um erro inesperado. Tente novamente.",
+            retryable=True,
+        )), 500
 
 
 @bp.route('/conversations/<conversation_id>', methods=['GET'])
