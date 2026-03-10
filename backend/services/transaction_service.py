@@ -74,6 +74,9 @@ class TransactionService:
             account = _account_for(self.accounts_repo, account_id, user_id)
             if not account:
                 raise ValidationException('Conta não encontrada')
+            account_tenant_id = account.get('tenant_id') or tenant_id
+        else:
+            account_tenant_id = None
 
         category_id = data.get('category_id')
         if category_id:
@@ -97,6 +100,7 @@ class TransactionService:
             'type': data.get('type', 'expense'),
             'category_id': data.get('category_id') or None,
             'account_id': account_id or None,
+            'account_tenant_id': account_tenant_id,
             'date': date_val,
             'is_recurring': data.get('is_recurring', False),
             'status': data.get('status', 'pending'),
@@ -246,6 +250,7 @@ class TransactionService:
                 'type': data.get('type', 'expense'),
                 'category_id': data.get('category_id') or None,
                 'account_id': account_id or None,
+                'account_tenant_id': tenant_id if account_id else None,
                 'date': date_str,
                 'is_recurring': False,
                 'status': status,
