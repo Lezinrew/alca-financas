@@ -10,7 +10,17 @@ from database.connection import get_supabase
 class TransactionRepository(BaseRepository):
     def __init__(self):
         super().__init__("transactions")
-    
+
+    def create(self, data: Dict[str, Any]) -> str:
+        """Garante account_tenant_id e category_tenant_id = tenant_id (NOT NULL + CHECK no schema)."""
+        tenant_id = data.get("tenant_id")
+        if tenant_id:
+            if not data.get("account_tenant_id"):
+                data = {**data, "account_tenant_id": tenant_id}
+            if not data.get("category_tenant_id"):
+                data = {**data, "category_tenant_id": tenant_id}
+        return super().create(data)
+
     def find_by_filter(
         self,
         user_id: str,
@@ -139,20 +149,23 @@ class TransactionRepository(BaseRepository):
 
     def create_many(self, transactions: List[Dict[str, Any]]) -> List[str]:
         """
-        Cria múltiplas transações
+        Cria múltiplas transações. Garante account_tenant_id e category_tenant_id = tenant_id.
         """
         if not transactions:
             return []
-        
         try:
-            # Adicionar timestamps
             now = datetime.utcnow().isoformat()
             for tx in transactions:
-                if 'created_at' not in tx:
-                    tx['created_at'] = now
-                if 'updated_at' not in tx:
-                    tx['updated_at'] = now
-            
+                if "created_at" not in tx:
+                    tx["created_at"] = now
+                if "updated_at" not in tx:
+                    tx["updated_at"] = now
+                tenant_id = tx.get("tenant_id")
+                if tenant_id:
+                    if not tx.get("account_tenant_id"):
+                        tx["account_tenant_id"] = tenant_id
+                    if not tx.get("category_tenant_id"):
+                        tx["category_tenant_id"] = tenant_id
             supabase = get_supabase()
             response = supabase.table(self.table_name).insert(transactions).execute()
             
