@@ -69,23 +69,20 @@ class TransactionService:
         
         date = parse_date_value(data['date'])
 
+        # Schema: account_tenant_id e category_tenant_id são NOT NULL e CHECK (= tenant_id).
+        # Sempre enviar tenant_id nesses campos para satisfazer constraint.
         account_id = data.get('account_id')
         if account_id:
             account = _account_for(self.accounts_repo, account_id, user_id)
             if not account:
                 raise ValidationException('Conta não encontrada')
-            account_tenant_id = account.get('tenant_id') or tenant_id
-        else:
-            account_tenant_id = None
-
+        account_tenant_id = tenant_id  # obrigatório; CHECK (account_tenant_id = tenant_id)
         category_id = data.get('category_id')
         if category_id:
             category = _category_for(self.categories_repo, category_id)
             if not category:
                 raise ValidationException('Categoria não encontrada')
-            category_tenant_id = category.get('tenant_id') or tenant_id
-        else:
-            category_tenant_id = None
+        category_tenant_id = tenant_id  # obrigatório; CHECK (category_tenant_id = tenant_id)
 
         # Handle installments
         if data.get('installments') and int(data['installments']) > 1:
@@ -253,9 +250,9 @@ class TransactionService:
                 'amount': installment_amount,
                 'type': data.get('type', 'expense'),
                 'category_id': data.get('category_id') or None,
-                'category_tenant_id': tenant_id if data.get('category_id') else None,
+                'category_tenant_id': tenant_id,
                 'account_id': account_id or None,
-                'account_tenant_id': tenant_id if account_id else None,
+                'account_tenant_id': tenant_id,
                 'date': date_str,
                 'is_recurring': False,
                 'status': status,
