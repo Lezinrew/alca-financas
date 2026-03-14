@@ -83,6 +83,9 @@ class TransactionService:
             category = _category_for(self.categories_repo, category_id)
             if not category:
                 raise ValidationException('Categoria não encontrada')
+            category_tenant_id = category.get('tenant_id') or tenant_id
+        else:
+            category_tenant_id = None
 
         # Handle installments
         if data.get('installments') and int(data['installments']) > 1:
@@ -99,6 +102,7 @@ class TransactionService:
             'amount': amount_val,
             'type': data.get('type', 'expense'),
             'category_id': data.get('category_id') or None,
+            'category_tenant_id': category_tenant_id,
             'account_id': account_id or None,
             'account_tenant_id': account_tenant_id,
             'date': date_val,
@@ -249,6 +253,7 @@ class TransactionService:
                 'amount': installment_amount,
                 'type': data.get('type', 'expense'),
                 'category_id': data.get('category_id') or None,
+                'category_tenant_id': tenant_id if data.get('category_id') else None,
                 'account_id': account_id or None,
                 'account_tenant_id': tenant_id if account_id else None,
                 'date': date_str,
