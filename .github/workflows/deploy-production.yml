@@ -65,6 +65,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          password: ${{ secrets.PROD_PASSWORD }}
           source: "backend-images.tar.gz"
           target: "/tmp/"
 
@@ -74,10 +75,11 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          password: ${{ secrets.PROD_PASSWORD }}
           script: |
             gunzip -c /tmp/backend-images.tar.gz | docker load
             rm /tmp/backend-images.tar.gz
-            cd /var/www/alcahub
+            cd /var/www/alca-financas
             docker-compose -f docker-compose.prod.yml up -d openclaw-bridge backend
             docker system prune -f
 
@@ -114,8 +116,9 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          password: ${{ secrets.PROD_PASSWORD }}
           source: "frontend/dist/*"
-          target: "/var/www/alcahub/frontend"
+          target: "/var/www/alca-financas/frontend"
           strip_components: 2
 
       - name: Restart Nginx
@@ -124,6 +127,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          password: ${{ secrets.PROD_PASSWORD }}
           script: |
             sudo systemctl reload nginx
 
