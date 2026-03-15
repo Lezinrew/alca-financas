@@ -1,10 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <defs>
-    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="6" fill="url(#gradient)"/>
-  <text x="16" y="22" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="white">A</text>
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="32.000000pt" height="32.000000pt" viewBox="0 0 32.000000 32.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,32.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M245 266 c-11 -11 -33 -31 -50 -44 -25 -19 -26 -21 -5 -11 32 16 90
+62 90 72 0 12 -14 6 -35 -17z"/>
+<path d="M250 149 c0 -60 3 -80 13 -77 8 3 13 31 15 81 2 64 0 77 -13 77 -12
+0 -15 -15 -15 -81z"/>
+<path d="M210 136 c0 -30 5 -58 10 -61 6 -4 10 17 10 54 0 34 -4 61 -10 61 -5
+0 -10 -24 -10 -54z"/>
+<path d="M21 154 c-64 -82 43 -175 121 -106 10 8 18 22 18 29 0 10 -9 7 -31
+-11 -37 -31 -62 -33 -89 -6 -33 33 -24 85 17 101 34 13 55 -1 105 -67 23 -31
+51 -60 62 -64 63 -23 123 62 81 116 -14 18 -15 16 -9 -22 5 -34 2 -46 -15 -63
+-12 -12 -26 -21 -32 -21 -13 0 -61 49 -102 103 -24 32 -34 37 -67 37 -30 0
+-43 -6 -59 -26z"/>
+<path d="M170 146 c0 -8 5 -18 10 -21 6 -3 10 3 10 14 0 12 -4 21 -10 21 -5 0
+-10 -6 -10 -14z"/>
+</g>
 </svg>
