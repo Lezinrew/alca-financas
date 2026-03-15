@@ -67,12 +67,19 @@ class BudgetRepositorySupabase:
             return r.data[0]
         return row
 
-    def get_plans_for_month(self, tenant_id: str, month: int, year: int) -> List[Dict[str, Any]]:
+    def get_plans_for_month(
+        self,
+        tenant_id: str,
+        user_id: str,
+        month: int,
+        year: int,
+    ) -> List[Dict[str, Any]]:
         try:
             r = (
                 self.supabase.table(self.plans_table)
                 .select("*")
                 .eq("tenant_id", tenant_id)
+                .eq("user_id", user_id)
                 .eq("month", month)
                 .eq("year", year)
                 .execute()
@@ -84,37 +91,76 @@ class BudgetRepositorySupabase:
     def upsert_plans(
         self,
         tenant_id: str,
+        user_id: str,
         month: int,
         year: int,
         category_plans: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         if not category_plans:
             return []
-        self.delete_plans_for_month(tenant_id, month, year)
+        self.delete_plans_for_month(tenant_id, user_id, month, year)
         now = datetime.utcnow().isoformat()
         rows = []
         for item in category_plans:
             category_id = item.get("category_id")
             planned_amount = float(item.get("planned_amount", 0))
+            notes = item.get("notes")
             if not category_id:
                 continue
-            rows.append({
+            row = {
                 "tenant_id": tenant_id,
+                "user_id": user_id,
                 "month": month,
                 "year": year,
                 "category_id": category_id,
                 "planned_amount": planned_amount,
                 "created_at": now,
                 "updated_at": now,
-            })
+            }
+            if notes is not None:
+                row["notes"] = notes
+            rows.append(row)
         if not rows:
             return []
         r = self.supabase.table(self.plans_table).insert(rows).execute()
         return r.data if r.data else []
 
-    def delete_plans_for_month(self, tenant_id: str, month: int, year: int) -> bool:
+    def delete_plans_for_month(
+        self,
+        tenant_id: str,
+        user_id: str,
+        month: int,
+        year: int,
+    ) -> bool:
         try:
-            self.supabase.table(self.plans_table).delete().eq("tenant_id", tenant_id).eq("month", month).eq("year", year).execute()
+            (
+                self.supabase.table(self.plans_table)
+                .delete()
+                .eq("tenant_id", tenant_id)
+                .eq("user_id", user_id)
+                .eq("month", month)
+                .eq("year", year)
+                .execute()
+            )
+            return True
+        except Exception:
+            return False
+
+    def delete_plan_by_id(
+        self,
+        plan_id: str,
+        tenant_id: str,
+        user_id: str,
+    ) -> bool:
+        try:
+            (
+                self.supabase.table(self.plans_table)
+                .delete()
+                .eq("id", plan_id)
+                .eq("tenant_id", tenant_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
             return True
         except Exception:
             return False
