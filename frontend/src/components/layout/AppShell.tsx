@@ -84,7 +84,7 @@ const AppShell = () => {
         <div className={`h-16 flex items-center justify-between border-b border-slate-700 ${sidebarHidden ? 'px-2 lg:justify-center' : 'px-6'
           }`}>
           <div className="flex items-center">
-            <img src="/icon-alca-hub.png" alt="Alça Finanças" className="w-8 h-8 object-contain flex-shrink-0" />
+            <img src="/alcahub-logo.png" alt="Alça Finanças" className="w-8 h-8 object-contain flex-shrink-0" />
             {!sidebarHidden && (
               <span className="ml-2 text-white font-bold text-lg whitespace-nowrap">Alça Finanças</span>
             )}
