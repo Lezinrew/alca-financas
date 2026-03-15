@@ -76,8 +76,8 @@ const Login: React.FC = () => {
                 aria-hidden
               />
               <img
-                src="/logo-alca-hub.png"
-                alt="AlçaHub Logo"
+                src="/favicon.png"
+                alt="Alça Finanças"
                 className="w-44 h-auto drop-shadow-lg dark:drop-shadow-[0_10px_30px_rgba(255,255,255,0.25)]"
               />
             </div>
