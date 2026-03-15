@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import uuid
 from utils.exceptions import ValidationException, NotFoundException
@@ -25,6 +25,40 @@ def _account_for(accounts_repo, account_id, user_id):
     if acc.get('user_id') != user_id:
         return None
     return acc
+
+
+def _resolve_transaction_tenant_ids(
+    tenant_id: str,
+    account_id: Optional[str],
+    category_id: Optional[str],
+    user_id: str,
+    accounts_repo,
+    categories_repo,
+) -> Tuple[str, str]:
+    """
+    Resolve account_tenant_id e category_tenant_id a partir dos registros reais de
+    accounts e categories. Garante consistência com tenant_id e FK do schema.
+    Retorna (account_tenant_id, category_tenant_id); ambos nunca null (schema NOT NULL).
+    """
+    account_tenant_id = tenant_id
+    category_tenant_id = tenant_id
+    if account_id:
+        account = _account_for(accounts_repo, account_id, user_id)
+        if not account:
+            raise ValidationException('Conta não encontrada')
+        acc_tenant = account.get('tenant_id')
+        if acc_tenant is not None and acc_tenant != tenant_id:
+            raise ValidationException('Conta não pertence ao workspace atual.')
+        account_tenant_id = acc_tenant if acc_tenant else tenant_id
+    if category_id:
+        category = _category_for(categories_repo, category_id)
+        if not category:
+            raise ValidationException('Categoria não encontrada')
+        cat_tenant = category.get('tenant_id')
+        if cat_tenant is not None and cat_tenant != tenant_id:
+            raise ValidationException('Categoria não pertence ao workspace atual.')
+        category_tenant_id = cat_tenant if cat_tenant else tenant_id
+    return (account_tenant_id, category_tenant_id)
 
 
 class TransactionService:
@@ -66,27 +100,25 @@ class TransactionService:
 
         if data.get('type') and data['type'] not in ['income', 'expense']:
             raise ValidationException('Tipo de transação inválido. Use "income" ou "expense"')
-        
+
         date = parse_date_value(data['date'])
-
-        # Schema: account_tenant_id e category_tenant_id são NOT NULL e CHECK (= tenant_id).
-        # Sempre enviar tenant_id nesses campos para satisfazer constraint.
         account_id = data.get('account_id')
-        if account_id:
-            account = _account_for(self.accounts_repo, account_id, user_id)
-            if not account:
-                raise ValidationException('Conta não encontrada')
-        account_tenant_id = tenant_id  # obrigatório; CHECK (account_tenant_id = tenant_id)
         category_id = data.get('category_id')
-        if category_id:
-            category = _category_for(self.categories_repo, category_id)
-            if not category:
-                raise ValidationException('Categoria não encontrada')
-        category_tenant_id = tenant_id  # obrigatório; CHECK (category_tenant_id = tenant_id)
 
-        # Handle installments
+        account_tenant_id, category_tenant_id = _resolve_transaction_tenant_ids(
+            tenant_id, account_id, category_id, user_id,
+            self.accounts_repo, self.categories_repo,
+        )
+        if category_id and not category_tenant_id:
+            raise ValidationException('Categoria não pertence ao workspace. Escolha outra categoria ou recarregue a página.')
+        if account_id and not account_tenant_id:
+            raise ValidationException('Conta não pertence ao workspace. Escolha outra conta ou recarregue a página.')
+
         if data.get('installments') and int(data['installments']) > 1:
-            return self._create_installments(data, user_id, tenant_id, date, account_id)
+            return self._create_installments(
+                data, user_id, tenant_id, date, account_id,
+                account_tenant_id, category_tenant_id,
+            )
 
         new_id = str(uuid.uuid4())
         date_val = date.strftime('%Y-%m-%d') if isinstance(date, datetime) else date
@@ -98,7 +130,7 @@ class TransactionService:
             'description': data['description'],
             'amount': amount_val,
             'type': data.get('type', 'expense'),
-            'category_id': data.get('category_id') or None,
+            'category_id': category_id or None,
             'category_tenant_id': category_tenant_id,
             'account_id': account_id or None,
             'account_tenant_id': account_tenant_id,
@@ -114,14 +146,17 @@ class TransactionService:
                 transaction_data['id'] = created_id
         except Exception as e:
             raise ValidationException(f'Erro ao salvar no banco de dados. Detalhe: {str(e)}')
-        
+
         if account_id and transaction_data['status'] == 'paid':
             self._update_account_balance(account_id, transaction_data['amount'], transaction_data['type'])
 
         return {'count': 1, 'transaction': transaction_data}
 
     def create_many_transactions(self, transactions: List[Dict[str, Any]]) -> List[str]:
-        return self.transaction_repo.create_many(transactions)
+        try:
+            return self.transaction_repo.create_many(transactions)
+        except ValueError as e:
+            raise ValidationException(f'Dados inválidos para transações. {str(e)}')
 
     def get_transaction(self, user_id: str, transaction_id: str) -> Dict[str, Any]:
         transaction = self.transaction_repo.find_by_id(transaction_id)
@@ -177,17 +212,20 @@ class TransactionService:
         new_amount = float(update_data.get('amount', old_amount) or old_amount)
         new_account_id = update_data.get('account_id', old_account_id)
 
-        # Valida conta, se tiver sido alterada
-        if 'account_id' in update_data and new_account_id:
-            account = _account_for(self.accounts_repo, new_account_id, user_id)
-            if not account:
-                raise ValidationException('Conta não encontrada')
-
-        # Valida categoria, se tiver sido alterada
-        if 'category_id' in update_data and update_data.get('category_id'):
-            category = _category_for(self.categories_repo, update_data['category_id'])
-            if not category:
-                raise ValidationException('Categoria não encontrada')
+        current_tenant_id = transaction.get('tenant_id')
+        if not current_tenant_id:
+            raise ValidationException('Transação sem workspace. Recarregue a página.')
+        new_category_id = update_data.get('category_id', transaction.get('category_id'))
+        account_tenant_id, category_tenant_id = _resolve_transaction_tenant_ids(
+            current_tenant_id,
+            new_account_id,
+            new_category_id,
+            user_id,
+            self.accounts_repo,
+            self.categories_repo,
+        )
+        update_data['account_tenant_id'] = account_tenant_id
+        update_data['category_tenant_id'] = category_tenant_id
 
         # Reconciliação de saldo:
         # 1) Reverte impacto antigo (se transação antiga era paga e tinha conta)
@@ -229,7 +267,16 @@ class TransactionService:
 
         return self.transaction_repo.delete(transaction_id)
 
-    def _create_installments(self, data: Dict[str, Any], user_id: str, tenant_id: str, base_date: datetime, account_id: Optional[str]) -> Dict[str, Any]:
+    def _create_installments(
+        self,
+        data: Dict[str, Any],
+        user_id: str,
+        tenant_id: str,
+        base_date: datetime,
+        account_id: Optional[str],
+        account_tenant_id: str,
+        category_tenant_id: str,
+    ) -> Dict[str, Any]:
         installments = int(data.get('installments', 1))
         status = data.get('status', 'pending')
         total_amount = parse_money_value(data.get('amount'))
@@ -250,9 +297,9 @@ class TransactionService:
                 'amount': installment_amount,
                 'type': data.get('type', 'expense'),
                 'category_id': data.get('category_id') or None,
-                'category_tenant_id': tenant_id,
+                'category_tenant_id': category_tenant_id,
                 'account_id': account_id or None,
-                'account_tenant_id': tenant_id,
+                'account_tenant_id': account_tenant_id,
                 'date': date_str,
                 'is_recurring': False,
                 'status': status,

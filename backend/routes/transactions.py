@@ -105,6 +105,7 @@ def transaction_detail(transaction_id: str):
 
 @bp.route('/import', methods=['POST'])
 @require_auth
+@require_tenant
 def import_transactions():
     from services.import_service import parse_import_file
     from services.account_service import AccountService
@@ -269,9 +270,16 @@ def import_transactions():
                 date_val = tx['date']
                 if hasattr(date_val, 'strftime'):
                     date_val = date_val.strftime('%Y-%m-%d')
+                tenant_id = getattr(request, 'tenant_id', None)
+                if not tenant_id:
+                    errors.append('Importação exige workspace. Recarregue a página ou faça login novamente.')
+                    continue
                 transaction_data = {
                     'id': str(uuid.uuid4()),
                     'user_id': request.user_id,
+                    'tenant_id': tenant_id,
+                    'account_tenant_id': tenant_id,
+                    'category_tenant_id': tenant_id,
                     'description': tx['description'],
                     'amount': tx['amount'],
                     'type': tx['type'],
@@ -282,11 +290,8 @@ def import_transactions():
                     'responsible_person': 'Leandro',
                     'installment_info': None,
                 }
-                
-                # Associa a conta se fornecida
                 if account_id:
                     transaction_data['account_id'] = account_id
-                
                 imported_transactions.append(transaction_data)
             except Exception as e:
                 errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
@@ -329,6 +334,8 @@ def import_transactions():
         if errors:
             result['errors'] = errors
         return jsonify(result), 201 if imported_transactions else 400
+    except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
 
