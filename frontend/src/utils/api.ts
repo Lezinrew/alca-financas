@@ -200,6 +200,43 @@ export const reportsAPI = {
   },
 };
 
+// Planejamento (um endpoint agregado por mês)
+export interface PlanningCategoryItem {
+  category_id: string;
+  category_name: string;
+  category_color: string;
+  category_icon: string;
+  planned: number;
+  spent: number;
+  remaining: number;
+  progress_percent: number;
+}
+
+export interface PlanningMonthResponse {
+  period: { month: number; year: number };
+  planned_income: number;
+  planned_expenses: number;
+  real_income: number;
+  real_expenses: number;
+  balance_real: number;
+  balance_planned: number;
+  savings_rate: number;
+  savings_percentage_planned: number;
+  categories: PlanningCategoryItem[];
+}
+
+export const planningAPI = {
+  getMonth: (month: number, year: number) =>
+    api.get<PlanningMonthResponse>(`/planning/month?month=${month}&year=${year}`),
+  saveMonth: (data: {
+    month: number;
+    year: number;
+    planned_income: number;
+    savings_percentage: number;
+    category_plans: Array<{ category_id: string; planned_amount: number }>;
+  }) => api.put('/planning/month', data),
+};
+
 // Funções do dashboard
 export const dashboardAPI = {
   getData: (month?: string, year?: string) => {

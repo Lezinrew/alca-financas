@@ -12,13 +12,17 @@ class TransactionRepository(BaseRepository):
         super().__init__("transactions")
 
     def create(self, data: Dict[str, Any]) -> str:
-        """Garante account_tenant_id e category_tenant_id = tenant_id (NOT NULL + CHECK no schema)."""
         tenant_id = data.get("tenant_id")
-        if tenant_id:
-            if not data.get("account_tenant_id"):
-                data = {**data, "account_tenant_id": tenant_id}
-            if not data.get("category_tenant_id"):
-                data = {**data, "category_tenant_id": tenant_id}
+        if not tenant_id:
+            raise ValueError("tenant_id é obrigatório para criar transação.")
+        if data.get("account_id") and not data.get("account_tenant_id"):
+            raise ValueError("account_tenant_id é obrigatório quando account_id está preenchido.")
+        if data.get("category_id") and not data.get("category_tenant_id"):
+            raise ValueError("category_tenant_id é obrigatório quando category_id está preenchido.")
+        if not data.get("account_tenant_id"):
+            data = {**data, "account_tenant_id": tenant_id}
+        if not data.get("category_tenant_id"):
+            data = {**data, "category_tenant_id": tenant_id}
         return super().create(data)
 
     def find_by_filter(
@@ -160,12 +164,17 @@ class TransactionRepository(BaseRepository):
                     tx["created_at"] = now
                 if "updated_at" not in tx:
                     tx["updated_at"] = now
-                tenant_id = tx.get("tenant_id")
-                if tenant_id:
-                    if not tx.get("account_tenant_id"):
-                        tx["account_tenant_id"] = tenant_id
-                    if not tx.get("category_tenant_id"):
-                        tx["category_tenant_id"] = tenant_id
+                t_tenant_id = tx.get("tenant_id")
+                if not t_tenant_id:
+                    raise ValueError("Cada transação deve ter tenant_id.")
+                if tx.get("account_id") and not tx.get("account_tenant_id"):
+                    raise ValueError("account_tenant_id é obrigatório quando account_id está preenchido.")
+                if tx.get("category_id") and not tx.get("category_tenant_id"):
+                    raise ValueError("category_tenant_id é obrigatório quando category_id está preenchido.")
+                if not tx.get("account_tenant_id"):
+                    tx["account_tenant_id"] = t_tenant_id
+                if not tx.get("category_tenant_id"):
+                    tx["category_tenant_id"] = t_tenant_id
             supabase = get_supabase()
             response = supabase.table(self.table_name).insert(transactions).execute()
             
