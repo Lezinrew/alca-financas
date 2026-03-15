@@ -200,29 +200,60 @@ export const reportsAPI = {
   },
 };
 
-// Planejamento (um endpoint agregado por mês)
-export interface PlanningCategoryItem {
+// Planejamento — contrato da API (summary, expense_categories, income_categories, alerts)
+export interface PlanningSummary {
+  planned_income: number;
+  planned_expenses: number;
+  planned_balance: number;
+  real_income: number;
+  real_expenses: number;
+  real_balance: number;
+  savings_rate: number;
+}
+
+export interface PlanningExpenseCategory {
   category_id: string;
   category_name: string;
-  category_color: string;
-  category_icon: string;
-  planned: number;
-  spent: number;
-  remaining: number;
+  category_color?: string;
+  category_icon?: string;
+  planned_amount: number;
+  spent_amount: number;
+  remaining_amount: number;
   progress_percent: number;
+  status: 'safe' | 'warning' | 'exceeded' | 'unplanned';
+}
+
+export interface PlanningIncomeCategory {
+  category_id: string;
+  category_name: string;
+  category_color?: string;
+  category_icon?: string;
+  planned_amount: number;
+  received_amount: number;
+  difference_amount: number;
+  progress_percent: number;
+  status: 'on_track' | 'below_target' | 'exceeded_target';
+}
+
+export interface PlanningAlert {
+  type: string;
+  category_id: string;
+  category_name: string;
+  spent_amount?: number;
+  planned_amount?: number;
 }
 
 export interface PlanningMonthResponse {
-  period: { month: number; year: number };
-  planned_income: number;
-  planned_expenses: number;
-  real_income: number;
-  real_expenses: number;
-  balance_real: number;
-  balance_planned: number;
-  savings_rate: number;
-  savings_percentage_planned: number;
-  categories: PlanningCategoryItem[];
+  period: { year: number; month: number };
+  summary: PlanningSummary;
+  expense_categories: PlanningExpenseCategory[];
+  income_categories: PlanningIncomeCategory[];
+  alerts: PlanningAlert[];
+}
+
+export interface PlanningCategoriesResponse {
+  expense: Array<{ id: string; name: string; type: string; color: string; icon: string }>;
+  income: Array<{ id: string; name: string; type: string; color: string; icon: string }>;
 }
 
 export const planningAPI = {
@@ -235,6 +266,13 @@ export const planningAPI = {
     savings_percentage: number;
     category_plans: Array<{ category_id: string; planned_amount: number }>;
   }) => api.put('/planning/month', data),
+  postMonthLines: (data: {
+    month: number;
+    year: number;
+    lines: Array<{ category_id: string; planned_amount: number; notes?: string }>;
+  }) => api.post('/planning/month', data),
+  getMonthCategories: () => api.get<PlanningCategoriesResponse>('/planning/month/categories'),
+  deletePlanLine: (planId: string) => api.delete(`/planning/month/${planId}`),
 };
 
 // Funções do dashboard
