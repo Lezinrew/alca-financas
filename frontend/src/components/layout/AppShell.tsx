@@ -12,6 +12,7 @@ import {
   Tag,
   Calendar,
   CreditCard,
+  Target,
   Menu,
   X,
   Shield,
@@ -33,6 +34,7 @@ const AppShell = () => {
     { path: '/accounts', icon: Wallet, label: 'Contas' },
     { path: '/credit-cards', icon: CreditCard, label: 'Cartões de crédito' },
     { path: '/planning', icon: Calendar, label: 'Planejamento' },
+    { path: '/goals', icon: Target, label: 'Metas' },
     { path: '/reports', icon: PieChart, label: 'Relatórios' },
     { path: '/import', icon: Upload, label: 'Importar' },
   ];
@@ -82,7 +84,7 @@ const AppShell = () => {
         <div className={`h-16 flex items-center justify-between border-b border-slate-700 ${sidebarHidden ? 'px-2 lg:justify-center' : 'px-6'
           }`}>
           <div className="flex items-center">
-            <img src="/logo-alca-hub.png" alt="AlçaHub" className="w-8 h-8 object-contain flex-shrink-0" />
+            <img src="/favicon.png" alt="Alça Finanças" className="w-8 h-8 object-contain flex-shrink-0" />
             {!sidebarHidden && (
               <span className="ml-2 text-white font-bold text-lg whitespace-nowrap">Alça Finanças</span>
             )}
