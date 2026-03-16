@@ -75,7 +75,16 @@ class TransactionService:
         per_page: int = 20,
         tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        result = self.transaction_repo.find_by_filter(user_id, filters, page, per_page, tenant_id=tenant_id)
+        # Garante que paginação sempre esteja presente nos filtros para o repositório avançado
+        filters = dict(filters or {})
+        filters.setdefault("page", page)
+        filters.setdefault("limit", per_page)
+
+        result = self.transaction_repo.find_advanced(
+            user_id,
+            filters,
+            tenant_id=tenant_id,
+        )
         data = result.get('data') or []
         for transaction in data:
             cat_id = transaction.get('category_id')

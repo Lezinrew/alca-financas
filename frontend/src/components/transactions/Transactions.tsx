@@ -5,18 +5,21 @@ import { useAuth } from '../../contexts/AuthContext';
 import { transactionsAPI, categoriesAPI, accountsAPI } from '../../utils/api';
 import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
+import { TransactionFilters as TransactionFiltersBar } from './TransactionFilters';
 import {
   TransactionCategory,
   TransactionRecord,
   TransactionSubmitPayload,
   TransactionType,
 } from '../../types/transaction';
+import { useTransactionFilters } from '../../hooks/useTransactionFilters';
 
 const Transactions = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const { filters, updateFilters, clearFilters } = useTransactionFilters();
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -26,47 +29,6 @@ const Transactions = () => {
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
   const [initialTransactionType, setInitialTransactionType] = useState<TransactionType | null>(null);
 
-  // Inicializa filtros com base no state da navegação (se houver)
-  type FilterType = '' | TransactionType;
-
-  interface TransactionFilters {
-    month: number;
-    year: number;
-    category_id: string;
-    account_id: string;
-    type: FilterType;
-  }
-
-  const getInitialFilters = (): TransactionFilters => {
-    // Lê parâmetros da URL
-    const searchParams = new URLSearchParams(location.search);
-    const urlMonth = searchParams.get('month');
-    const urlYear = searchParams.get('year');
-    const urlCategoryId = searchParams.get('category_id');
-    const urlAccountId = searchParams.get('account_id');
-    const urlType = searchParams.get('type');
-    
-    // Lê state da navegação (para compatibilidade com código existente)
-    const state = location.state as { filterType?: FilterType } | null;
-    const stateType: FilterType =
-      state?.filterType === 'income' || state?.filterType === 'expense' ? state.filterType : '';
-    
-    // Prioriza URL params, depois state, depois padrão
-    const initialType: FilterType = 
-      (urlType === 'income' || urlType === 'expense') ? urlType : stateType;
-
-    return {
-      month: urlMonth ? parseInt(urlMonth, 10) : new Date().getMonth() + 1,
-      year: urlYear ? parseInt(urlYear, 10) : new Date().getFullYear(),
-      category_id: urlCategoryId || '',
-      account_id: urlAccountId || '',
-      type: initialType,
-    };
-  };
-
-  // Filtros
-  const [filters, setFilters] = useState<TransactionFilters>(getInitialFilters);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -74,7 +36,22 @@ const Transactions = () => {
 
       // Carrega transações e categorias primeiro (essenciais)
       const [transactionsRes, categoriesRes] = await Promise.all([
-        transactionsAPI.getAll(filters),
+        transactionsAPI.getAll({
+          date_preset: filters.datePreset,
+          date_from: filters.dateFrom,
+          date_to: filters.dateTo,
+          types: filters.types.join(','),
+          account_ids: filters.accountIds.join(','),
+          category_ids: filters.categoryIds.join(','),
+          min_amount: filters.minAmount,
+          max_amount: filters.maxAmount,
+          search: filters.search,
+          method: filters.method,
+          status: filters.status,
+          page: filters.page,
+          limit: filters.limit,
+          sort: filters.sort,
+        }),
         categoriesAPI.getAll()
       ]);
 
@@ -170,27 +147,6 @@ const Transactions = () => {
     }
   };
 
-  // Atualiza filtros quando a URL mudar (query params)
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const urlMonth = searchParams.get('month');
-    const urlYear = searchParams.get('year');
-    const urlCategoryId = searchParams.get('category_id');
-    const urlAccountId = searchParams.get('account_id');
-    const urlType = searchParams.get('type');
-    
-    if (urlMonth || urlYear || urlCategoryId || urlAccountId || urlType) {
-      setFilters(prev => ({
-        ...prev,
-        month: urlMonth ? parseInt(urlMonth, 10) : prev.month,
-        year: urlYear ? parseInt(urlYear, 10) : prev.year,
-        category_id: urlCategoryId || prev.category_id,
-        account_id: urlAccountId || prev.account_id,
-        type: (urlType === 'income' || urlType === 'expense') ? urlType : prev.type,
-      }));
-    }
-  }, [location.search]);
-
   useEffect(() => {
     // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
     if (isAuthenticated && !authLoading) {
@@ -210,18 +166,12 @@ const Transactions = () => {
         setShowForm(true);
       }
 
-      // Se veio com filtro de tipo (Receitas ou Despesas) e ainda não foi aplicado
+      // Se veio com filtro de tipo (Receitas ou Despesas)
       if (state.filterType && (state.filterType === 'income' || state.filterType === 'expense')) {
-        setFilters(prev => {
-          // Só atualiza se o filtro for diferente do atual
-          if (prev.type !== state.filterType) {
-            return {
-              ...prev,
-              type: state.filterType
-            };
-          }
-          return prev;
-        });
+        updateFilters({
+          types: [state.filterType],
+          page: 1,
+        } as any);
       }
 
       // Limpa o state para não aplicar novamente ao navegar
@@ -289,24 +239,6 @@ const Transactions = () => {
     }
   };
 
-  const handleFilterChange = <K extends keyof TransactionFilters>(
-    field: K,
-    value: TransactionFilters[K]
-  ) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const months = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-
   // Mostra loading enquanto autenticação está sendo verificada ou dados estão carregando
   if (authLoading || (loading && isAuthenticated)) {
     return (
@@ -353,125 +285,13 @@ const Transactions = () => {
       )}
 
       {/* Filtros */}
-      <div className="card-base p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Filtros</h3>
-          {(filters.account_id || filters.category_id || filters.type) && (
-            <button
-              onClick={() => {
-                setFilters({
-                  month: filters.month,
-                  year: filters.year,
-                  category_id: '',
-                  account_id: '',
-                  type: ''
-                });
-              }}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              Limpar filtros
-            </button>
-          )}
-        </div>
-        <div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label htmlFor="filter-month" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t('common.filter')} por Mês</label>
-              <select
-                id="filter-month"
-                name="month"
-                className="input-base dark:bg-[#1a1d29] dark:text-white dark:border-slate-700"
-                value={filters.month}
-                onChange={(e) => handleFilterChange('month', Number(e.target.value))}
-              >
-                {months.map((month, index) => (
-                  <option key={index} value={index + 1}>
-                    {month}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="filter-year" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Ano</label>
-              <select
-                id="filter-year"
-                name="year"
-                className="select-base"
-                value={filters.year}
-                onChange={(e) => handleFilterChange('year', Number(e.target.value))}
-              >
-                {years.map(year => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="filter-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t('transactions.category')}</label>
-              <select
-                id="filter-category"
-                name="category_id"
-                className="select-base"
-                value={filters.category_id}
-                onChange={(e) => handleFilterChange('category_id', e.target.value)}
-              >
-                <option value="">Todas as categorias</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="filter-type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t('transactions.type')}</label>
-              <select
-                id="filter-type"
-                name="type"
-                className="select-base"
-                value={filters.type}
-                onChange={(e) => handleFilterChange('type', e.target.value as FilterType)}
-              >
-                <option value="">Todos os tipos</option>
-                <option value="income">{t('transactions.income')}</option>
-                <option value="expense">{t('transactions.expense')}</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="filter-account" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Conta
-                {filters.account_id && (
-                  <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Filtrado)</span>
-                )}
-              </label>
-              <select
-                id="filter-account"
-                name="account_id"
-                className="select-base"
-                value={filters.account_id || ''}
-                onChange={(e) => handleFilterChange('account_id', e.target.value)}
-                disabled={loading}
-              >
-                <option value="">Todas as contas</option>
-                {accounts.length > 0 ? (
-                  accounts.map((account) => (
-                    <option key={account.id || account._id} value={account.id || account._id}>
-                      {account.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>Carregando contas...</option>
-                )}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TransactionFiltersBar
+        filters={filters}
+        onChange={updateFilters}
+        onClear={clearFilters}
+        categories={categories}
+        accounts={accounts}
+      />
 
       {/* Lista de Transações */}
       <TransactionList
