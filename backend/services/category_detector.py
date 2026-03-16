@@ -240,7 +240,8 @@ def get_or_create_category(
     )
     
     if existing:
-        return existing['_id']
+        # Suporta tanto documentos antigos (_id) quanto registros SQL (id)
+        return existing.get('id') or existing.get('_id')
     
     # Cria nova categoria
     category_data = {
