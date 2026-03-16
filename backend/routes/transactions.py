@@ -110,6 +110,7 @@ def import_transactions():
     from services.import_service import parse_import_file
     from services.account_service import AccountService
     from services.category_service import CategoryService
+    from services.merchant_alias_service import MerchantAliasService
 
     transaction_repo = current_app.config['TRANSACTIONS']
     categories_repo = current_app.config['CATEGORIES']
@@ -117,6 +118,8 @@ def import_transactions():
     service = TransactionService(transaction_repo, categories_repo, accounts_repo)
     account_service = AccountService(accounts_repo, transaction_repo)
     category_service = CategoryService(categories_repo, transaction_repo)
+    alias_repo = current_app.config.get('MERCHANT_ALIAS_REPO')
+    alias_service = MerchantAliasService(alias_repo) if alias_repo else None
     
     if 'file' not in request.files:
         return jsonify({'error': 'Arquivo é obrigatório'}), 400
@@ -200,6 +203,8 @@ def import_transactions():
         errors = []
         created_categories = []  # Para rastrear categorias criadas
         
+        tenant_id = getattr(request, 'tenant_id', None)
+
         for idx, tx in enumerate(parsed_transactions):
             try:
                 category_id = None
@@ -223,9 +228,29 @@ def import_transactions():
                             errors.append(f'Linha {idx + 2}: Erro ao criar categoria "{tx["category_name"]}": {str(e)}')
                             continue
                 else:
-                    # Para Nubank/OFX, detecta categoria automaticamente pela descrição
-                    detected = detect_category_from_description(tx['description'])
-                    
+                    # Para Nubank/OFX, primeiro tenta resolver via aliases persistentes
+                    detected = None
+                    alias_category = None
+
+                    if alias_service:
+                        alias_result = alias_service.find_category_for_description(
+                            user_id=request.user_id,
+                            tenant_id=tenant_id,
+                            description=tx['description'],
+                            category_type=tx['type'],
+                        )
+                        if alias_result:
+                            alias_name, alias_type = alias_result
+                            alias_category = (alias_name, alias_type)
+
+                    if alias_category:
+                        # Usa categoria padronizada do alias; cor/ícone são derivados pela heurística genérica
+                        alias_name, alias_type = alias_category
+                        detected = detect_category_from_description(alias_name) or (alias_name, None, None)
+                    else:
+                        # Se não houver alias, usa heurística pela descrição original
+                        detected = detect_category_from_description(tx['description'])
+
                     if detected:
                         category_name, color, icon = detected
                         try:

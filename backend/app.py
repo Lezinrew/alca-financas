@@ -121,6 +121,7 @@ try:
         from repositories.account_repository_supabase import AccountRepository
         from repositories.budget_repository_supabase import BudgetRepositorySupabase
         from repositories.goal_repository_supabase import GoalRepositorySupabase
+        from repositories.merchant_alias_repository_supabase import MerchantAliasRepositorySupabase
 
         app.config['SUPABASE'] = db_client
         app.config['OAUTH_STATES'] = db_client.table('oauth_states')
@@ -130,6 +131,7 @@ try:
         app.config['ACCOUNT_REPO'] = AccountRepository()
         app.config['BUDGET_REPO'] = BudgetRepositorySupabase()
         app.config['GOAL_REPO'] = GoalRepositorySupabase()
+        app.config['MERCHANT_ALIAS_REPO'] = MerchantAliasRepositorySupabase()
 
         app.config['USERS'] = app.config['USER_REPO']
         app.config['CATEGORIES'] = app.config['CATEGORY_REPO']
