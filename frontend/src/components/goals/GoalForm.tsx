@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { formatCurrency, goalsAPI, type Goal } from '../../utils/api';
+import { goalsAPI, type Goal } from '../../utils/api';
+
+type GoalStatus = 'active' | 'completed' | 'paused';
 
 interface GoalFormProps {
   goal?: Goal | null;
@@ -17,7 +19,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
     goal?.target_date ? goal.target_date.slice(0, 10) : ''
   );
   const [imageUrl, setImageUrl] = useState(goal?.image_url ?? '');
-  const [status, setStatus] = useState(goal?.status ?? 'active');
+  const [status, setStatus] = useState<GoalStatus>(goal?.status ?? 'active');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,7 +30,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
       setTargetAmount(goal.target_amount != null ? String(goal.target_amount) : '');
       setTargetDate(goal.target_date ? goal.target_date.slice(0, 10) : '');
       setImageUrl(goal.image_url ?? '');
-      setStatus(goal.status ?? 'active');
+      setStatus((goal.status as GoalStatus) ?? 'active');
     }
   }, [goal]);
 
@@ -161,7 +163,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
           </label>
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => setStatus(e.target.value as GoalStatus)}
             className="input-base w-full"
           >
             <option value="active">Em andamento</option>
