@@ -221,7 +221,8 @@ def get_or_create_category(
     category_name: str,
     category_type: str,
     color: Optional[str] = None,
-    icon: Optional[str] = None
+    icon: Optional[str] = None,
+    tenant_id: Optional[str] = None,
 ) -> str:
     """
     Busca uma categoria pelo nome ou cria uma nova se não existir.
@@ -231,7 +232,12 @@ def get_or_create_category(
     # O serviço não tem find_by_name exposto publicamente que retorna o objeto completo com _id
     # Mas podemos usar o repositório acessível via serviço
     
-    existing = category_service.category_repo.find_by_name(user_id, category_name, category_type)
+    existing = category_service.category_repo.find_by_name(
+        user_id,
+        category_name,
+        category_type,
+        tenant_id=tenant_id,
+    )
     
     if existing:
         return existing['_id']
@@ -244,6 +250,6 @@ def get_or_create_category(
         'icon': icon or 'circle'
     }
     
-    new_category = category_service.create_category(user_id, category_data)
+    new_category = category_service.create_category(user_id, category_data, tenant_id=tenant_id)
     return new_category['id']
 
