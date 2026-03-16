@@ -21,6 +21,12 @@ const ALERT_CONFIG: Record<string, { icon: string; label: string; bg: string; te
     bg: 'bg-amber-100 dark:bg-amber-900/30',
     text: 'text-amber-800 dark:text-amber-200',
   },
+  strong_savings_month: {
+    icon: 'bi-piggy-bank',
+    label: 'Mês com boa economia',
+    bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    text: 'text-emerald-800 dark:text-emerald-200',
+  },
 };
 
 interface PlanningAlertsProps {
@@ -60,6 +66,11 @@ export const PlanningAlerts: React.FC<PlanningAlertsProps> = ({ alerts }) => {
               {alert.spent_amount != null && (
                 <span className={`font-semibold ${config.text} flex-shrink-0`}>
                   {formatCurrency(alert.spent_amount)}
+                </span>
+              )}
+              {alert.savings_rate != null && (
+                <span className={`font-semibold ${config.text} flex-shrink-0`}>
+                  {alert.savings_rate}%
                 </span>
               )}
             </li>
