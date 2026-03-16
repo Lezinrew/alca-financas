@@ -219,7 +219,8 @@ def import_transactions():
                                 category_service,
                                 request.user_id,
                                 tx['category_name'],
-                                tx['type']
+                                tx['type'],
+                                tenant_id=tenant_id,
                             )
                             # Atualiza o dicionário de categorias
                             user_categories[tx['category_name']] = category_id
@@ -260,7 +261,8 @@ def import_transactions():
                                 category_name,
                                 tx['type'],
                                 color,
-                                icon
+                                icon,
+                                tenant_id=tenant_id,
                             )
                             # Atualiza o dicionário de categorias
                             if category_name not in user_categories:
