@@ -6,8 +6,8 @@ interface TransactionFiltersProps {
   filters: TransactionFilterState;
   onChange: (partial: Partial<TransactionFilterState>) => void;
   onClear: () => void;
-  categories: Array<{ id: string; name: string; type: string }>;
-  accounts: Array<{ id: string; name: string }>;
+  categories: Array<{ id: string; name: string; type: string; count?: number }>;
+  accounts: Array<{ id: string; name: string; count?: number }>;
 }
 
 export const TransactionFilters: FC<TransactionFiltersProps> = ({
@@ -98,6 +98,7 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
                   {acc.name}
+                  {typeof acc.count === 'number' ? ` (${acc.count})` : ''}
                 </option>
               ))}
             </select>
@@ -117,6 +118,9 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
+                  {typeof (cat as any).count === 'number'
+                    ? ` (${(cat as any).count})`
+                    : ''}
                 </option>
               ))}
             </select>

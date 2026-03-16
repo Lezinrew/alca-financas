@@ -7,9 +7,15 @@ interface TransactionListProps {
   transactions: TransactionRecord[];
   onEdit: (transaction: TransactionRecord) => void;
   onDelete: (transactionId: string) => void;
+  loading?: boolean;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEdit, onDelete }) => {
+const TransactionList: React.FC<TransactionListProps> = ({
+  transactions,
+  onEdit,
+  onDelete,
+  loading = false,
+}) => {
   const { t } = useTranslation();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -57,6 +63,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEdit,
     );
   }
 
+  const skeletonRows = Array.from({ length: 6 });
+
   return (
     <div className="table-container">
       <div className="overflow-x-auto">
@@ -73,6 +81,38 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEdit,
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+            {loading &&
+              skeletonRows.map((_, idx) => (
+                <tr key={`skeleton-${idx}`} className="animate-pulse">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700" />
+                      <div className="space-y-2 flex-1">
+                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+                        <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-8 ml-auto" />
+                  </td>
+                </tr>
+              ))}
             {safeTransactions.map((transaction) => {
               const categoryColor = transaction.category?.color || '#6b7280';
               const categoryIcon = transaction.category?.icon || 'circle';
