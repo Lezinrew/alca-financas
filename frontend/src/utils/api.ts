@@ -5,13 +5,15 @@ import { getAuthToken, clearAuthStorage } from './tokenStorage';
 // Utilitário para remover barras duplicadas ao final
 const trimTrailingSlashes = (value?: string) => value?.replace(/\/+$/, '') ?? '';
 
-const DEFAULT_API_HOST = 'http://localhost:8001';
+// Em desenvolvimento, usamos backend local; em produção, usamos origem relativa por padrão.
+const DEFAULT_API_HOST = import.meta.env.DEV ? 'http://localhost:8001' : '';
 
-// Normaliza a URL base: deve ser absoluta (http/https). Evita ":8001" ou caminho relativo.
+// Normaliza a URL base: se VITE_API_URL/REACT_APP_BACKEND_URL for uma URL absoluta (http/https),
+// ela tem prioridade; caso contrário, usamos o fallback (DEFAULT_API_HOST).
 const resolveApiHost = (value?: string): string => {
   const trimmed = trimTrailingSlashes(value ?? '');
   if (!trimmed) return DEFAULT_API_HOST;
-  // URL relativa ou só ":porta" → usar default
+  // Se não começar com http/https, consideramos inválido e caímos no fallback.
   if (!/^https?:\/\//i.test(trimmed)) return DEFAULT_API_HOST;
   if (trimmed.toLowerCase().endsWith('/api')) return trimmed.slice(0, -4);
   return trimmed;
