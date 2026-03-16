@@ -228,6 +228,10 @@ class TransactionRepository(BaseRepository):
             if params.get("method"):
                 query = query.eq("method", params["method"])
 
+            # Recorrente
+            if params.get("is_recurring") in (True, "true", "1", 1):
+                query = query.eq("is_recurring", True)
+
             # Busca textual simples em description
             search = params.get("search")
             if search:

@@ -6,6 +6,7 @@ import { transactionsAPI, categoriesAPI, accountsAPI } from '../../utils/api';
 import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
 import { TransactionFilters as TransactionFiltersBar } from './TransactionFilters';
+import { FilterChipsBar } from './FilterChipsBar';
 import {
   TransactionCategory,
   TransactionRecord,
@@ -23,6 +24,7 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -84,6 +86,14 @@ const Transactions = () => {
       }
 
       setTransactions(transactionsArray as TransactionRecord[]);
+
+      // Captura total de resultados para UX
+      const pagination = (transactionsData as any)?.pagination;
+      if (pagination && typeof pagination.total === 'number') {
+        setTotalCount(pagination.total);
+      } else {
+        setTotalCount(transactionsArray.length);
+      }
 
       // Garante que categories seja sempre um array
       const categoriesData = categoriesRes.data;
@@ -240,7 +250,7 @@ const Transactions = () => {
   };
 
   // Mostra loading enquanto autenticação está sendo verificada ou dados estão carregando
-  if (authLoading || (loading && isAuthenticated)) {
+  if (authLoading || (!transactions.length && loading && isAuthenticated)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -291,6 +301,13 @@ const Transactions = () => {
         onClear={clearFilters}
         categories={categories}
         accounts={accounts}
+      />
+
+      <FilterChipsBar
+        filters={filters}
+        onChange={updateFilters}
+        onClear={clearFilters}
+        total={totalCount}
       />
 
       {/* Lista de Transações */}
