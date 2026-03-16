@@ -13,6 +13,7 @@ export type TransactionFilterState = {
   search?: string;
   method?: string;
   status?: string;
+  isRecurring?: boolean;
   page: number;
   limit: number;
   sort: string;
@@ -44,6 +45,7 @@ export function useTransactionFilters() {
       search: searchParams.get('search') || undefined,
       method: searchParams.get('method') || undefined,
       status: searchParams.get('status') || undefined,
+      isRecurring: searchParams.get('is_recurring') === 'true' || undefined,
       page: Number(searchParams.get('page') || 1),
       limit: Number(searchParams.get('limit') || 50),
       sort: searchParams.get('sort') || 'date:desc',
@@ -66,6 +68,7 @@ export function useTransactionFilters() {
     if (next.search) nextParams.search = next.search;
     if (next.method) nextParams.method = next.method;
     if (next.status) nextParams.status = next.status;
+    if (next.isRecurring) nextParams.is_recurring = 'true';
     if (next.page !== 1) nextParams.page = String(next.page);
     if (next.limit !== 50) nextParams.limit = String(next.limit);
     if (next.sort !== 'date:desc') nextParams.sort = next.sort;
