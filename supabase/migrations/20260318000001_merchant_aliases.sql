@@ -30,8 +30,7 @@ CREATE TABLE IF NOT EXISTS public.merchant_category_aliases (
 
 -- Unicidade por escopo + tipo + valor normalizado
 ALTER TABLE public.merchant_category_aliases
-  ADD CONSTRAINT merchant_alias_unique_scope UNIQUE (tenant_id, user_id, match_type, normalized_value, category_type)
-  ON CONFLICT DO NOTHING;
+  ADD CONSTRAINT merchant_alias_unique_scope UNIQUE (tenant_id, user_id, match_type, normalized_value, category_type);
 
 -- Índices úteis
 CREATE INDEX IF NOT EXISTS idx_merchant_alias_user_tenant
