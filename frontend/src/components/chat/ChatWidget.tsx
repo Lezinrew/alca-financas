@@ -15,12 +15,32 @@ interface Message {
 }
 
 const isDevelopment = import.meta.env.DEV;
-const CHATBOT_API_URL = isDevelopment
-  ? 'http://127.0.0.1:8100/api/chat'
-  : 'https://chat.alcahub.com.br/api/chat';
-const CHATBOT_WS_URL = isDevelopment
-  ? 'ws://127.0.0.1:8100/api/chat/ws'
-  : 'wss://chat.alcahub.com.br/api/chat/ws';
+
+// HTTP base:
+// - DEV: http://127.0.0.1:8100/api/chat (fallback)
+// - PROD: origem relativa /api/chat (a menos que VITE_CHAT_API_URL esteja definida)
+const CHAT_HTTP_BASE =
+  (import.meta.env.VITE_CHAT_API_URL as string | undefined) && import.meta.env.VITE_CHAT_API_URL.trim().length
+    ? import.meta.env.VITE_CHAT_API_URL.trim().replace(/\/+$/, '')
+    : isDevelopment
+      ? 'http://127.0.0.1:8100/api/chat'
+      : '/api/chat';
+
+const CHATBOT_API_URL = CHAT_HTTP_BASE;
+
+// WebSocket base:
+// - DEV: ws://127.0.0.1:8100/api/chat/ws
+// - PROD: ws(s)://{host}/api/chat/ws, preservando protocolo da página
+const buildWebSocketUrl = () => {
+  if (isDevelopment) {
+    return 'ws://127.0.0.1:8100/api/chat/ws';
+  }
+  const loc = window.location;
+  const wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${loc.host}/api/chat/ws`;
+};
+
+const CHATBOT_WS_URL = buildWebSocketUrl();
 
 export const ChatWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
