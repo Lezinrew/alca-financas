@@ -243,6 +243,27 @@ def import_transactions():
                         if alias_result:
                             alias_name, alias_type = alias_result
                             alias_category = (alias_name, alias_type)
+                            current_app.logger.debug(
+                                "ImportTransactions: alias aplicado",
+                                extra={
+                                    "user_id": request.user_id,
+                                    "tenant_id": tenant_id,
+                                    "description": tx['description'],
+                                    "tx_type": tx['type'],
+                                    "alias_category_name": alias_name,
+                                    "alias_category_type": alias_type,
+                                },
+                            )
+                        else:
+                            current_app.logger.debug(
+                                "ImportTransactions: nenhum alias encontrado",
+                                extra={
+                                    "user_id": request.user_id,
+                                    "tenant_id": tenant_id,
+                                    "description": tx['description'],
+                                    "tx_type": tx['type'],
+                                },
+                            )
 
                     if alias_category:
                         # Usa categoria padronizada do alias; cor/ícone são derivados pela heurística genérica
