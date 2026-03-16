@@ -1,6 +1,99 @@
 name: Deploy to Production
 
 on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar chave SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Adicionar servidor ao known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sincronizar projeto no servidor
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            set -e
+            cd /var/www/alca-financas
+
+            echo "==> Limpando alterações locais indesejadas"
+            git reset --hard HEAD
+            git clean -fd
+
+            echo "==> Atualizando repositório"
+            git pull origin main
+          EOF
+
+      - name: Buildar frontend e publicar em build/frontend no servidor
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            set -e
+            cd /var/www/alca-financas
+
+            echo "==> Limpando builds antigos"
+            rm -rf frontend/dist build/frontend
+            mkdir -p build/frontend
+
+            echo "==> Buildando frontend com Node em container"
+            docker run --rm \
+              -v /var/www/alca-financas/frontend:/app \
+              -w /app \
+              node:22-alpine \
+              sh -lc "npm install && npm run build"
+
+            echo "==> Copiando dist para build/frontend"
+            cp -a frontend/dist/. build/frontend/
+
+            echo "==> Verificando index final"
+            sed -n '1,20p' build/frontend/index.html
+          EOF
+
+      - name: Rebuild e restart dos containers
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            set -e
+            cd /var/www/alca-financas
+
+            echo "==> Rebuildando backend/openclaw se necessário"
+            docker compose -f docker-compose.prod.yml build
+
+            echo "==> Subindo containers"
+            docker compose -f docker-compose.prod.yml up -d
+
+            echo "==> Forçando recriação do frontend"
+            docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
+
+            echo "==> Status dos containers"
+            docker compose -f docker-compose.prod.yml ps
+          EOF
+
+      - name: Validar HTML servido pelo frontend
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            set -e
+            cd /var/www/alca-financas
+
+            echo "==> index.html servido pelo nginx"
+            docker compose -f docker-compose.prod.yml exec -T frontend sh -lc 'sed -n "1,20p" /usr/share/nginx/html/index.html'
+          EOF
+
+name: Deploy to Production
+
+on:
   workflow_run:
     workflows: ["CI/CD Pipeline - Supabase"]
     types: [completed]
