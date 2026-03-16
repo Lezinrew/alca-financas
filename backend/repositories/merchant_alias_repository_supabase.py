@@ -2,6 +2,7 @@
 Repositório para merchant_category_aliases (mapeia descrição/comerciante -> categoria).
 """
 from typing import Dict, Any, Optional, List
+import unicodedata
 
 from .base_repository_supabase import BaseRepository
 
@@ -12,7 +13,17 @@ class MerchantAliasRepositorySupabase(BaseRepository):
 
     @staticmethod
     def _normalize(text: str) -> str:
-        return (text or "").strip().lower()
+        """
+        Normaliza texto para comparação de aliases:
+        - strip
+        - lower
+        - remove acentos (NFKD)
+        """
+        base = (text or "").strip().lower()
+        if not base:
+            return ""
+        normalized = unicodedata.normalize("NFKD", base)
+        return "".join(ch for ch in normalized if not unicodedata.combining(ch))
 
     def find_all_active(self, category_type: str) -> List[Dict[str, Any]]:
         return self.find_all(
@@ -42,7 +53,9 @@ class MerchantAliasRepositorySupabase(BaseRepository):
         best_alias: Optional[Dict[str, Any]] = None
 
         for alias in aliases:
-            alias_norm = alias.get("normalized_value") or ""
+            # Usa match_value/normalized_value e aplica normalização local
+            alias_source = alias.get("normalized_value") or alias.get("match_value") or ""
+            alias_norm = self._normalize(alias_source)
             match_type = alias.get("match_type") or "contains"
 
             scope_score = 0
