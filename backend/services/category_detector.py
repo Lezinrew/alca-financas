@@ -14,7 +14,9 @@ CATEGORY_KEYWORDS = {
             'bebida', 'bebidas', 'bar', 'boteco', 'cervejaria', 'churrascaria', 'sorveteria',
             'doceria', 'confeitaria', 'fast food', 'comida', 'alimento', 'alimentação',
             'marukame', 'coco bambu', 'dona conce', 'pizza pazza', 'mi garba', 'estripulia',
-            'tradição da roca', 'patio', 'restaurante', 'rest', 'lanche', 'lanches'
+            'tradição da roca', 'patio', 'restaurante', 'rest', 'lanche', 'lanches',
+            # Nubank OFX / mercado
+            'produtos alimen', 'produtos alimem', 'jl produtos', 'lanchonete', 'restaurante '
         ],
         'color': '#FF6B6B',
         'icon': 'basket'
@@ -26,7 +28,9 @@ CATEGORY_KEYWORDS = {
             'ônibus', 'onibus', 'bilhete', 'passagem', 'transporte', 'viagem', 'viagens',
             'aéreo', 'aereo', 'aviao', 'avião', 'hotel', 'hospedagem', 'aluguel de carro',
             'zeppelin', 'tereza cristina', 'quick', 'lagoa santa', 'auto bitts', 'direcao',
-            'direção', 'auto', 'carro', 'moto', 'bicicleta', 'bike'
+            'direção', 'auto', 'carro', 'moto', 'bicicleta', 'bike',
+            # Nubank OFX: compra no débito em posto
+            'compra no débito - posto', 'compra no debito - posto', 'posto mineir'
         ],
         'color': '#4ECDC4',
         'icon': 'car-front'
@@ -57,7 +61,9 @@ CATEGORY_KEYWORDS = {
         'keywords': [
             'escola', 'faculdade', 'universidade', 'curso', 'cursos', 'aula', 'aulas',
             'livro', 'livros', 'material escolar', 'mensalidade', 'matrícula', 'matricula',
-            'ensino', 'educação', 'educacao', 'apostila', 'apostilas'
+            'ensino', 'educação', 'educacao', 'apostila', 'apostilas',
+            # Nubank OFX: instituições educacionais
+            'companhia brasileira de educacao', 'companhia brasileira de educação'
         ],
         'color': '#9B59B6',
         'icon': 'book'
@@ -68,7 +74,9 @@ CATEGORY_KEYWORDS = {
             'ingressos', 'parque', 'parques', 'diversão', 'diversao', 'fator diversoes',
             'jogo', 'jogos', 'videogame', 'playstation', 'xbox', 'nintendo', 'streaming',
             'netflix', 'spotify', 'amazon prime', 'disney', 'hbo', 'youtube premium',
-            'diamond mall', 'shopping', 'loja', 'lojas', 'compras', 'compra'
+            'diamond mall', 'shopping', 'loja', 'lojas', 'compras', 'compra',
+            # Nubank OFX: descrições específicas
+            'gentretenimento'
         ],
         'color': '#F39C12',
         'icon': 'film'
@@ -118,6 +126,37 @@ CATEGORY_KEYWORDS = {
         ],
         'color': '#1ABC9C',
         'icon': 'paw'
+    },
+    'Filhos': {
+        'keywords': [
+            'baby', 'bebê', 'bebe', 'luli baby', 'fralda', 'brinquedo infantil', 'bercinho'
+        ],
+        'color': '#FD7E14',
+        'icon': 'emoji-smile'
+    },
+    'Pix Enviado': {
+        'keywords': [
+            'transferência enviada pelo pix', 'transferencia enviada pelo pix',
+            'pagamento via pix', 'pix enviado'
+        ],
+        'color': '#0EA5E9',
+        'icon': 'arrow-up-right-circle'
+    },
+    'Pix Recebido': {
+        'keywords': [
+            'transferência recebida pelo pix', 'transferencia recebida pelo pix',
+            'pix recebido'
+        ],
+        'color': '#22C55E',
+        'icon': 'arrow-down-left-circle'
+    },
+    'Compras online': {
+        'keywords': [
+            'pix marketplace', 'mercado pago', 'marketplace', 'compra online',
+            'compras online'
+        ],
+        'color': '#8B5CF6',
+        'icon': 'cart'
     },
     'Outros': {
         'keywords': [],
