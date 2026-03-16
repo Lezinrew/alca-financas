@@ -22,37 +22,32 @@ def transactions():
 
     if request.method == 'GET':
         page = int(request.args.get('page', 1))
-        # Aumenta o limite padrão para mostrar mais transações
-        per_page = int(request.args.get('limit', 100))
+        # Limite padrão mais profissional
+        per_page = int(request.args.get('limit', 50))
         
-        # Coleta filtros, removendo valores vazios
-        filters = {}
+        # Coleta filtros em formato avançado
+        filters = {
+            'page': page,
+            'limit': per_page,
+            'month': request.args.get('month'),
+            'year': request.args.get('year'),
+            'date_from': request.args.get('date_from'),
+            'date_to': request.args.get('date_to'),
+            'type': request.args.get('type'),
+            'account_id': request.args.get('account_id'),
+            'account_ids': request.args.get('account_ids'),
+            'category_id': request.args.get('category_id'),
+            'category_ids': request.args.get('category_ids'),
+            'min_amount': request.args.get('min_amount'),
+            'max_amount': request.args.get('max_amount'),
+            'search': request.args.get('search'),
+            'status': request.args.get('status'),
+            'method': request.args.get('method'),
+            'sort': request.args.get('sort'),
+        }
         
-        month = request.args.get('month')
-        if month and month.strip():
-            try:
-                filters['month'] = int(month)
-            except ValueError:
-                pass
-        
-        year = request.args.get('year')
-        if year and year.strip():
-            try:
-                filters['year'] = int(year)
-            except ValueError:
-                pass
-        
-        category_id = request.args.get('category_id')
-        if category_id and category_id.strip():
-            filters['category_id'] = category_id
-        
-        transaction_type = request.args.get('type')
-        if transaction_type and transaction_type.strip():
-            filters['type'] = transaction_type
-        
-        account_id = request.args.get('account_id')
-        if account_id and account_id.strip():
-            filters['account_id'] = account_id
+        # Remove chaves com valores vazios para não poluir o repositório
+        filters = {k: v for k, v in filters.items() if v not in (None, '', [])}
         
         return jsonify(
             service.list_transactions(
