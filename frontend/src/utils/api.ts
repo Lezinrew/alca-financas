@@ -171,6 +171,16 @@ export const transactionsAPI = {
     });
     return api.get(`/transactions?${params.toString()}`);
   },
+  getFacets: (filters: Record<string, any> = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach((key) => {
+      const value = filters[key];
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    return api.get(`/transactions/facets?${params.toString()}`);
+  },
   create: (transactionData: any) => api.post('/transactions', transactionData),
   update: (id: string, transactionData: any) => api.put(`/transactions/${id}`, transactionData),
   delete: (id: string) => api.delete(`/transactions/${id}`),

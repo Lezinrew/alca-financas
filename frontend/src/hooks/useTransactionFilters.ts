@@ -29,26 +29,36 @@ export function useTransactionFilters() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const filters: TransactionFilterState = useMemo(() => {
+    // Primeiro tenta URL; se vazia, tenta último estado salvo em localStorage
+    const hasUrlFilters =
+      Array.from(searchParams.keys()).length > 0;
+    const savedRaw = !hasUrlFilters
+      ? window.localStorage.getItem('transactions_filters_v1')
+      : null;
+    const saved = savedRaw ? (JSON.parse(savedRaw) as Partial<TransactionFilterState>) : {};
+
+    const get = (key: string) => searchParams.get(key) || (saved as any)?.[key];
+
     return {
       datePreset: (searchParams.get('date_preset') as any) || 'this_month',
-      dateFrom: searchParams.get('date_from') || undefined,
-      dateTo: searchParams.get('date_to') || undefined,
+      dateFrom: get('date_from') || undefined,
+      dateTo: get('date_to') || undefined,
       types: parseList(searchParams.get('types')) as any,
       accountIds: parseList(searchParams.get('account_ids')),
       categoryIds: parseList(searchParams.get('category_ids')),
-      minAmount: searchParams.get('min_amount')
-        ? Number(searchParams.get('min_amount'))
+      minAmount: get('min_amount')
+        ? Number(get('min_amount'))
         : undefined,
-      maxAmount: searchParams.get('max_amount')
-        ? Number(searchParams.get('max_amount'))
+      maxAmount: get('max_amount')
+        ? Number(get('max_amount'))
         : undefined,
-      search: searchParams.get('search') || undefined,
-      method: searchParams.get('method') || undefined,
-      status: searchParams.get('status') || undefined,
-      isRecurring: searchParams.get('is_recurring') === 'true' || undefined,
-      page: Number(searchParams.get('page') || 1),
-      limit: Number(searchParams.get('limit') || 50),
-      sort: searchParams.get('sort') || 'date:desc',
+      search: get('search') || undefined,
+      method: get('method') || undefined,
+      status: get('status') || undefined,
+      isRecurring: get('is_recurring') === 'true' || undefined,
+      page: Number(searchParams.get('page') || saved.page || 1),
+      limit: Number(searchParams.get('limit') || saved.limit || 50),
+      sort: searchParams.get('sort') || (saved.sort as string) || 'date:desc',
     };
   }, [searchParams]);
 
@@ -74,6 +84,16 @@ export function useTransactionFilters() {
     if (next.sort !== 'date:desc') nextParams.sort = next.sort;
 
     setSearchParams(nextParams);
+
+    // Persistência em localStorage (estado bruto)
+    try {
+      window.localStorage.setItem(
+        'transactions_filters_v1',
+        JSON.stringify(next),
+      );
+    } catch {
+      // ignore
+    }
   };
 
   const clearFilters = () => {

@@ -232,12 +232,16 @@ class TransactionRepository(BaseRepository):
             if params.get("is_recurring") in (True, "true", "1", 1):
                 query = query.eq("is_recurring", True)
 
-            # Busca textual simples em description
+            # Busca textual em múltiplos campos (description, merchant_name, notes)
             search = params.get("search")
             if search:
                 s = str(search).strip()
                 if s:
-                    query = query.ilike("description", f"%{s}%")
+                    pattern = f"%{s}%"
+                    # Usa OR em múltiplas colunas quando suportado
+                    query = query.or_(
+                        f"description.ilike.{pattern},merchant_name.ilike.{pattern},notes.ilike.{pattern}"
+                    )
 
             # Ordenação
             sort_raw = params.get("sort") or "date:desc"

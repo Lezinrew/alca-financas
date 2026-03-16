@@ -7,6 +7,7 @@ import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
 import { TransactionFilters as TransactionFiltersBar } from './TransactionFilters';
 import { FilterChipsBar } from './FilterChipsBar';
+import { QuickFilters } from './QuickFilters';
 import {
   TransactionCategory,
   TransactionRecord,
@@ -25,6 +26,11 @@ const Transactions = () => {
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
+  const [facets, setFacets] = useState<{
+    categories: Array<{ id: string; name: string; count: number }>;
+    accounts: Array<{ id: string; name: string; count: number }>;
+    types: Array<{ type: string; count: number }>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -114,7 +120,16 @@ const Transactions = () => {
           id: String(c.id),
         }));
 
-      setCategories(validCategories);
+      // Enriquecer categorias com contagem (facets)
+      if (facets?.categories?.length) {
+        const withCounts = validCategories.map((cat) => {
+          const facet = facets.categories.find((f) => f.id === cat.id);
+          return facet ? { ...cat, count: facet.count } : cat;
+        });
+        setCategories(withCounts as any);
+      } else {
+        setCategories(validCategories);
+      }
 
       // Processa contas (se foram carregadas com sucesso)
       if (accountsRes) {
@@ -140,7 +155,16 @@ const Transactions = () => {
             index === self.findIndex((a: any) => a.id === acc.id)
           );
         
-        setAccounts(activeAccounts);
+        // Enriquecer contas com contagem (facets)
+        if (facets?.accounts?.length) {
+          const withCounts = activeAccounts.map((acc: any) => {
+            const facet = facets.accounts.find((f) => f.id === acc.id);
+            return facet ? { ...acc, count: facet.count } : acc;
+          });
+          setAccounts(withCounts);
+        } else {
+          setAccounts(activeAccounts);
+        }
       } else {
         // Se não conseguiu carregar, mantém o array vazio
         setAccounts([]);
@@ -160,7 +184,30 @@ const Transactions = () => {
   useEffect(() => {
     // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
     if (isAuthenticated && !authLoading) {
-      loadData();
+      // Primeiro carrega facets para enriquecer filtros, depois dados
+      const fetchFacetsAndData = async () => {
+        try {
+          const facetsRes = await transactionsAPI.getFacets({
+            date_from: filters.dateFrom,
+            date_to: filters.dateTo,
+            types: filters.types.join(','),
+            account_ids: filters.accountIds.join(','),
+            category_ids: filters.categoryIds.join(','),
+            min_amount: filters.minAmount,
+            max_amount: filters.maxAmount,
+            search: filters.search,
+            method: filters.method,
+            status: filters.status,
+            is_recurring: filters.isRecurring,
+          });
+          setFacets(facetsRes.data);
+        } catch (e) {
+          console.warn('Erro ao carregar facets de transações (não crítico):', e);
+          setFacets(null);
+        }
+        await loadData();
+      };
+      fetchFacetsAndData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, isAuthenticated, authLoading]);
@@ -303,6 +350,8 @@ const Transactions = () => {
         accounts={accounts}
       />
 
+      <QuickFilters filters={filters} onChange={updateFilters} />
+
       <FilterChipsBar
         filters={filters}
         onChange={updateFilters}
@@ -315,6 +364,7 @@ const Transactions = () => {
         transactions={transactions}
         onEdit={handleEditTransaction}
         onDelete={handleDeleteTransaction}
+        loading={loading}
       />
 
       {/* Modal do Formulário */}

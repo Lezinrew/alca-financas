@@ -183,6 +183,106 @@ def import_transactions():
         
         if not parsed_transactions:
             return jsonify({'error': 'Nenhuma transação encontrada no arquivo'}), 400
+
+
+@bp.route('/facets', methods=['GET'])
+@require_auth
+@require_tenant
+def transactions_facets():
+  """
+  Retorna contadores agregados de categorias, contas e tipos
+  para enriquecer a UX de filtros.
+  """
+  transaction_repo = current_app.config['TRANSACTIONS']
+  categories_repo = current_app.config['CATEGORIES']
+  accounts_repo = current_app.config['ACCOUNTS']
+  service = TransactionService(transaction_repo, categories_repo, accounts_repo)
+
+  # Reaproveita lógica de filtros avançados (sem paginação)
+  filters = {
+      'date_from': request.args.get('date_from'),
+      'date_to': request.args.get('date_to'),
+      'month': request.args.get('month'),
+      'year': request.args.get('year'),
+      'type': request.args.get('type'),
+      'account_ids': request.args.get('account_ids'),
+      'category_ids': request.args.get('category_ids'),
+      'min_amount': request.args.get('min_amount'),
+      'max_amount': request.args.get('max_amount'),
+      'search': request.args.get('search'),
+      'status': request.args.get('status'),
+      'method': request.args.get('method'),
+      'is_recurring': request.args.get('is_recurring'),
+      # Não usamos paginação aqui
+  }
+
+  # Busca dados brutos com limites razoáveis (apenas ids relevantes)
+  from database.connection import get_supabase
+
+  supabase = get_supabase()
+  base = supabase.table('transactions').select(
+      'id, category_id, account_id, type',
+  ).eq('user_id', request.user_id)
+
+  tenant_id = getattr(request, 'tenant_id', None)
+  if tenant_id:
+      base = base.eq('tenant_id', tenant_id)
+
+  # Aplica filtros principais de período / tipo / método, etc, de forma similar a find_advanced
+  params = {k: v for k, v in filters.items() if v not in (None, '', [])}
+  from repositories.transaction_repository_supabase import TransactionRepository
+  tmp_repo = TransactionRepository()
+  # Reutiliza find_advanced parcialmente: chamamos com limit grande e depois agregamos aqui
+  adv = tmp_repo.find_advanced(request.user_id, {**params, 'limit': 5000}, tenant_id=tenant_id)
+  data = adv.get('data') or []
+
+  # Agregações em memória (para o subconjunto filtrado)
+  from collections import Counter
+
+  cat_counter = Counter()
+  acc_counter = Counter()
+  type_counter = Counter()
+
+  for tx in data:
+      if tx.get('category_id'):
+          cat_counter[tx['category_id']] += 1
+      if tx.get('account_id'):
+          acc_counter[tx['account_id']] += 1
+      if tx.get('type'):
+          type_counter[tx['type']] += 1
+
+  # Resolve nomes de categorias e contas
+  categories = []
+  if cat_counter:
+      cat_ids = list(cat_counter.keys())
+      for cid in cat_ids:
+          cat = categories_repo.find_by_id(cid) if hasattr(categories_repo, 'find_by_id') else None
+          if cat:
+              categories.append({
+                  'id': cid,
+                  'name': cat.get('name', ''),
+                  'count': cat_counter[cid],
+              })
+
+  accounts = []
+  if acc_counter:
+      acc_ids = list(acc_counter.keys())
+      for aid in acc_ids:
+          acc = accounts_repo.find_by_id(aid) if hasattr(accounts_repo, 'find_by_id') else None
+          if acc:
+              accounts.append({
+                  'id': aid,
+                  'name': acc.get('name', ''),
+                  'count': acc_counter[aid],
+              })
+
+  types = [{'type': t, 'count': c} for t, c in type_counter.items()]
+
+  return jsonify({
+      'categories': categories,
+      'accounts': accounts,
+      'types': types,
+  })
         
         # Importa serviço de detecção de categorias
         from services.category_detector import detect_category_from_description, get_or_create_category
