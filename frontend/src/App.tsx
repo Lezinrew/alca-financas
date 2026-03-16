@@ -25,6 +25,10 @@ const Import = lazy(() => import('./components/import/Import'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Accounts = lazy(() => import('./components/accounts/Accounts'));
 const Planning = lazy(() => import('./components/planning/Planning'));
+const Goals = lazy(() => import('./components/goals/Goals'));
+const GoalDetail = lazy(() => import('./components/goals/GoalDetail'));
+const NewGoal = lazy(() => import('./components/goals/NewGoal'));
+const EditGoal = lazy(() => import('./components/goals/EditGoal'));
 const CreditCards = lazy(() => import('./components/credit-cards/CreditCards'));
 const CreditCardDetail = lazy(() => import('./components/credit-cards/CreditCardDetail'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -131,6 +135,10 @@ const AppRoutes: React.FC = () => {
           <Route path="categories" element={<Categories />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="planning" element={<Planning />} />
+          <Route path="goals" element={<Goals />} />
+          <Route path="goals/new" element={<NewGoal />} />
+          <Route path="goals/:goalId" element={<GoalDetail />} />
+          <Route path="goals/:goalId/edit" element={<EditGoal />} />
           <Route path="credit-cards" element={<CreditCards />} />
           <Route path="credit-cards/:cardId" element={<CreditCardDetail />} />
           <Route path="reports" element={<Reports />} />

@@ -18,6 +18,8 @@ from services.planning_constants import (
     ALERT_UNPLANNED_EXPENSE,
     ALERT_ABOVE_BUDGET,
     ALERT_CLOSE_TO_LIMIT,
+    ALERT_STRONG_SAVINGS,
+    STRONG_SAVINGS_RATE_THRESHOLD,
 )
 
 
@@ -186,6 +188,14 @@ def get_planning_month_payload(
 
     expense_categories.sort(key=lambda x: -x["spent_amount"])
     income_categories.sort(key=lambda x: -x["received_amount"])
+
+    if real_income > 0 and savings_rate >= STRONG_SAVINGS_RATE_THRESHOLD:
+        alerts.append({
+            "type": ALERT_STRONG_SAVINGS,
+            "category_id": "",
+            "category_name": "Mês com boa economia",
+            "savings_rate": round(savings_rate, 2),
+        })
 
     return {
         "period": {"year": year, "month": month},

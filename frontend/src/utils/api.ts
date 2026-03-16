@@ -241,6 +241,7 @@ export interface PlanningAlert {
   category_name: string;
   spent_amount?: number;
   planned_amount?: number;
+  savings_rate?: number;
 }
 
 export interface PlanningMonthResponse {
@@ -273,6 +274,73 @@ export const planningAPI = {
   }) => api.post('/planning/month', data),
   getMonthCategories: () => api.get<PlanningCategoriesResponse>('/planning/month/categories'),
   deletePlanLine: (planId: string) => api.delete(`/planning/month/${planId}`),
+};
+
+// Metas (Goals)
+export interface Goal {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  target_amount: number;
+  current_amount: number;
+  target_date?: string;
+  image_url?: string;
+  status: 'active' | 'completed' | 'paused';
+  created_at: string;
+  updated_at: string;
+  progress_percent?: number;
+  remaining_amount?: number;
+  months_remaining?: number | null;
+  monthly_needed?: number | null;
+}
+
+export interface GoalContribution {
+  id: string;
+  goal_id: string;
+  tenant_id: string;
+  user_id: string;
+  amount: number;
+  date: string;
+  source_type?: string;
+  source_reference_id?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export const goalsAPI = {
+  list: (status?: string) =>
+    api.get<Goal[]>(status ? `/goals?status=${status}` : '/goals'),
+  get: (id: string) => api.get<Goal>(`/goals/${id}`),
+  create: (data: {
+    title: string;
+    description?: string;
+    target_amount: number;
+    current_amount?: number;
+    target_date?: string;
+    image_url?: string;
+    status?: string;
+  }) => api.post<Goal>('/goals', data),
+  update: (id: string, data: Partial<{
+    title: string;
+    description: string;
+    target_amount: number;
+    current_amount: number;
+    target_date: string;
+    image_url: string;
+    status: string;
+  }>) => api.put<Goal>(`/goals/${id}`, data),
+  delete: (id: string) => api.delete(`/goals/${id}`),
+  listContributions: (goalId: string) =>
+    api.get<GoalContribution[]>(`/goals/${goalId}/contributions`),
+  addContribution: (goalId: string, data: {
+    amount: number;
+    date?: string;
+    source_type?: string;
+    source_reference_id?: string;
+    notes?: string;
+  }) => api.post<GoalContribution>(`/goals/${goalId}/contributions`, data),
 };
 
 // Funções do dashboard

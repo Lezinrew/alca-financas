@@ -21,3 +21,7 @@ INCOME_STATUS_EXCEEDED_TARGET = "exceeded_target"  # received > planned
 ALERT_UNPLANNED_EXPENSE = "unplanned_expense"
 ALERT_ABOVE_BUDGET = "above_budget"
 ALERT_CLOSE_TO_LIMIT = "close_to_limit"
+ALERT_STRONG_SAVINGS = "strong_savings_month"
+
+# Insight: consider "strong savings" when rate >= this (percent)
+STRONG_SAVINGS_RATE_THRESHOLD = 20.0
