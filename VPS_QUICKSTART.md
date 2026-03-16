@@ -2,12 +2,12 @@
 
 ## Resumo Executivo
 
-Deploy da aplicação no seu VPS Hostinger usando o domínio alcahub.com.br.
+Deploy da aplicação no seu VPS Hostinger usando o domínio alcahub.cloud.
 
 **URLs finais:**
-- Frontend: https://alcahub.com.br (Principal)
+- Frontend: https://alcahub.cloud (Principal)
 - Frontend: https://alcahub.cloud (Novo)
-- Backend API: https://api.alcahub.com.br
+- Backend API: https://alcahub.cloud/api
 - Backend API: https://api.alcahub.cloud
 
 ---
@@ -34,30 +34,30 @@ Cole o conteúdo de `VPS_BACKEND_ENV.txt` (no seu projeto local).
 
 **API (backend):**
 ```bash
-sudo nano /etc/nginx/sites-available/api.alcahub.com.br
+sudo nano /etc/nginx/sites-available/api.alcahub.cloud
 ```
 ```nginx
-server_name api.alcahub.com.br api.alcahub.cloud;
+server_name api.alcahub.cloud api.alcahub.cloud;
 ```
 
 **Frontend:**
 ```bash
-sudo nano /etc/nginx/sites-available/alcahub.com.br
+sudo nano /etc/nginx/sites-available/alcahub.cloud
 ```
 ```nginx
-server_name alcahub.com.br www.alcahub.com.br alcahub.cloud www.alcahub.cloud;
+server_name alcahub.cloud www.alcahub.cloud alcahub.cloud www.alcahub.cloud;
 ```
 
 Ativar:
 ```bash
-sudo ln -s /etc/nginx/sites-available/api.alcahub.com.br /etc/nginx/sites-enabled/
-sudo ln -s /etc/nginx/sites-available/alcahub.com.br /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/api.alcahub.cloud /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/alcahub.cloud /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ### Passo 4: Configurar DNS (No Hostinger hPanel para AMBOS os domínios)
 
-Adicionar registros A em `alcahub.com.br` e `alcahub.cloud`:
+Adicionar registros A em `alcahub.cloud` e `alcahub.cloud`:
 ```
 @ -> 76.13.239.220
 www -> 76.13.239.220
@@ -71,7 +71,7 @@ Na sua máquina local:
 cd frontend
 
 # Criar .env.production
-# Use api.alcahub.cloud (novo) ou api.alcahub.com.br (antigo)
+# Use api.alcahub.cloud (novo) ou api.alcahub.cloud (antigo)
 cat > .env.production << EOF
 VITE_API_URL=https://api.alcahub.cloud
 VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
@@ -83,7 +83,7 @@ npm install
 npm run build
 
 # Upload
-rsync -avz --delete dist/ alcaapp@76.13.239.220:/var/www/alcahub.com.br/
+rsync -avz --delete dist/ alcaapp@76.13.239.220:/var/www/alcahub.cloud/
 ```
 
 ### Passo 6: Iniciar backend
@@ -98,20 +98,20 @@ sudo supervisorctl status
 
 ```bash
 # Frontend (Todos os domínios)
-sudo certbot --nginx -d alcahub.com.br -d www.alcahub.com.br -d alcahub.cloud -d www.alcahub.cloud
+sudo certbot --nginx -d alcahub.cloud -d www.alcahub.cloud -d alcahub.cloud -d www.alcahub.cloud
 
 # API (Todos os domínios)
-sudo certbot --nginx -d api.alcahub.com.br -d api.alcahub.cloud
+sudo certbot --nginx -d api.alcahub.cloud -d api.alcahub.cloud
 ```
 
 ### Passo 8: Testar
 
 ```bash
 # Backend
-curl https://api.alcahub.com.br/api/health
+curl https://alcahub.cloud/api/api/health
 
 # Frontend
-# Abrir no navegador: https://alcahub.com.br
+# Abrir no navegador: https://alcahub.cloud
 ```
 
 ---
@@ -135,8 +135,8 @@ VPS_IP=76.13.239.220 ./scripts/deploy-vps.sh frontend
 
 ## Checklist de Validação
 
-- [ ] Backend health check OK: `curl https://api.alcahub.com.br/api/health`
-- [ ] Frontend carrega: https://alcahub.com.br
+- [ ] Backend health check OK: `curl https://alcahub.cloud/api/api/health`
+- [ ] Frontend carrega: https://alcahub.cloud
 - [ ] HTTPS funcionando (cadeado verde)
 - [ ] Login funciona
 - [ ] Dashboard mostra dados
@@ -158,8 +158,8 @@ tail -f /var/log/alca-backend.log
 
 **DNS não propaga:**
 ```bash
-nslookup alcahub.com.br
-nslookup api.alcahub.com.br
+nslookup alcahub.cloud
+nslookup api.alcahub.cloud
 ```
 
 **Nginx erro:**

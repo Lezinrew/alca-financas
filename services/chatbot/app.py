@@ -21,6 +21,7 @@ DEFAULT_GREETING = (
 
 # Configuração
 JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY", "dev-secret-key"))
+# API_BASE_URL deve apontar para o backend (em dev usamos localhost; em produção, variável de ambiente).
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8001")
 
 security = HTTPBearer()
@@ -48,8 +49,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://app.alcahub.com.br",
-        "https://alcahub.com.br",
+        "https://alcahub.cloud",
+        "https://www.alcahub.cloud",
         "http://localhost:5173",
         "http://localhost:3000",
     ],

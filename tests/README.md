@@ -32,7 +32,7 @@ chmod +x tests/scripts/quick-test.sh
 ./tests/scripts/quick-test.sh
 
 # Executar (outro servidor)
-./tests/scripts/quick-test.sh https://api.alcahub.com.br/api
+./tests/scripts/quick-test.sh https://alcahub.cloud/api
 ```
 
 **Saída esperada**:
@@ -70,7 +70,7 @@ chmod +x tests/scripts/full-test.py
 python3 tests/scripts/full-test.py
 
 # Executar (outro servidor)
-python3 tests/scripts/full-test.py https://api.alcahub.com.br/api
+python3 tests/scripts/full-test.py https://alcahub.cloud/api
 ```
 
 **Saída esperada**:
@@ -154,7 +154,7 @@ k6 run load-test.js
 k6 run --vus 50 --duration 2m load-test.js
 
 # Executar contra servidor externo
-API_URL=https://api.alcahub.com.br/api k6 run load-test.js
+API_URL=https://alcahub.cloud/api k6 run load-test.js
 ```
 
 **Saída esperada**:

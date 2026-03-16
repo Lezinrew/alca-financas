@@ -48,7 +48,7 @@ FRONTEND_URL=http://localhost:3000
 
 - Em **desenvolvimento** com o script: use `http://localhost:3000` (frontend na porta 3000).
 - Se rodar o Vite em outra porta (ex.: 5173), use `http://localhost:5173`.
-- Em **produção**: use a URL pública do frontend (ex.: `https://alcahub.com.br`).
+- Em **produção**: use a URL pública do frontend (ex.: `https://alcahub.cloud`).
 
 Reinicie o backend após alterar o `.env`.
 

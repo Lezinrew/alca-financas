@@ -147,7 +147,7 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173,...
 
 ```python
 # Permite apenas domínio oficial
-CORS_ORIGINS=https://alcahub.com.br,https://www.alcahub.com.br
+CORS_ORIGINS=https://alcahub.cloud,https://www.alcahub.com.br
 ```
 
 **Nunca use `*` em produção!**

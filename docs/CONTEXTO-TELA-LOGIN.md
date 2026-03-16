@@ -88,7 +88,7 @@ Resumo: para “Esqueci a senha” funcionar de verdade, falta: rota + tela “E
 
 - **Frontend:** `VITE_API_URL` (ou `REACT_APP_BACKEND_URL`) deve apontar para o backend (ex.: `http://localhost:8001` em dev).
 - **Backend:** `CORS_ORIGINS` deve incluir a origem do frontend (ex.: `http://localhost:5173`). Com `*` o app usa fallback para localhost.
-- **Google OAuth:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, e no Google Cloud Console o redirect URI do callback (ex.: `https://api.alcahub.com.br/api/auth/google/callback` ou equivalente em dev).
+- **Google OAuth:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, e no Google Cloud Console o redirect URI do callback (ex.: `https://alcahub.cloud/api/api/auth/google/callback` ou equivalente em dev).
 
 ---
 

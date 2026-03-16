@@ -23,10 +23,10 @@ Este guia explica como configurar login social (OAuth) com Google, Microsoft e A
    - **Name**: Alça Finanças
    - **Authorized JavaScript origins**: 
      - `http://localhost:3000` (desenvolvimento)
-     - `https://alcahub.com.br` (produção)
+     - `https://alcahub.cloud` (produção)
    - **Authorized redirect URIs**:
      - `http://localhost:3000/api/auth/google/callback` (desenvolvimento)
-     - `https://alcahub.com.br/api/auth/google/callback` (produção)
+     - `https://alcahub.cloud/api/auth/google/callback` (produção)
 
 ### 2. Obter Credenciais
 
@@ -47,7 +47,7 @@ GOOGLE_CLIENT_SECRET=seu-client-secret
 
 ```bash
 # No servidor
-ssh root@alcahub.com.br
+ssh root@alcahub.cloud
 systemctl restart alca-financas
 ```
 
@@ -88,7 +88,7 @@ O login com Apple ainda não está implementado no backend. Para implementar:
 ### Atualizar .env no Servidor
 
 ```bash
-ssh root@alcahub.com.br
+ssh root@alcahub.cloud
 nano /var/www/alca-financas/backend/.env
 ```
 
@@ -115,7 +115,7 @@ journalctl -u alca-financas -f
 
 ## ✅ Testar OAuth
 
-1. Acesse: `https://alcahub.com.br/register`
+1. Acesse: `https://alcahub.cloud/register`
 2. Clique em "Continuar com Google"
 3. Você será redirecionado para o Google
 4. Após autorizar, será redirecionado de volta e logado automaticamente
@@ -132,7 +132,7 @@ journalctl -u alca-financas -f
 ### Erro: "redirect_uri_mismatch"
 
 - Verifique se o redirect URI no Google Cloud Console corresponde exatamente ao usado
-- Deve ser: `https://alcahub.com.br/api/auth/google/callback`
+- Deve ser: `https://alcahub.cloud/api/auth/google/callback`
 
 ### Microsoft/Apple retornam erro 501
 

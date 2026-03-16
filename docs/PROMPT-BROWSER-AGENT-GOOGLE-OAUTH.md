@@ -11,9 +11,9 @@ Você é um assistente especializado em configurar OAuth 2.0 no Google Cloud Con
 
 OBJETIVO:
 Configurar autenticação OAuth do Google para a aplicação "Alça Finanças" que roda em:
-- Domínio de produção: https://alcahub.com.br
-- API endpoint: https://api.alcahub.com.br
-- Callback URL: https://api.alcahub.com.br/api/auth/google/callback
+- Domínio de produção: https://alcahub.cloud
+- API endpoint: https://alcahub.cloud/api
+- Callback URL: https://alcahub.cloud/api/api/auth/google/callback
 
 TAREFAS A EXECUTAR (em ordem):
 
@@ -49,8 +49,8 @@ TAREFAS A EXECUTAR (em ordem):
    - Preencha:
      * Nome: "Alca Finanças Web Client"
      * URIs de redirecionamento autorizados (Authorized redirect URIs):
-       - https://api.alcahub.com.br/api/auth/google/callback
-       - https://alcahub.com.br/api/auth/google/callback
+       - https://alcahub.cloud/api/api/auth/google/callback
+       - https://alcahub.cloud/api/auth/google/callback
        - http://localhost:8001/api/auth/google/callback
      * (Adicione cada URI em uma linha separada)
    - Clique em "CRIAR" (ou "Create")
@@ -94,8 +94,8 @@ Configure OAuth 2.0 no Google Cloud Console para "Alça Finanças":
 1. Acesse console.cloud.google.com e crie/selecione projeto "Alca Financas"
 2. Configure Tela de Consentimento OAuth (Externo, nome: "Alça Finanças")
 3. Crie credenciais OAuth 2.0 (Web application) com URIs:
-   - https://api.alcahub.com.br/api/auth/google/callback
-   - https://alcahub.com.br/api/auth/google/callback
+   - https://alcahub.cloud/api/api/auth/google/callback
+   - https://alcahub.cloud/api/auth/google/callback
    - http://localhost:8001/api/auth/google/callback
 4. Capture e exiba GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET
 5. Informe que essas credenciais devem ser adicionadas em /var/www/alca-financas/backend/.env

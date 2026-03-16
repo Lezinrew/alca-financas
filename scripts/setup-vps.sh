@@ -7,7 +7,7 @@ set -e
 
 echo "========================================="
 echo "Setup Inicial - VPS Hostinger"
-echo "alcahub.com.br"
+echo "alcahub.cloud"
 echo "========================================="
 
 # Verificar se está rodando como root
@@ -65,8 +65,8 @@ fi
 ENDSU
 
 echo "[7/8] Criando diretórios..."
-mkdir -p /var/www/alcahub.com.br
-chown -R www-data:www-data /var/www/alcahub.com.br
+mkdir -p /var/www/alcahub.cloud
+chown -R www-data:www-data /var/www/alcahub.cloud
 
 echo "[8/8] Configurando Supervisor..."
 cat > /etc/supervisor/conf.d/alca-backend.conf << 'EOF'
@@ -98,19 +98,19 @@ echo "2. Iniciar backend:"
 echo "   supervisorctl start alca-backend"
 echo ""
 echo "3. Configurar Nginx para API:"
-echo "   nano /etc/nginx/sites-available/api.alcahub.com.br"
+echo "   nano /etc/nginx/sites-available/api.alcahub.cloud"
 echo "   (Copie config do guia DEPLOY_VPS_HOSTINGER.md)"
 echo ""
 echo "4. Ativar site API:"
-echo "   ln -s /etc/nginx/sites-available/api.alcahub.com.br /etc/nginx/sites-enabled/"
+echo "   ln -s /etc/nginx/sites-available/api.alcahub.cloud /etc/nginx/sites-enabled/"
 echo "   nginx -t && systemctl reload nginx"
 echo ""
 echo "5. Configurar Nginx para Frontend:"
-echo "   nano /etc/nginx/sites-available/alcahub.com.br"
+echo "   nano /etc/nginx/sites-available/alcahub.cloud"
 echo "   (Copie config do guia DEPLOY_VPS_HOSTINGER.md)"
 echo ""
 echo "6. Ativar site Frontend:"
-echo "   ln -s /etc/nginx/sites-available/alcahub.com.br /etc/nginx/sites-enabled/"
+echo "   ln -s /etc/nginx/sites-available/alcahub.cloud /etc/nginx/sites-enabled/"
 echo "   nginx -t && systemctl reload nginx"
 echo ""
 echo "7. Configurar DNS (apontar para este servidor):"
@@ -119,7 +119,7 @@ echo "   A www -> $(curl -s ifconfig.me)"
 echo "   A api -> $(curl -s ifconfig.me)"
 echo ""
 echo "8. Instalar SSL (após DNS propagar):"
-echo "   certbot --nginx -d api.alcahub.com.br"
-echo "   certbot --nginx -d alcahub.com.br -d www.alcahub.com.br"
+echo "   certbot --nginx -d api.alcahub.cloud"
+echo "   certbot --nginx -d alcahub.cloud -d www.alcahub.cloud"
 echo ""
 echo "========================================="

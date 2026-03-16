@@ -56,7 +56,7 @@ Este documento descreve **como** trabalhar dentro desse modelo sem quebrar runti
 - **Chatbot de regras**:
   - Serviço independente: `services/chatbot/app.py` (FastAPI).
   - Usa JWT da aplicação, fala com `API_BASE_URL` (`/api/accounts`, `/api/transactions`, `/api/dashboard`, etc.).
-  - UI Web: `frontend/src/components/chat/ChatWidget.tsx` (HTTP/WS para `chat.alcahub.com.br` ou `127.0.0.1:8100`).
+  - UI Web: `frontend/src/components/chat/ChatWidget.tsx` (HTTP/WS via rotas relativas `/api/chat` e `/api/chat/ws`, ou `127.0.0.1:8100` em dev).
 
 ## 3. Fluxos ponta a ponta (resumo)
 

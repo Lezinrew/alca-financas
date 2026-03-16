@@ -6,7 +6,7 @@
 # =====================================================
 
 # API Backend
-VITE_API_URL=https://api.alcahub.com.br
+VITE_API_URL=https://alcahub.cloud/api
 
 # SUPABASE - Cliente (Public Keys)
 # ⚠️  Substituir pelos valores reais do seu projeto

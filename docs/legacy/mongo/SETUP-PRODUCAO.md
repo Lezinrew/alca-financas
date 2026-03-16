@@ -1,4 +1,4 @@
-# 🚀 Setup de Produção - alcahub.com.br
+# 🚀 Setup de Produção - alcahub.cloud
 
 Guia completo para configurar o ambiente de produção.
 
@@ -31,7 +31,7 @@ Guia completo para configurar o ambiente de produção.
 
 ```bash
 # Conecte ao servidor
-ssh root@alcahub.com.br
+ssh root@alcahub.cloud
 
 # Atualize o sistema
 sudo apt update && sudo apt upgrade -y
@@ -77,7 +77,7 @@ sudo chmod 700 /home/deploy/.ssh
 sudo chmod 600 /home/deploy/.ssh/authorized_keys
 
 # Testar login
-ssh deploy@alcahub.com.br
+ssh deploy@alcahub.cloud
 ```
 
 ### Criar Estrutura de Diretórios
@@ -101,23 +101,23 @@ Configure no seu provedor de DNS:
 
 ```
 # A Records
-alcahub.com.br          A       <IP_DO_SERVIDOR>
-www.alcahub.com.br      A       <IP_DO_SERVIDOR>
-api.alcahub.com.br      A       <IP_DO_SERVIDOR>
+alcahub.cloud          A       <IP_DO_SERVIDOR>
+www.alcahub.cloud      A       <IP_DO_SERVIDOR>
+api.alcahub.cloud      A       <IP_DO_SERVIDOR>
 
 # CNAME (opcional)
-*.alcahub.com.br        CNAME   alcahub.com.br
+*.alcahub.cloud        CNAME   alcahub.cloud
 ```
 
 ### Testar DNS
 
 ```bash
 # Local
-dig alcahub.com.br
-dig api.alcahub.com.br
+dig alcahub.cloud
+dig api.alcahub.cloud
 
 # Ou
-nslookup alcahub.com.br
+nslookup alcahub.cloud
 ```
 
 ---
@@ -127,11 +127,11 @@ nslookup alcahub.com.br
 ### Instalar Certificado
 
 ```bash
-# Para alcahub.com.br
-sudo certbot --nginx -d alcahub.com.br -d www.alcahub.com.br
+# Para alcahub.cloud
+sudo certbot --nginx -d alcahub.cloud -d www.alcahub.cloud
 
-# Para api.alcahub.com.br
-sudo certbot --nginx -d api.alcahub.com.br
+# Para api.alcahub.cloud
+sudo certbot --nginx -d api.alcahub.cloud
 
 # Renovação automática
 sudo certbot renew --dry-run
@@ -146,21 +146,21 @@ sudo nano /etc/nginx/sites-available/alcahub
 Adicione a configuração:
 
 ```nginx
-# Frontend - alcahub.com.br
+# Frontend - alcahub.cloud
 server {
     listen 80;
     listen [::]:80;
-    server_name alcahub.com.br www.alcahub.com.br;
+    server_name alcahub.cloud www.alcahub.cloud;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name alcahub.com.br www.alcahub.com.br;
+    server_name alcahub.cloud www.alcahub.cloud;
 
-    ssl_certificate /etc/letsencrypt/live/alcahub.com.br/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/alcahub.com.br/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/alcahub.cloud/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/alcahub.cloud/privkey.pem;
 
     root /var/www/alcahub/frontend/dist;
     index index.html;
@@ -187,21 +187,21 @@ server {
     }
 }
 
-# Backend API - api.alcahub.com.br
+# Backend API - api.alcahub.cloud
 server {
     listen 80;
     listen [::]:80;
-    server_name api.alcahub.com.br;
+    server_name api.alcahub.cloud;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name api.alcahub.com.br;
+    server_name api.alcahub.cloud;
 
-    ssl_certificate /etc/letsencrypt/live/api.alcahub.com.br/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.alcahub.com.br/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/api.alcahub.cloud/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.alcahub.cloud/privkey.pem;
 
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -296,7 +296,7 @@ sudo systemctl restart mongod
 
 ```bash
 # No servidor
-ssh-keygen -t ed25519 -C "deploy@alcahub.com.br" -f ~/.ssh/deploy_key -N ""
+ssh-keygen -t ed25519 -C "deploy@alcahub.cloud" -f ~/.ssh/deploy_key -N ""
 
 # Ver chave pública (adicione ao authorized_keys)
 cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys
@@ -318,7 +318,7 @@ DOCKER_USERNAME: seu-usuario-docker
 DOCKER_PASSWORD: sua-senha-docker
 
 # Servidor
-PROD_HOST: alcahub.com.br
+PROD_HOST: alcahub.cloud
 PROD_USER: deploy
 PROD_SSH_KEY: |
   -----BEGIN OPENSSH PRIVATE KEY-----
@@ -348,7 +348,7 @@ TELEGRAM_BOT_TOKEN: seu-bot-token
 ### No Servidor
 
 ```bash
-ssh deploy@alcahub.com.br
+ssh deploy@alcahub.cloud
 cd /var/www/alcahub
 
 # Criar .env
@@ -362,8 +362,8 @@ Adicione:
 NODE_ENV=production
 
 # URLs
-PROD_API_URL=https://api.alcahub.com.br
-PROD_WEB_URL=https://alcahub.com.br
+PROD_API_URL=https://api.alcahub.cloud
+PROD_WEB_URL=https://alcahub.cloud
 
 # MongoDB
 MONGO_URI=mongodb+srv://usuario:senha@cluster.mongodb.net/alca_financas
@@ -387,7 +387,7 @@ SMTP_PASS=
 
 # Deploy
 DEPLOY_USER=deploy
-DEPLOY_HOST=alcahub.com.br
+DEPLOY_HOST=alcahub.cloud
 DEPLOY_PATH=/var/www/alcahub
 ```
 
@@ -461,18 +461,18 @@ docker build -t alcahub/backend:latest .
 # 2. Build Frontend
 cd ../frontend
 npm install
-VITE_API_URL=https://api.alcahub.com.br npm run build
+VITE_API_URL=https://api.alcahub.cloud npm run build
 
 # 3. Enviar para servidor
-rsync -avz --delete dist/ deploy@alcahub.com.br:/var/www/alcahub/frontend/dist/
+rsync -avz --delete dist/ deploy@alcahub.cloud:/var/www/alcahub/frontend/dist/
 
 # 4. Docker backend
-docker save alcahub/backend:latest | ssh deploy@alcahub.com.br "docker load"
-ssh deploy@alcahub.com.br "cd /var/www/alcahub && docker-compose up -d"
+docker save alcahub/backend:latest | ssh deploy@alcahub.cloud "docker load"
+ssh deploy@alcahub.cloud "cd /var/www/alcahub && docker-compose up -d"
 
 # 5. Verificar
-curl https://api.alcahub.com.br/api/health
-curl https://alcahub.com.br
+curl https://api.alcahub.cloud/api/health
+curl https://alcahub.cloud
 ```
 
 ---
@@ -506,7 +506,7 @@ git push origin main
 ### Cron Job no Servidor
 
 ```bash
-ssh deploy@alcahub.com.br
+ssh deploy@alcahub.cloud
 
 # Editar crontab
 crontab -e
@@ -547,8 +547,8 @@ sudo journalctl -u nginx -f
 - [StatusCake](https://www.statuscake.com/)
 
 Configure para monitorar:
-- https://alcahub.com.br
-- https://api.alcahub.com.br/api/health
+- https://alcahub.cloud
+- https://api.alcahub.cloud/api/health
 
 ---
 

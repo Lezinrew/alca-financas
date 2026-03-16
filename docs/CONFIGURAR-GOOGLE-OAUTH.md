@@ -6,7 +6,7 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
 
 - Conta Google (Gmail)
 - Acesso ao Google Cloud Console
-- Domínio da aplicação: `alcahub.com.br` (ou seu domínio de produção)
+- Domínio da aplicação: `alcahub.cloud` (ou seu domínio de produção)
 
 ---
 
@@ -50,8 +50,8 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
    - **Nome**: `Alca Finanças Web Client`
    - **URIs de redirecionamento autorizados**:
      ```
-     https://api.alcahub.com.br/api/auth/google/callback
-     https://alcahub.com.br/api/auth/google/callback
+     https://alcahub.cloud/api/api/auth/google/callback
+     https://alcahub.cloud/api/auth/google/callback
      http://localhost:8001/api/auth/google/callback
      ```
      - **Importante**: Adicione todas as URLs onde sua aplicação pode receber o callback do Google
@@ -65,7 +65,7 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
 
 1. Acesse o servidor via SSH:
    ```bash
-   ssh root@alcahub.com.br
+   ssh root@alcahub.cloud
    ```
 
 2. Edite o arquivo `.env` do backend:
@@ -93,7 +93,7 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
 
 ### 6. Testar a Autenticação
 
-1. Acesse: `https://alcahub.com.br/register` ou `https://alcahub.com.br/login`
+1. Acesse: `https://alcahub.cloud/register` ou `https://alcahub.cloud/login`
 2. Clique em **"Continuar com Google"**
 3. Você deve ser redirecionado para a tela de login do Google
 4. Após autorizar, deve retornar para a aplicação logado
@@ -105,7 +105,7 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
 ### Verificar se as credenciais estão configuradas
 
 ```bash
-ssh root@alcahub.com.br
+ssh root@alcahub.cloud
 cat /var/www/alca-financas/backend/.env | grep GOOGLE
 ```
 
@@ -132,7 +132,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxx
 ### Testar endpoint diretamente
 
 ```bash
-curl -I https://api.alcahub.com.br/api/auth/google/login
+curl -I https://alcahub.cloud/api/api/auth/google/login
 ```
 
 Deve retornar `302 Found` com `Location` apontando para `accounts.google.com`.

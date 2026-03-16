@@ -316,7 +316,7 @@ make ci
 
 ```bash
 # Smoke tests pós-deploy
-API="https://api.alcahub.com.br/api"
+API="https://alcahub.cloud/api"
 
 # Health check
 curl -f "$API/health" || echo "Health check FAILED"

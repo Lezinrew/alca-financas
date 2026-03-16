@@ -35,6 +35,7 @@ const localStorageMock = {
 global.localStorage = localStorageMock as any
 
 // Mock environment variables
+// Em produção, VITE_API_URL aponta para o domínio principal (API em /api).
 process.env.VITE_API_URL = process.env.NODE_ENV === 'production'
-  ? 'https://api.alcahub.com.br'
+  ? 'https://alcahub.cloud'
   : 'http://localhost:5000'

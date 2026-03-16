@@ -45,7 +45,7 @@ Como obter:
 
 **PROD_HOST**
 ```
-alcahub.com.br
+alcahub.cloud
 ```
 
 **PROD_USER**
@@ -66,7 +66,7 @@ b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 Como gerar:
 ```bash
 # No servidor
-ssh-keygen -t ed25519 -C "deploy@alcahub.com.br" -f ~/.ssh/deploy_key -N ""
+ssh-keygen -t ed25519 -C "deploy@alcahub.cloud" -f ~/.ssh/deploy_key -N ""
 
 # Adicione a chave pública ao authorized_keys
 cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys
@@ -272,7 +272,7 @@ Se tiver problemas:
 2. Teste conexões manualmente:
    ```bash
    # SSH
-   ssh -i deploy_key deploy@alcahub.com.br
+   ssh -i deploy_key deploy@alcahub.cloud
 
    # Docker
    docker login registry.hub.docker.com

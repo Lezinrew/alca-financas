@@ -25,7 +25,7 @@ FRONTEND_URL=https://alcahub.cloud
 API_BASE_URL=https://api.alcahub.cloud
 
 # CORS - PRODUÇÃO (Suporta múltiplos domínios)
-CORS_ORIGINS=https://alcahub.com.br,https://www.alcahub.com.br,https://alcahub.cloud,https://www.alcahub.cloud
+CORS_ORIGINS=https://alcahub.cloud,https://www.alcahub.com.br,https://alcahub.cloud,https://www.alcahub.cloud
 
 # SERVER CONFIG
 HOST=0.0.0.0

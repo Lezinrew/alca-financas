@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 const isProduction = process.env.TEST_ENV === 'production'
 const baseURL = isProduction
-  ? 'https://alcahub.com.br'
+  ? 'https://alcahub.cloud'
   : 'http://localhost:3000'
 
 export default defineConfig({
