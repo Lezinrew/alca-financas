@@ -265,10 +265,10 @@ def google_login():
     oauth: OAuth = current_app.config['OAUTH']
     google = oauth.create_client('google')
     
-    # Usa a URL base da API (api.alcahub.com.br) para o callback
+    # Usa a URL base da API para o callback (domínio principal + /api)
     # Isso garante que o redirect_uri corresponda ao configurado no Google
-    api_base_url = os.getenv('API_BASE_URL', 'https://api.alcahub.com.br')
-    redirect_uri = f"{api_base_url}/api/auth/google/callback"
+    api_base_url = os.getenv('API_BASE_URL', 'https://alcahub.cloud/api')
+    redirect_uri = f"{api_base_url}/auth/google/callback"
     
     import secrets
     nonce = secrets.token_urlsafe(16)
@@ -281,7 +281,7 @@ def google_login():
 @bp.route('/auth/google/callback', methods=['GET'])
 def google_callback():
     GOOGLE_CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
-    frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.com.br')
+    frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.cloud')
     
     if str(GOOGLE_CLIENT_ID).startswith('placeholder') or not GOOGLE_CLIENT_ID:
         error_html = f"""<!DOCTYPE html>
@@ -306,7 +306,7 @@ def google_callback():
     try:
         oauth: OAuth = current_app.config['OAUTH']
         google = oauth.create_client('google')
-        api_base_url = os.getenv('API_BASE_URL', 'https://api.alcahub.com.br')
+        api_base_url = os.getenv('API_BASE_URL', 'https://alcahub.cloud/api')
         
         # Verifica se há erro na requisição
         error = request.args.get('error')
@@ -415,7 +415,7 @@ def google_callback():
         
         # Redireciona para o frontend com o token e dados do usuário
         # Usa uma página HTML intermediária que processa o token e redireciona
-        frontend_url = os.getenv('FRONTEND_URL', 'https://app.alcahub.com.br')
+        frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.cloud')
         
         # Prepara dados para o frontend
         access_token = jwt_token['access_token']

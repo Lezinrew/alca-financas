@@ -158,5 +158,5 @@ def api_base_url():
     """Get API base URL based on environment"""
     env = os.getenv('NODE_ENV', 'local')
     if env == 'production':
-        return os.getenv('PROD_API_URL', 'https://api.alcahub.com.br')
+        return os.getenv('PROD_API_URL', 'https://alcahub.cloud/api')
     return os.getenv('LOCAL_API_URL', 'http://localhost:5000')

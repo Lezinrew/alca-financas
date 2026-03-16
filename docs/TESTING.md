@@ -131,8 +131,8 @@ MONGO_URL=mongodb://localhost:27017/alca_financas
 **Produção (.env):**
 ```bash
 NODE_ENV=production
-PROD_API_URL=https://api.alcahub.com.br
-PROD_WEB_URL=https://alcahub.com.br
+PROD_API_URL=https://alcahub.cloud/api
+PROD_WEB_URL=https://alcahub.cloud
 PROD_MONGO_URL=mongodb+srv://...
 ```
 

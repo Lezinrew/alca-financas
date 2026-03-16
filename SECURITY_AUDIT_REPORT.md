@@ -47,7 +47,7 @@ Adicionalmente, o backend usa `SUPABASE_SERVICE_ROLE_KEY` que **bypassa completa
 #### Exploração
 ```bash
 # Um usuário autenticado pode fazer:
-curl -X GET https://api.alcahub.com.br/api/transactions \
+curl -X GET https://alcahub.cloud/api/api/transactions \
   -H "Authorization: Bearer <token_usuario_A>" \
   -d "user_id=<usuario_B>"  # Acessa dados de outro usuário
 ```

@@ -81,11 +81,11 @@ Após adicionar o IP, o backend deve conseguir conectar automaticamente. Você p
 
 1. **Verificar logs do backend:**
    ```bash
-   ssh root@alcahub.com.br 'journalctl -u alca-financas -n 20 --no-pager'
+   ssh root@alcahub.cloud 'journalctl -u alca-financas -n 20 --no-pager'
    ```
 
 2. **Testar login com Google:**
-   - Acesse: https://alcahub.com.br/login
+   - Acesse: https://alcahub.cloud/login
    - Clique em "Continuar com Google"
    - O erro 502 deve desaparecer
 
@@ -105,7 +105,7 @@ Procure por mensagens de sucesso na conexão com MongoDB.
 
 ### Método 2: Testar Login
 
-1. Acesse https://alcahub.com.br/login
+1. Acesse https://alcahub.cloud/login
 2. Clique em "Continuar com Google"
 3. Se funcionar, você será redirecionado para o Google e depois de volta para o dashboard
 
@@ -128,7 +128,7 @@ Procure por mensagens de sucesso na conexão com MongoDB.
 3. Verifique se o status está como "Active" (não "Pending")
 4. Reinicie o serviço backend:
    ```bash
-   ssh root@alcahub.com.br 'systemctl restart alca-financas'
+   ssh root@alcahub.cloud 'systemctl restart alca-financas'
    ```
 
 ### Problema 3: Erro "IP not whitelisted"

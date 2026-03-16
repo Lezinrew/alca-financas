@@ -48,7 +48,7 @@ echo -e "${GREEN}🔐 Configurando Google OAuth no servidor...${NC}"
 echo ""
 
 # Configurações do servidor
-SERVER_HOST="alcahub.com.br"
+SERVER_HOST="alcahub.cloud"
 SERVER_USER="root"
 ENV_FILE="/var/www/alca-financas/backend/.env"
 
@@ -107,8 +107,8 @@ echo ""
 echo -e "${GREEN}✅ Configuração concluída!${NC}"
 echo ""
 echo "📋 Próximos passos:"
-echo "   1. Teste o login com Google em: https://alcahub.com.br/login"
+echo "   1. Teste o login com Google em: https://alcahub.cloud/login"
 echo "   2. Verifique os logs se houver problemas:"
-echo "      ssh root@alcahub.com.br 'journalctl -u alca-financas -f'"
+echo "      ssh root@alcahub.cloud 'journalctl -u alca-financas -f'"
 echo ""
 

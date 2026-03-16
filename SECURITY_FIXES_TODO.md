@@ -116,7 +116,7 @@
 **Validação:**
 ```bash
 # Teste manual: tentar acessar dados de outro usuário deve falhar
-curl -X GET "https://api.alcahub.com.br/api/transactions" \
+curl -X GET "https://alcahub.cloud/api/api/transactions" \
   -H "Authorization: Bearer <token_usuario_A>"
 # Deve retornar APENAS transações do usuário A
 ```

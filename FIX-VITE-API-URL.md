@@ -248,7 +248,7 @@ VITE_API_URL=http://localhost:5000
 
 ```bash
 # ✅ Use domínio completo
-VITE_API_URL=https://api.alcahub.com.br
+VITE_API_URL=https://alcahub.cloud/api
 ```
 
 **Nunca commite `.env` com valores de produção!**

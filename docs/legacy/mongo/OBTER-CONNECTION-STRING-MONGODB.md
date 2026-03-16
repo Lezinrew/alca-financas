@@ -239,11 +239,11 @@ Após obter a connection string:
 
 2. **Verificar se o backend iniciou:**
    ```bash
-   ssh root@alcahub.com.br 'systemctl status alca-financas'
+   ssh root@alcahub.cloud 'systemctl status alca-financas'
    ```
 
 3. **Testar o login:**
-   - Acesse: https://alcahub.com.br/login
+   - Acesse: https://alcahub.cloud/login
    - Clique em "Continuar com Google"
    - Deve funcionar! 🎉
 

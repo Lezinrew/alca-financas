@@ -44,7 +44,7 @@ gh auth login
 
 O script vai pedir:
 - Docker username/password
-- Host do servidor (alcahub.com.br)
+- Host do servidor (alcahub.cloud)
 - SSH key
 - Telegram (opcional)
 
@@ -101,7 +101,7 @@ Siga esta ordem:
 ### Parte 1: Infraestrutura (30-60 min)
 
 - [ ] **1.1** Contratar/configurar servidor (DigitalOcean, AWS, Vultr)
-- [ ] **1.2** Configurar DNS (alcahub.com.br → IP do servidor)
+- [ ] **1.2** Configurar DNS (alcahub.cloud → IP do servidor)
 - [ ] **1.3** Instalar Docker no servidor
 - [ ] **1.4** Criar usuário `deploy`
 - [ ] **1.5** Configurar Nginx
@@ -136,7 +136,7 @@ OU configurar manualmente seguindo: `.github/SECRETS-TEMPLATE.md`
 
 ### Parte 4: Variáveis Servidor (5 min)
 
-- [ ] **4.1** SSH no servidor: `ssh deploy@alcahub.com.br`
+- [ ] **4.1** SSH no servidor: `ssh deploy@alcahub.cloud`
 - [ ] **4.2** Criar `.env` em `/var/www/alcahub/.env`
 - [ ] **4.3** Adicionar variáveis (MongoDB, JWT, etc)
 
@@ -147,7 +147,7 @@ OU configurar manualmente seguindo: `.github/SECRETS-TEMPLATE.md`
 - [ ] **5.1** Commit código: `git add . && git commit -m "feat: setup produção"`
 - [ ] **5.2** Push: `git push origin main`
 - [ ] **5.3** Acompanhar: https://github.com/seu-usuario/alca-financas/actions
-- [ ] **5.4** Verificar: https://alcahub.com.br
+- [ ] **5.4** Verificar: https://alcahub.cloud
 
 ---
 
@@ -168,8 +168,8 @@ git push origin main
 gh run watch
 
 # 4. Quando concluir, teste
-curl https://api.alcahub.com.br/api/health
-curl https://alcahub.com.br
+curl https://alcahub.cloud/api/api/health
+curl https://alcahub.cloud
 ```
 
 ---
