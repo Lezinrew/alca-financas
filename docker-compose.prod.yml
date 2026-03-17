@@ -1,6 +1,6 @@
-version: '3.8'
 
 services:
+  # Backend Flask em produção (Supabase + Gunicorn)
   backend:
     build:
       context: .
@@ -24,6 +24,7 @@ services:
     restart: always
     command: gunicorn --bind 0.0.0.0:${BACKEND_PORT:-8001} --workers 4 --timeout 30 app:app
 
+  # Frontend em produção servido por Nginx
   frontend:
     image: nginx:alpine
     volumes:
