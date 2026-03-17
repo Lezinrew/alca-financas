@@ -1,6 +1,5 @@
-version: '3.8'
-
 services:
+  # Ambiente de desenvolvimento: backend com auto-reload + Supabase
   backend:
     build:
       context: .
@@ -26,6 +25,7 @@ services:
     command: python app.py
     restart: unless-stopped
 
+  # Ambiente de desenvolvimento: frontend com Vite (npm run dev)
   frontend:
     build:
       context: .
