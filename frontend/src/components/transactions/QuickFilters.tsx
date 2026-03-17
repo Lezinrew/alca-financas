@@ -24,14 +24,6 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
     });
   };
 
-  const applyMethod = (method: string) => {
-    const already = filters.method === method;
-    onChange({
-      method: already ? undefined : method,
-      page: 1,
-    });
-  };
-
   const pillBase =
     'h-8 px-3 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1';
 
@@ -101,31 +93,6 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         − Despesas
       </button>
 
-      {/* Método rápido */}
-      <button
-        type="button"
-        className={
-          pillBase +
-          (filters.method === 'pix'
-            ? ' bg-violet-500 text-white border-violet-500'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
-        }
-        onClick={() => applyMethod('pix')}
-      >
-        Pix
-      </button>
-      <button
-        type="button"
-        className={
-          pillBase +
-          (filters.method === 'card'
-            ? ' bg-indigo-500 text-white border-indigo-500'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
-        }
-        onClick={() => applyMethod('card')}
-      >
-        Cartão
-      </button>
     </div>
   );
 };

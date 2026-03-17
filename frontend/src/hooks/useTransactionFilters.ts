@@ -53,7 +53,6 @@ export function useTransactionFilters() {
         ? Number(get('max_amount'))
         : undefined,
       search: get('search') || undefined,
-      method: get('method') || undefined,
       status: get('status') || undefined,
       isRecurring: get('is_recurring') === 'true' || undefined,
       page: Number(searchParams.get('page') || saved.page || 1),
@@ -76,7 +75,6 @@ export function useTransactionFilters() {
     if (next.minAmount != null) nextParams.min_amount = String(next.minAmount);
     if (next.maxAmount != null) nextParams.max_amount = String(next.maxAmount);
     if (next.search) nextParams.search = next.search;
-    if (next.method) nextParams.method = next.method;
     if (next.status) nextParams.status = next.status;
     if (next.isRecurring) nextParams.is_recurring = 'true';
     if (next.page !== 1) nextParams.page = String(next.page);
