@@ -54,7 +54,6 @@ const Transactions = () => {
           min_amount: filters.minAmount,
           max_amount: filters.maxAmount,
           search: filters.search,
-          method: filters.method,
           status: filters.status,
           page: filters.page,
           limit: filters.limit,
@@ -196,7 +195,6 @@ const Transactions = () => {
             min_amount: filters.minAmount,
             max_amount: filters.maxAmount,
             search: filters.search,
-            method: filters.method,
             status: filters.status,
             is_recurring: filters.isRecurring,
           });

@@ -63,12 +63,7 @@ export const FilterChipsBar: FC<FilterChipsBarProps> = ({
     });
   }
 
-  if (filters.method) {
-    chips.push({
-      label: `Método: ${filters.method}`,
-      onRemove: () => onChange({ method: undefined, page: 1 }),
-    });
-  }
+  // Filtro de método desativado temporariamente (coluna ainda não existe no banco)
 
   if (filters.isRecurring) {
     chips.push({
@@ -82,13 +77,13 @@ export const FilterChipsBar: FC<FilterChipsBarProps> = ({
   }
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
-      <div className="flex flex-wrap gap-2">
+    <div className="card-base flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4 px-3 py-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {chips.map((chip, idx) => (
           <button
             key={idx}
             type="button"
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-slate-50 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 border border-slate-200/70 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             onClick={chip.onRemove}
           >
             <span>{chip.label}</span>
@@ -98,7 +93,7 @@ export const FilterChipsBar: FC<FilterChipsBarProps> = ({
         {chips.length > 0 && (
           <button
             type="button"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-1"
+            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline ml-1"
             onClick={onClear}
           >
             Limpar tudo
@@ -106,7 +101,7 @@ export const FilterChipsBar: FC<FilterChipsBarProps> = ({
         )}
       </div>
       {typeof total === 'number' && (
-        <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
           {total === 0
             ? 'Nenhuma transação encontrada'
             : `${total} transação${total === 1 ? '' : 's'} encontradas`}

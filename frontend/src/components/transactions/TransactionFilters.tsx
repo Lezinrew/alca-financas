@@ -70,7 +70,10 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
           {/* Período */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-secondary uppercase">
-              {t('transactions.period') || 'Período'}
+              {(() => {
+                const label = t('transactions.period');
+                return label === 'transactions.period' ? 'Período' : label;
+              })()}
             </span>
             <select
               className="select-base h-9"
@@ -87,14 +90,22 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
           {/* Conta (multi em UX simples: still single select, mas pronto para evoluir) */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-secondary uppercase">
-              {t('accounts.title') || 'Conta'}
+              {(() => {
+                const label = t('accounts.title');
+                return label === 'accounts.title' ? 'Conta' : label;
+              })()}
             </span>
             <select
               className="select-base h-9 min-w-[160px]"
               value={filters.accountIds[0] || ''}
               onChange={handleAccountChange}
             >
-              <option value="">{t('common.all') || 'Todas'}</option>
+              <option value="">
+                {(() => {
+                  const label = t('common.all');
+                  return label === 'common.all' ? 'Todas' : label;
+                })()}
+              </option>
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
                   {acc.name}
@@ -107,14 +118,22 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
           {/* Categoria */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-secondary uppercase">
-              {t('categories.title') || 'Categoria'}
+              {(() => {
+                const label = t('categories.title');
+                return label === 'categories.title' ? 'Categoria' : label;
+              })()}
             </span>
             <select
               className="select-base h-9 min-w-[160px]"
               value={filters.categoryIds[0] || ''}
               onChange={handleCategoryChange}
             >
-              <option value="">{t('common.all') || 'Todas'}</option>
+              <option value="">
+                {(() => {
+                  const label = t('common.all');
+                  return label === 'common.all' ? 'Todas' : label;
+                })()}
+              </option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
@@ -246,29 +265,6 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                 <option value="pending">Pendente</option>
                 <option value="overdue">Atrasado</option>
                 <option value="cancelled">Cancelado</option>
-              </select>
-            </div>
-            {/* Método */}
-            <div>
-              <label className="block text-xs font-medium text-secondary mb-1">
-                Método
-              </label>
-              <select
-                className="select-base h-9"
-                value={filters.method || ''}
-                onChange={(e) =>
-                  onChange({
-                    method: e.target.value || undefined,
-                    page: 1,
-                  })
-                }
-              >
-                <option value="">Todos</option>
-                <option value="pix">Pix</option>
-                <option value="card">Cartão</option>
-                <option value="debit">Débito</option>
-                <option value="transfer">Transferência</option>
-                <option value="cash">Dinheiro</option>
               </select>
             </div>
             {/* Recorrente + Ordenação */}

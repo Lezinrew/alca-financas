@@ -42,7 +42,6 @@ def transactions():
             'max_amount': request.args.get('max_amount'),
             'search': request.args.get('search'),
             'status': request.args.get('status'),
-            'method': request.args.get('method'),
             'sort': request.args.get('sort'),
         }
         
@@ -409,7 +408,6 @@ def transactions_facets():
         'max_amount': request.args.get('max_amount'),
         'search': request.args.get('search'),
         'status': request.args.get('status'),
-        'method': request.args.get('method'),
         'is_recurring': request.args.get('is_recurring'),
         # Não usamos paginação aqui
     }

@@ -150,7 +150,6 @@ class TransactionRepository(BaseRepository):
         - min_amount, max_amount
         - search (ilike em description)
         - status
-        - method (quando existir no schema)
         """
         from database.connection import get_supabase
         import logging
@@ -223,10 +222,6 @@ class TransactionRepository(BaseRepository):
             # Status
             if params.get("status"):
                 query = query.eq("status", params["status"])
-
-            # Método (campo opcional no schema)
-            if params.get("method"):
-                query = query.eq("method", params["method"])
 
             # Recorrente
             if params.get("is_recurring") in (True, "true", "1", 1):
