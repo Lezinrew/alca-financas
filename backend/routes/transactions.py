@@ -130,12 +130,12 @@ def import_transactions():
     # Lê o conteúdo do arquivo uma vez
     file_content = file.read()
     
-    # Obtém account_id do formulário (opcional)
+    # Obtém account_id do formulário (opcional, mas obrigatório ao final do fluxo)
     account_id = request.form.get('account_id')
     account_created = False
     created_account_name = None
     
-    # Se não forneceu account_id, tenta detectar/criar automaticamente
+    # Se não forneceu account_id explicitamente, tenta detectar/criar automaticamente
     if not account_id:
         from services.account_detector import (
             extract_account_info_from_ofx,
@@ -162,15 +162,21 @@ def import_transactions():
                     account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
                     created_account_name = account.get('name') if account else None
         except Exception as e:
-            # Se falhar na detecção, continua sem account_id
-            # Mas registra o erro para informar ao usuário
+            # Se falhar na detecção, registra log e segue para validação abaixo
             current_app.logger.warning(f'Falha ao detectar/criar conta automaticamente: {str(e)}')
-            pass
     
-    if account_id:
-        account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
-        if not account or account.get('user_id') != request.user_id:
-            return jsonify({'error': 'Conta não encontrada'}), 404
+    # Política profissional: não permitimos mais importação de transações sem conta associada.
+    # Se, após tentativa de detecção/criação, ainda não houver account_id, abortamos com erro claro.
+    if not account_id:
+        return jsonify({
+            'error': 'Não foi possível identificar a conta de destino para este arquivo. '
+                     'Selecione uma conta antes de importar ou tente novamente com um arquivo compatível.'
+        }), 400
+    
+    # Validação da conta escolhida/detectada
+    account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
+    if not account or account.get('user_id') != request.user_id:
+        return jsonify({'error': 'Conta não encontrada'}), 404
     
     try:
         
@@ -331,35 +337,61 @@ def import_transactions():
                     'status': 'paid',
                     'responsible_person': 'Leandro',
                     'installment_info': None,
+                    # Propaga FITID (quando disponível) para deduplicação e rastreio
+                    'fitid': (tx.get('raw_data') or {}).get('fitid'),
                 }
-                if account_id:
-                    transaction_data['account_id'] = account_id
+                # account_id já foi garantido/validado anteriormente e é obrigatório
+                transaction_data['account_id'] = account_id
                 imported_transactions.append(transaction_data)
             except Exception as e:
                 errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
-        
+
+        duplicates_skipped = 0
+
         if imported_transactions:
-            service.create_many_transactions(imported_transactions)
-            
-            # Atualiza o saldo da conta se account_id foi fornecido
-            # Apenas transações com status 'paid' afetam o saldo atual
-            if account_id:
-                # Calcula o saldo a ser atualizado (apenas transações pagas)
+            # Deduplicação básica por FITID (quando disponível)
+            fitids = sorted(
+                {tx.get('fitid') for tx in imported_transactions if tx.get('fitid')}
+            )
+            existing_fitids = set()
+            if fitids:
+                existing_fitids = set(
+                    transaction_repo.find_existing_fitids(
+                        request.user_id,
+                        account_id,
+                        fitids,
+                        tenant_id=tenant_id,
+                    )
+                )
+
+            deduped_transactions = []
+            for tx in imported_transactions:
+                tx_fitid = tx.get('fitid')
+                if tx_fitid and tx_fitid in existing_fitids:
+                    duplicates_skipped += 1
+                    continue
+                deduped_transactions.append(tx)
+
+            if deduped_transactions:
+                service.create_many_transactions(deduped_transactions)
+
+                # Atualiza o saldo da conta apenas para transações realmente inseridas
                 total_change = 0
-                for tx in imported_transactions:
-                    # Só atualiza saldo se a transação estiver paga
+                for tx in deduped_transactions:
                     if tx.get('status') == 'paid':
                         amount = tx['amount']
                         if tx['type'] == 'expense':
                             amount = -amount
                         total_change += amount
-                
+
                 if total_change != 0:
                     account_service.update_balance(account_id, total_change)
-        
+        else:
+            deduped_transactions = []
+
         result = {
-            'message': f'{len(imported_transactions)} transações importadas com sucesso',
-            'imported_count': len(imported_transactions),
+            'message': f'{len(deduped_transactions)} transações importadas com sucesso',
+            'imported_count': len(deduped_transactions),
             'error_count': len(errors),
             'file_format': file_format,
             'categories_created': len(created_categories),
@@ -367,15 +399,12 @@ def import_transactions():
             'account_created': account_created,
             'account_name': created_account_name,
             'account_id': account_id if account_id else None,
-            'warning': None
+            'duplicates_skipped': duplicates_skipped,
         }
-        
-        # Adiciona aviso se não conseguiu associar a uma conta
-        if not account_id and imported_transactions:
-            result['warning'] = 'As transações foram importadas sem associação a uma conta. Crie uma conta e associe as transações manualmente se necessário.'
+
         if errors:
             result['errors'] = errors
-        return jsonify(result), 201 if imported_transactions else 400
+        return jsonify(result), 201 if deduped_transactions else 400
     except ValidationException as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:

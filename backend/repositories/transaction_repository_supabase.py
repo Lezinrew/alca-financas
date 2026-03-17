@@ -291,6 +291,41 @@ class TransactionRepository(BaseRepository):
             logging.error(f"Erro ao buscar transações recentes: {e}")
             return []
 
+    def find_existing_fitids(
+        self,
+        user_id: str,
+        account_id: str,
+        fitids: List[str],
+        tenant_id: Optional[str] = None,
+    ) -> List[str]:
+        """
+        Retorna a lista de FITIDs já existentes para o par (user_id, account_id) em uma lista fornecida.
+        Usado para deduplicação básica na importação de OFX.
+        """
+        from database.connection import get_supabase
+        import logging
+
+        if not fitids:
+            return []
+
+        try:
+            supabase = get_supabase()
+            query = (
+                supabase.table(self.table_name)
+                .select("fitid")
+                .eq("user_id", user_id)
+                .eq("account_id", account_id)
+                .in_("fitid", fitids)
+            )
+            if tenant_id:
+                query = query.eq("tenant_id", tenant_id)
+            response = query.execute()
+            rows = response.data or []
+            return [row.get("fitid") for row in rows if row.get("fitid")]
+        except Exception as e:
+            logging.error(f"Erro ao buscar FITIDs existentes: {e}")
+            return []
+
     def create_many(self, transactions: List[Dict[str, Any]]) -> List[str]:
         """
         Cria múltiplas transações. Garante account_tenant_id e category_tenant_id = tenant_id.
