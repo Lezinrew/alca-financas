@@ -77,3 +77,4 @@ scripts/db/_exports/
 scripts/insecure-legacy/
 scripts/**/insecure*.sh
 scripts/**/*password*.sh
+backend/.env
