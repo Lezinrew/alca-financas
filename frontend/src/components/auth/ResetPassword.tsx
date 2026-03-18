@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { GradientButton } from '../ui/gradient-button';
 import { Eye, EyeOff, Loader2, Lock } from 'lucide-react';
-import { authAPI } from '../../utils/api';
+import { supabase } from '../../utils/supabaseClient';
 
 const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token') ?? '';
+  const code = searchParams.get('code') ?? '';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,8 +17,25 @@ const ResetPassword: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (!token) setError('Link inválido ou expirado. Solicite um novo link.');
-  }, [token]);
+    // No Supabase, o recovery link pode chegar como `?code=...` (PKCE).
+    // Trocamos o código por sessão para permitir update de senha.
+    const ensureSession = async () => {
+      try {
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href);
+          if (exchangeError) throw exchangeError;
+          return;
+        }
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          setError('Link inválido ou expirado. Solicite um novo link.');
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Link inválido ou expirado. Solicite um novo link.');
+      }
+    };
+    ensureSession();
+  }, [code]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,34 +50,15 @@ const ResetPassword: React.FC = () => {
     }
     setLoading(true);
     try {
-      await authAPI.resetPassword(token, password);
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Não foi possível redefinir a senha. Use o link mais recente do e-mail.');
+      setError(err?.message || 'Não foi possível redefinir a senha. Use o link mais recente do e-mail.');
     } finally {
       setLoading(false);
     }
   };
-
-  if (!token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-login-page p-4">
-        <Card className="card-login w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-xl text-center">Link inválido</CardTitle>
-            <CardDescription className="text-center">
-              Este link de redefinição não é válido ou expirou. Solicite um novo em &quot;Esqueci a senha&quot;.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link to="/forgot-password">Solicitar novo link</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-login-page p-4">

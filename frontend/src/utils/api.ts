@@ -1,6 +1,7 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { getAuthToken, clearAuthStorage } from './tokenStorage';
+import { clearAuthStorage, getAuthToken } from './tokenStorage';
+import { supabase } from './supabaseClient';
 
 // Utilitário para remover barras duplicadas ao final
 const trimTrailingSlashes = (value?: string) => value?.replace(/\/+$/, '') ?? '';
@@ -33,8 +34,11 @@ const api = axios.create({
 
 // Interceptor para adicionar token de autenticação (localStorage ou sessionStorage conforme Lembrar-me)
 api.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken();
+  async (config) => {
+    // Fonte de verdade: sessão do Supabase (Supabase-only).
+    // Fallback: tokenStorage legado (se existir por algum motivo).
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token ?? getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -70,6 +74,7 @@ export const authAPI = {
   resetPassword: (token: string, newPassword: string) =>
     api.post('/auth/reset-password', { token, new_password: newPassword }),
   getMe: () => api.get('/auth/me'),
+  bootstrap: () => api.post('/auth/bootstrap'),
   updateSettings: (settings: any) => api.put('/auth/settings', settings),
   getSettings: () => api.get('/auth/settings'),
   exportBackup: () => api.get('/auth/backup/export'),

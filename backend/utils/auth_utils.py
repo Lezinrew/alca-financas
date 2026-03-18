@@ -1,33 +1,16 @@
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from typing import Optional
 import bcrypt
 import jwt
 import os
 
+from utils.supabase_jwt import verify_supabase_jwt
 
-# Validar JWT_SECRET (não permitir defaults inseguros)
-JWT_SECRET = os.getenv('JWT_SECRET', '').strip()
-if not JWT_SECRET or JWT_SECRET == 'dev-secret-key' or len(JWT_SECRET) < 32:
-    raise RuntimeError(
-        "\n" + "="*60 + "\n"
-        "❌ ERRO CRÍTICO: JWT_SECRET não configurado ou inseguro!\n"
-        + "="*60 + "\n"
-        "JWT_SECRET deve ter pelo menos 32 caracteres.\n"
-        "DEVE ser diferente de SECRET_KEY!\n"
-        "\n"
-        "Para gerar um secret seguro, execute:\n"
-        "  openssl rand -hex 32\n"
-        "\n"
-        "Depois configure no .env:\n"
-        "  JWT_SECRET=<valor_gerado>\n"
-        "\n"
-        "NUNCA use 'dev-secret-key' em produção!\n"
-        + "="*60
-    )
 
-JWT_EXPIRES_HOURS = int(os.getenv('JWT_EXPIRES_HOURS', 24))
+JWT_SECRET = os.getenv("JWT_SECRET", "").strip()  # legado (não usado no Supabase-only)
+JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", 24))
 
 
 def hash_password(password: str) -> str:
@@ -148,18 +131,25 @@ def verify_jwt(token: str):
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
             return jsonify({'error': 'Token de autorização necessário'}), 401
 
-        if token.startswith('Bearer '):
-            token = token[7:]
+        token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
 
-        user_id = verify_jwt(token)
+        try:
+            payload = verify_supabase_jwt(token)
+        except Exception as e:
+            current_app.logger.debug(f"Auth inválida (Supabase JWT): {e}")
+            return jsonify({"error": "Token inválido ou expirado"}), 401
+
+        user_id = payload.get("sub")
         if not user_id:
-            return jsonify({'error': 'Token inválido ou expirado'}), 401
+            return jsonify({"error": "Token inválido ou expirado"}), 401
 
         request.user_id = user_id
+        # Disponibiliza claims para resolução de tenant (se houver tenant_id em claims)
+        setattr(request, "jwt_payload", payload)
         return f(*args, **kwargs)
     return decorated
 
@@ -171,9 +161,13 @@ def admin_required(f):
         if not hasattr(request, 'user_id'):
             return jsonify({'error': 'Autenticação necessária'}), 401
 
-        from flask import current_app
-        users_collection = current_app.config['USERS']
-        user = users_collection.find_one({'_id': request.user_id})
+        users_repo = current_app.config.get("USERS")
+        user = None
+        if users_repo:
+            if hasattr(users_repo, "find_by_id"):
+                user = users_repo.find_by_id(request.user_id)
+            else:
+                user = users_repo.find_one({"id": request.user_id})
         
         if not user or not user.get('is_admin'):
             return jsonify({'error': 'Acesso negado. Requer privilégios de administrador.'}), 403

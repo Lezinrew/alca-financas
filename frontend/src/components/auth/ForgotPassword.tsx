@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { ArrowLeft, Loader2, Mail } from 'lucide-react';
-import { authAPI } from '../../utils/api';
+import { supabase } from '../../utils/supabaseClient';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,10 +17,15 @@ const ForgotPassword: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      await authAPI.forgotPassword(email.trim());
+      const emailTrim = email.trim();
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(emailTrim, {
+        redirectTo,
+      });
+      if (resetError) throw resetError;
       setSent(true);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Não foi possível enviar o e-mail. Tente novamente.');
+      setError(err?.message || 'Não foi possível enviar o e-mail. Tente novamente.');
     } finally {
       setLoading(false);
     }

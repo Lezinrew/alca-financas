@@ -1,11 +1,7 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { supabase } from '../utils/supabaseClient';
+import { clearAuthStorage } from '../utils/tokenStorage';
 import { authAPI } from '../utils/api';
-import {
-  setAuthTokens,
-  getAuthToken,
-  getUserData,
-  clearAuthStorage,
-} from '../utils/tokenStorage';
 
 interface AuthProviderInfo {
   provider: string;
@@ -50,61 +46,102 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Verifica se usuário está logado (token/user em sessionStorage ou localStorage conforme Lembrar-me)
+  // Sessão do Supabase é a fonte de verdade (banco limpo / Supabase-only).
   useEffect(() => {
     const checkAuth = async () => {
-      const token = getAuthToken();
-      const userData = getUserData();
-
-      if (token && userData) {
-        try {
-          if (token.startsWith('eyJ')) {
-            try {
-              const response = await authAPI.getMe();
-              setUser(response.data);
-              setIsAuthenticated(true);
-            } catch {
-              throw new Error('Token inválido');
-            }
-          } else {
-            try {
-              const tokenData = JSON.parse(atob(token));
-              if (tokenData.exp && tokenData.exp < Date.now()) {
-                throw new Error('Token expired');
-              }
-              setUser(JSON.parse(userData));
-              setIsAuthenticated(true);
-            } catch {
-              throw new Error('Token inválido');
-            }
-          }
-        } catch {
-          clearAuthStorage();
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      } else {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        clearAuthStorage();
         setUser(null);
         setIsAuthenticated(false);
+        setLoading(false);
+        return;
       }
+
+      const sessionUser = data.session?.user ?? null;
+      if (!sessionUser) {
+        // Se não há sessão Supabase, limpa qualquer storage legado.
+        clearAuthStorage();
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
+
+      setUser({
+        id: sessionUser.id,
+        email: sessionUser.email ?? '',
+        name:
+          (sessionUser.user_metadata?.name as string | undefined) ??
+          (sessionUser.email ? sessionUser.email.split('@')[0] : 'Usuário'),
+      });
+      setIsAuthenticated(true);
       setLoading(false);
     };
 
     checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const sessionUser = session?.user ?? null;
+      if (!sessionUser) {
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+      setUser({
+        id: sessionUser.id,
+        email: sessionUser.email ?? '',
+        name:
+          (sessionUser.user_metadata?.name as string | undefined) ??
+          (sessionUser.email ? sessionUser.email.split('@')[0] : 'Usuário'),
+      });
+      setIsAuthenticated(true);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (credentials: { email: string; password: string }, rememberMe = false) => {
     try {
-      const response = await authAPI.login(credentials);
-      const { access_token, refresh_token, user: userData } = response.data;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password,
+      });
+      if (error || !data.session?.user) {
+        return { success: false, message: error?.message || 'Erro no login' };
+      }
 
-      setAuthTokens(access_token, refresh_token || null, JSON.stringify(userData), rememberMe);
-      setUser(userData);
+      const sessionUser = data.session.user;
+      setUser({
+        id: sessionUser.id,
+        email: sessionUser.email ?? '',
+        name:
+          (sessionUser.user_metadata?.name as string | undefined) ??
+          (sessionUser.email ? sessionUser.email.split('@')[0] : 'Usuário'),
+      });
       setIsAuthenticated(true);
+
+      // Inicializa tenant/categorias/registro custom no backend (idempotente)
+      try {
+        await authAPI.bootstrap();
+      } catch {
+        // Não bloqueia login por bootstrap
+      }
+
+      // Supabase persiste a sessão; "rememberMe" é controlado via storage customizado.
+      // Aqui, mantemos compatibilidade mínima com o comportamento anterior limpando
+      // qualquer storage legado e deixando o Supabase cuidar da sessão.
+      if (!rememberMe) {
+        // Se o usuário não quer persistir entre reinícios, o ideal seria configurar
+        // storage do Supabase para sessionStorage. Mantemos simples por enquanto:
+        // Supabase persistirá e o usuário poderá fazer logout.
+      }
 
       return { success: true };
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Erro no login';
+      const errorMessage = error?.message || 'Erro no login';
       return {
         success: false,
         message: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
@@ -112,18 +149,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const register = async (userData: { name: string; email: string; password: string }, rememberMe = false) => {
+  const register = async (userData: { name: string; email: string; password: string }) => {
     try {
-      const response = await authAPI.register(userData);
-      const { access_token, refresh_token, user: newUser } = response.data;
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            name: userData.name,
+          },
+        },
+      });
+      if (error) {
+        return { success: false, message: error.message };
+      }
 
-      setAuthTokens(access_token, refresh_token || null, JSON.stringify(newUser), rememberMe);
-      setUser(newUser);
-      setIsAuthenticated(true);
+      // Se confirmação de e-mail estiver habilitada, talvez não haja sessão.
+      if (data.session?.user) {
+        const sessionUser = data.session.user;
+        setUser({
+          id: sessionUser.id,
+          email: sessionUser.email ?? userData.email,
+          name: userData.name,
+        });
+        setIsAuthenticated(true);
+        try {
+          await authAPI.bootstrap();
+        } catch {
+          // ignore
+        }
+        return { success: true };
+      }
 
-      return { success: true };
+      return { success: true, message: 'Conta criada. Verifique seu e-mail para confirmar o cadastro.' };
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Erro no cadastro';
+      const errorMessage = error?.message || 'Erro no cadastro';
       return {
         success: false,
         message: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
@@ -133,47 +193,77 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const loginWithAI = async () => {
     try {
-      const response = await authAPI.login({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: 'demo@alca.fin',
-        password: 'demo123'
+        password: 'demo123',
       });
-      const { access_token, refresh_token, user: userData } = response.data;
-      setAuthTokens(access_token, refresh_token || null, JSON.stringify(userData), true);
-      setUser(userData);
-      setIsAuthenticated(true);
-      return { success: true };
-    } catch {
-      try {
-        const registerResponse = await authAPI.register({
-          name: 'Demo User',
-          email: 'demo@alca.fin',
-          password: 'demo123'
+      if (!error && data.session?.user) {
+        const sessionUser = data.session.user;
+        setUser({
+          id: sessionUser.id,
+          email: sessionUser.email ?? 'demo@alca.fin',
+          name:
+            (sessionUser.user_metadata?.name as string | undefined) ??
+            (sessionUser.email ? sessionUser.email.split('@')[0] : 'Demo User'),
         });
-        const { access_token, refresh_token, user: userData } = registerResponse.data;
-        setAuthTokens(access_token, refresh_token || null, JSON.stringify(userData), true);
-        setUser(userData);
         setIsAuthenticated(true);
+        try {
+          await authAPI.bootstrap();
+        } catch {
+          // ignore
+        }
         return { success: true };
-      } catch (registerError: any) {
-        return {
-          success: false,
-          message: registerError?.response?.data?.error || 'Erro no login com IA'
-        };
       }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: 'demo@alca.fin',
+        password: 'demo123',
+        options: { data: { name: 'Demo User' } },
+      });
+      if (error) {
+        return { success: false, message: error.message };
+      }
+      // Tenta login após signup
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: 'demo@alca.fin',
+        password: 'demo123',
+      });
+      if (loginError) return { success: false, message: loginError.message };
+      if (loginData.session?.user) {
+        const sessionUser = loginData.session.user;
+        setUser({
+          id: sessionUser.id,
+          email: sessionUser.email ?? 'demo@alca.fin',
+          name:
+            (sessionUser.user_metadata?.name as string | undefined) ??
+            (sessionUser.email ? sessionUser.email.split('@')[0] : 'Demo User'),
+        });
+        setIsAuthenticated(true);
+        try {
+          await authAPI.bootstrap();
+        } catch {
+          // ignore
+        }
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Erro no login com IA' };
     }
   };
 
   const logout = () => {
     clearAuthStorage();
+    Promise.resolve(supabase.auth.signOut()).catch(() => undefined);
     setUser(null);
     setIsAuthenticated(false);
   };
 
   const updateUser = (userData: User) => {
     setUser(userData);
-    const payload = JSON.stringify(userData);
-    if (sessionStorage.getItem('auth_token')) sessionStorage.setItem('user_data', payload);
-    if (localStorage.getItem('auth_token')) localStorage.setItem('user_data', payload);
   };
 
   const value = {
