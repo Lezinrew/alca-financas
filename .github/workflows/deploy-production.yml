@@ -4,38 +4,44 @@ on:
   workflow_run:
     workflows: ["CI/CD Pipeline - Supabase"]
     types: [completed]
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to'
+        description: "Environment to deploy to"
         required: true
-        default: 'production'
+        default: production
         type: choice
         options:
           - production
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
 env:
-  NODE_VERSION: '18.x'
-  PYTHON_VERSION: '3.9'
+  NODE_VERSION: "20.x"
+  PYTHON_VERSION: "3.9"
+  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy-backend:
     name: Deploy Backend
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
+    environment: production
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build Backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: backend/Dockerfile
@@ -46,7 +52,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build OpenClaw Bridge image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: services/openclaw_bridge/Dockerfile
@@ -60,7 +66,7 @@ jobs:
         run: docker save alcahub-backend:latest alcahub-openclaw-bridge:latest | gzip > backend-images.tar.gz
 
       - name: Copy image to server
-        uses: appleboy/scp-action@v0.1.4
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -69,31 +75,36 @@ jobs:
           target: "/tmp/"
 
       - name: Deploy to production server
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           password: ${{ secrets.PROD_PASSWORD }}
           script: |
+            set -e
             gunzip -c /tmp/backend-images.tar.gz | docker load
-            rm /tmp/backend-images.tar.gz
+            rm -f /tmp/backend-images.tar.gz
             cd /var/www/alca-financas
-            docker-compose -f docker-compose.prod.yml up -d openclaw-bridge backend
-            docker system prune -f
+            git fetch origin
+            git reset --hard ${{ env.DEPLOY_SHA }}
+            git clean -fd
+            docker compose -f docker-compose.prod.yml up -d openclaw-bridge backend
 
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
+    environment: production
+    needs: [deploy-backend]
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Build frontend on server into build/frontend
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -101,6 +112,9 @@ jobs:
           script: |
             set -e
             cd /var/www/alca-financas
+            git fetch origin
+            git reset --hard ${{ env.DEPLOY_SHA }}
+            git clean -fd
 
             echo "==> Limpando builds antigos"
             rm -rf frontend/dist build/frontend
@@ -111,12 +125,12 @@ jobs:
               -v /var/www/alca-financas/frontend:/app \
               -w /app \
               node:22-alpine \
-              sh -lc "npm install && npm run build"
+              sh -lc "npm ci && npm run build"
 
             echo "==> Copiando dist para build/frontend"
             cp -a frontend/dist/. build/frontend/
 
-            echo "==> Forçando recriação do container frontend"
+            echo "==> Recriando container frontend"
             docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
 
             echo "==> Validando index.html servido pelo nginx"
@@ -125,17 +139,18 @@ jobs:
   smoke-tests:
     name: Production Smoke Tests
     runs-on: ubuntu-latest
+    environment: production
     needs: [deploy-backend, deploy-frontend]
-    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4.2.0
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -160,5 +175,5 @@ jobs:
           message: |
             ⚠️ Production deployment smoke tests failed!
             Repository: ${{ github.repository }}
-            Commit: ${{ github.sha }}
+            Commit: ${{ env.DEPLOY_SHA }}
             Author: ${{ github.actor }}
