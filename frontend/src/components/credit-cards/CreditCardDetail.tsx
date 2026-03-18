@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, formatDate, categoriesAPI, accountsAPI, transactionsAPI } from '../../utils/api';
@@ -19,6 +19,8 @@ interface Expense {
   status: string;
 }
 
+type BillPreset = 'current_bill' | 'month';
+
 const CreditCardDetail: React.FC = () => {
   const { cardId } = useParams<{ cardId: string }>();
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ const CreditCardDetail: React.FC = () => {
   const [error, setError] = useState('');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [billPreset, setBillPreset] = useState<BillPreset>('current_bill');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [sortField, setSortField] = useState<'date' | 'description' | 'amount'>('date');
@@ -40,7 +43,51 @@ const CreditCardDetail: React.FC = () => {
       loadCardData();
       loadCategories();
     }
-  }, [isAuthenticated, authLoading, cardId, selectedMonth, selectedYear]);
+  }, [isAuthenticated, authLoading, cardId, selectedMonth, selectedYear, billPreset]);
+
+  const toISODate = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const computeCurrentBillPeriod = (closingDay: number) => {
+    // Fatura aberta atual: do dia após o último fechamento até o próximo fechamento (inclusive).
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth(); // 0-based
+
+    const thisClosing = new Date(y, m, closingDay);
+    let start: Date;
+    let end: Date;
+
+    if (today <= thisClosing) {
+      end = thisClosing;
+      const prevClosing = new Date(y, m - 1, closingDay);
+      start = new Date(prevClosing);
+      start.setDate(prevClosing.getDate() + 1);
+    } else {
+      const nextClosing = new Date(y, m + 1, closingDay);
+      end = nextClosing;
+      start = new Date(thisClosing);
+      start.setDate(thisClosing.getDate() + 1);
+    }
+
+    return { dateFrom: toISODate(start), dateTo: toISODate(end) };
+  };
+
+  const computeMonthPeriod = (month: number, year: number) => {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    return { dateFrom: toISODate(start), dateTo: toISODate(end) };
+  };
+
+  const period = useMemo(() => {
+    if (!card) return null;
+    if (billPreset === 'current_bill') return computeCurrentBillPeriod(card.closingDay);
+    return computeMonthPeriod(selectedMonth, selectedYear);
+  }, [card, billPreset, selectedMonth, selectedYear]);
 
   const loadCardData = async () => {
     try {
@@ -89,16 +136,26 @@ const CreditCardDetail: React.FC = () => {
 
       // Carrega despesas do cartão (transações associadas)
       try {
+        const p =
+          (billPreset === 'current_bill'
+            ? computeCurrentBillPeriod(creditCard.closingDay)
+            : computeMonthPeriod(selectedMonth, selectedYear));
+
         const expensesResponse = await transactionsAPI.getAll({
-          account_id: cardId,
-          month: selectedMonth,
-          year: selectedYear,
-          type: 'expense'
+          account_ids: cardId,
+          types: 'expense',
+          date_from: p.dateFrom,
+          date_to: p.dateTo,
+          sort: 'date:desc',
+          limit: 500,
         });
         const expensesData = expensesResponse.data || [];
-        // Garante que expenses seja sempre um array
-        const expensesArray = Array.isArray(expensesData) ? expensesData : [];
-        setExpenses(expensesArray);
+        const expensesArray = Array.isArray(expensesData)
+          ? expensesData
+          : (expensesData?.data && Array.isArray(expensesData.data))
+            ? expensesData.data
+            : [];
+        setExpenses(expensesArray as any);
       } catch (expensesErr) {
         // Se falhar ao carregar despesas, define como array vazio
         console.warn('Erro ao carregar despesas:', expensesErr);
@@ -130,8 +187,19 @@ const CreditCardDetail: React.FC = () => {
 
   const handleExpenseSubmit = async (expenseData: any) => {
     try {
-      // TODO: Implementar criação de despesa
-      console.log('Despesa salva:', expenseData);
+      if (!cardId) {
+        throw new Error('Cartão inválido');
+      }
+      await transactionsAPI.create({
+        description: expenseData.description,
+        amount: expenseData.amount,
+        date: expenseData.date,
+        type: 'expense',
+        category_id: expenseData.category_id,
+        account_id: cardId,
+        status: 'paid',
+        responsible_person: 'Leandro',
+      });
       setShowExpenseForm(false);
       await loadCardData();
     } catch (err: any) {
@@ -245,8 +313,10 @@ const CreditCardDetail: React.FC = () => {
     totalUsed,
     availableLimit,
     totalExpenses,
+    preset: billPreset,
     month: selectedMonth,
     year: selectedYear,
+    period,
     expensesCount: safeExpenses.length
   });
 
@@ -314,24 +384,61 @@ const CreditCardDetail: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Month Navigation */}
+          {/* Período */}
           <div className="card-base p-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => changeMonth('prev')}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <i className="bi bi-chevron-left text-slate-600 dark:text-slate-400"></i>
-              </button>
-              <span className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-full font-medium">
-                {monthNames[selectedMonth - 1]} {selectedYear}
-              </span>
-              <button
-                onClick={() => changeMonth('next')}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <i className="bi bi-chevron-right text-slate-600 dark:text-slate-400"></i>
-              </button>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className={
+                    'h-9 px-3 rounded-lg text-sm font-medium border transition-colors ' +
+                    (billPreset === 'current_bill'
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+                  }
+                  onClick={() => setBillPreset('current_bill')}
+                >
+                  Fatura atual
+                </button>
+                <button
+                  type="button"
+                  className={
+                    'h-9 px-3 rounded-lg text-sm font-medium border transition-colors ' +
+                    (billPreset === 'month'
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+                  }
+                  onClick={() => setBillPreset('month')}
+                >
+                  Por mês
+                </button>
+              </div>
+
+              {billPreset === 'month' && (
+                <div className="flex items-center justify-between md:justify-end gap-2">
+                  <button
+                    onClick={() => changeMonth('prev')}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <i className="bi bi-chevron-left text-slate-600 dark:text-slate-400"></i>
+                  </button>
+                  <span className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-full font-medium">
+                    {monthNames[selectedMonth - 1]} {selectedYear}
+                  </span>
+                  <button
+                    onClick={() => changeMonth('next')}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <i className="bi bi-chevron-right text-slate-600 dark:text-slate-400"></i>
+                  </button>
+                </div>
+              )}
+
+              {billPreset === 'current_bill' && period && (
+                <div className="text-sm text-slate-600 dark:text-slate-300">
+                  Período: {formatDate(period.dateFrom)} → {formatDate(period.dateTo)}
+                </div>
+              )}
             </div>
           </div>
 

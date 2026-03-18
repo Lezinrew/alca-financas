@@ -121,7 +121,9 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
         amount: amountValue,
         date: formData.date === 'today' ? new Date().toISOString() :
               formData.date === 'yesterday' ? new Date(Date.now() - 86400000).toISOString() :
-              new Date(formData.date).toISOString()
+              new Date(formData.date).toISOString(),
+        // compatibilidade com backend: usa account_id como vínculo, não card_id
+        account_id: formData.card_id,
       };
 
       await onSubmit(submitData);
