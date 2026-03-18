@@ -3,7 +3,6 @@ from flask import Blueprint, jsonify, request
 from utils.auth_utils import require_auth
 from utils.tenant_context import resolve_tenant_id
 from repositories.tenant_repository import TenantRepository
-from utils.auth_utils import generate_jwt
 
 bp = Blueprint("tenants", __name__, url_prefix="/api/tenants")
 
@@ -49,15 +48,12 @@ def switch_tenant():
             403,
         )
 
-    # Custom JWT flow: emite novo token com claim tenant_id
-    # generate_jwt é backward compatible: tenant_id é claim extra.
-    tokens = generate_jwt(request.user_id, tenant_id=tenant_id)
-
-    response = {
-        "message": "Tenant alterado com sucesso",
-        "tenant_id": tenant_id,
-        "access_token": tokens["access_token"],
-        "refresh_token": tokens["refresh_token"],
-    }
-    return jsonify(response)
+    # Supabase-only: o backend não emite token.
+    # O frontend deve enviar este tenant em chamadas subsequentes via header `X-Tenant-Id`.
+    return jsonify(
+        {
+            "message": "Tenant alterado com sucesso",
+            "tenant_id": tenant_id,
+        }
+    )
 

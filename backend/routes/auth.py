@@ -11,20 +11,14 @@ import json
 import jwt
 import requests
 
-from utils.auth_utils import (
-    hash_password,
-    check_password,
-    generate_jwt,
-    require_auth,
-    decode_token,
-    generate_reset_token,
-    decode_reset_token,
-)
+from utils.auth_utils import require_auth
 from services.user_service import create_user, create_default_categories, get_user_public
-from services.email_service import send_reset_link
 from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
 from extensions import limiter
 from pydantic import ValidationError
+from services.supabase_auth_service import SupabaseAuthService
+from utils.tenant_context import require_tenant
+from database.connection import get_supabase
 
 
 # Remova o 'url_prefix' daqui. Ele será definido em app.py
@@ -69,31 +63,33 @@ def register():
     except Exception as e:
         return jsonify({'error': f'Erro ao processar registro: {str(e)}'}), 400
 
-    users_collection = current_app.config['USERS']
-    categories_collection = current_app.config['CATEGORIES']
-
     email_norm = data.email.strip().lower()
-    if users_collection.find_by_email(email_norm):
-        return jsonify({'error': 'Email já cadastrado'}), 400
 
+    # Supabase-only: criação de usuário via Supabase Auth
     try:
-        user_data = data.model_dump()
-        user_data['email'] = email_norm
-        user = create_user(users_collection, user_data, hash_password)
-        create_default_categories(categories_collection, _user_id(user))
+        auth_service = SupabaseAuthService()
+        result = auth_service.sign_up(
+            email=email_norm,
+            password=data.password,
+            name=data.name,
+        )
 
-        tokens = generate_jwt(_user_id(user))
+        # Criar categorias padrão (repo já está no config do app)
+        categories_collection = current_app.config['CATEGORIES']
+        create_default_categories(categories_collection, result['user']['id'])
+
         return jsonify({
             'message': 'Usuário criado com sucesso',
-            'access_token': tokens['access_token'],
-            'refresh_token': tokens['refresh_token'],
-            'user': get_user_public(user)
+            'access_token': result.get('access_token'),
+            'refresh_token': result.get('refresh_token'),
+            'user': result.get('user'),
         }), 201
     except Exception as e:
-        import traceback
-        print(f"Erro ao criar usuário: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': f'Erro ao criar usuário: {str(e)}'}), 500
+        error_msg = str(e)
+        if 'already registered' in error_msg.lower() or 'user already exists' in error_msg.lower():
+            return jsonify({'error': 'Email já cadastrado'}), 400
+        current_app.logger.error(f"Erro ao registrar usuário (Supabase): {e}")
+        return jsonify({'error': f'Erro ao criar usuário: {error_msg}'}), 500
 
 
 @bp.route('/auth/login', methods=['POST'])
@@ -121,38 +117,23 @@ def login():
     except Exception as e:
         return jsonify({'error': f'Erro ao processar login: {str(e)}'}), 400
 
-    users_collection = current_app.config['USERS']
     email = data.email.strip().lower()
-    if current_app.config.get('DB_TYPE') == 'supabase':
-        user = users_collection.find_by_email(email)
-    else:
-        user = users_collection.find_one({'email': {'$regex': f'^{email}$', '$options': 'i'}})
-    
-    if not user:
-        current_app.logger.warning(f"Login falhou: usuário não encontrado para email: {email}")
-        return jsonify({'error': 'Email ou senha incorretos'}), 401
 
-    if user.get('password') is None:
-        return jsonify({'error': 'Este email está vinculado ao Google. Por favor, faça login via Google.'}), 400
-    
-    # Debug: log do tipo da senha (sem mostrar o valor)
-    password_type = type(user['password']).__name__
-    current_app.logger.debug(f"Tentativa de login para {email}: tipo da senha no banco: {password_type}")
-    
-    password_check_result = check_password(data.password, user['password'])
-    current_app.logger.debug(f"Resultado da verificação de senha: {password_check_result}")
-    
-    if not password_check_result:
-        current_app.logger.warning(f"Login falhou: senha incorreta para email: {email}")
-        return jsonify({'error': 'Email ou senha incorretos'}), 401
-        
-    tokens = generate_jwt(_user_id(user))
-    return jsonify({
-        'message': 'Login realizado com sucesso',
-        'access_token': tokens['access_token'],
-        'refresh_token': tokens['refresh_token'],
-        'user': get_user_public(user)
-    })
+    try:
+        auth_service = SupabaseAuthService()
+        result = auth_service.sign_in(email=email, password=data.password)
+        return jsonify({
+            'message': 'Login realizado com sucesso',
+            'access_token': result.get('access_token'),
+            'refresh_token': result.get('refresh_token'),
+            'user': result.get('user'),
+        })
+    except Exception as e:
+        error_msg = str(e)
+        if 'invalid' in error_msg.lower() or 'credentials' in error_msg.lower():
+            return jsonify({'error': 'Email ou senha incorretos'}), 401
+        current_app.logger.error(f"Erro no login (Supabase): {e}")
+        return jsonify({'error': f'Erro no login: {error_msg}'}), 500
 
 
 @bp.route('/auth/refresh', methods=['POST'])
@@ -162,67 +143,31 @@ def refresh():
         data = RefreshTokenSchema(**request.get_json())
     except ValidationError as e:
         return jsonify({'error': e.errors()}), 400
-        
-    user_id = decode_token(data.refresh_token, 'refresh')
-    if not user_id:
-        return jsonify({'error': 'Refresh token inválido ou expirado'}), 401
-        
-    users_collection = current_app.config['USERS']
-    user = users_collection.find_one(_user_id_filter(user_id))
-    if not user:
-        return jsonify({'error': 'Usuário não encontrado'}), 401
-        
-    tokens = generate_jwt(user_id)
-    return jsonify({
-        'access_token': tokens['access_token'],
-        'refresh_token': tokens['refresh_token']
-    })
+
+    try:
+        auth_service = SupabaseAuthService()
+        result = auth_service.refresh_session(data.refresh_token)
+        if not result:
+            return jsonify({'error': 'Token inválido ou expirado'}), 401
+        return jsonify({
+            'access_token': result.get('access_token'),
+            'refresh_token': result.get('refresh_token'),
+        })
+    except Exception as e:
+        current_app.logger.error(f"Erro ao renovar sessão (Supabase): {e}")
+        return jsonify({'error': 'Erro ao renovar token'}), 500
 
 
 @bp.route('/auth/forgot-password', methods=['POST'])
 def forgot_password():
-    data = request.get_json() or {}
-    email = (data.get('email') or '').strip().lower()
-    if not email:
-        return jsonify({'error': 'Email é obrigatório'}), 400
-
-    users_collection = current_app.config['USERS']
-    if current_app.config.get('DB_TYPE') == 'supabase':
-        user = users_collection.find_by_email(email)
-    else:
-        user = users_collection.find_one({'email': {'$regex': f'^{email}$', '$options': 'i'}})
-    if user and user.get('password') is not None:
-        reset_token = generate_reset_token(_user_id(user))
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
-        reset_url = f"{frontend_url}/reset-password?token={reset_token}"
-        send_reset_link(user['email'], reset_url)
-
-    return jsonify({'message': 'Se existir uma conta com esse e-mail, você receberá um link para redefinir sua senha.'}), 200
+    # Supabase-only: o frontend usa supabase.auth.resetPasswordForEmail diretamente.
+    return jsonify({'error': 'Use o fluxo de redefinição de senha do Supabase pelo frontend.'}), 410
 
 
 @bp.route('/auth/reset-password', methods=['POST'])
 def reset_password():
-    data = request.get_json() or {}
-    token = data.get('token') or ''
-    new_password = data.get('new_password') or ''
-    if not token:
-        return jsonify({'error': 'Token é obrigatório'}), 400
-    if len(new_password) < 6:
-        return jsonify({'error': 'A senha deve ter pelo menos 6 caracteres'}), 400
-
-    user_id = decode_reset_token(token)
-    if not user_id:
-        return jsonify({'error': 'Link inválido ou expirado. Solicite um novo.'}), 400
-
-    users_collection = current_app.config['USERS']
-    user = users_collection.find_one(_user_id_filter(user_id))
-    if not user:
-        return jsonify({'error': 'Usuário não encontrado'}), 400
-
-    hashed = hash_password(new_password)
-    users_collection.update(user_id, {'password': hashed})
-
-    return jsonify({'message': 'Senha redefinida com sucesso. Faça login com a nova senha.'}), 200
+    # Supabase-only: o frontend usa supabase.auth.updateUser({ password }) após recovery.
+    return jsonify({'error': 'Use o fluxo de redefinição de senha do Supabase pelo frontend.'}), 410
 
 
 @bp.route('/auth/me', methods=['GET'])
@@ -239,6 +184,63 @@ def get_user():
         'settings': user.get('settings', {}),
         'auth_providers': user.get('auth_providers', [])
     })
+
+
+@bp.route('/auth/bootstrap', methods=['POST'])
+@require_auth
+@require_tenant
+def bootstrap_user():
+    """
+    Supabase-only (banco limpo):
+    - Garante que exista um registro na tabela `users` (custom) para o user_id do Supabase Auth.
+    - Garante tenant default via require_tenant.
+    - Se ainda não existirem categorias no tenant, cria categorias padrão.
+    """
+    user_id = request.user_id
+    tenant_id = getattr(request, "tenant_id", None)
+    if not tenant_id:
+        return jsonify({"error": "Workspace não identificado."}), 403
+
+    users_repo = current_app.config["USERS"]
+    categories_repo = current_app.config["CATEGORIES"]
+
+    # 1) Garantir user custom
+    existing_user = users_repo.find_by_id(user_id) if hasattr(users_repo, "find_by_id") else users_repo.find_one({"id": user_id})
+    if not existing_user:
+        # Busca dados do usuário diretamente do Supabase Auth usando o access_token
+        auth_header = request.headers.get("Authorization") or ""
+        access_token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
+        sb = get_supabase()
+        auth_user = sb.auth.get_user(access_token)
+        email = auth_user.user.email if auth_user and auth_user.user else None
+        name = None
+        if auth_user and auth_user.user:
+            name = (auth_user.user.user_metadata or {}).get("name")
+        if not name and email:
+            name = email.split("@")[0]
+
+        create_user(
+            users_repo,
+            {
+                "id": user_id,
+                "name": name or "Usuário",
+                "email": email or "",
+                "password": "",  # não usado no Supabase-only
+            },
+            hash_password=None,
+        )
+
+    # 2) Seed de categorias por tenant (idempotente)
+    existing_categories = []
+    if hasattr(categories_repo, "find_by_user"):
+        existing_categories = categories_repo.find_by_user(user_id, tenant_id=tenant_id) or []
+    else:
+        existing_categories = categories_repo.find_all({"user_id": user_id, "tenant_id": tenant_id}) or []
+
+    if not existing_categories:
+        create_default_categories(categories_repo, user_id, tenant_id=tenant_id)
+
+    return jsonify({"ok": True, "tenant_id": tenant_id}), 200
 
 
 @bp.route('/auth/settings', methods=['GET', 'PUT'])

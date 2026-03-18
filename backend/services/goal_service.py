@@ -99,11 +99,11 @@ def add_contribution(
     tenant_id: str,
     user_id: str,
     amount: float,
+    goal_repo,
     date_iso: Optional[str] = None,
     source_type: Optional[str] = None,
     source_reference_id: Optional[str] = None,
     notes: Optional[str] = None,
-    goal_repo,
 ) -> Optional[Dict[str, Any]]:
     return goal_repo.add_contribution(
         goal_id=goal_id,

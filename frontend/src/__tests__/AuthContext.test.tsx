@@ -3,14 +3,29 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
 
-import { authAPI } from '../utils/api'
+const {
+  mockGetSession,
+  mockOnAuthStateChange,
+  mockSignInWithPassword,
+  mockSignUp,
+  mockSignOut,
+} = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockOnAuthStateChange: vi.fn(),
+  mockSignInWithPassword: vi.fn(),
+  mockSignUp: vi.fn(),
+  mockSignOut: vi.fn(),
+}))
 
-// Mock the API
-vi.mock('../utils/api', () => ({
-  authAPI: {
-    login: vi.fn(),
-    register: vi.fn(),
-    getMe: vi.fn(),
+vi.mock('../utils/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: mockGetSession,
+      onAuthStateChange: mockOnAuthStateChange,
+      signInWithPassword: mockSignInWithPassword,
+      signUp: mockSignUp,
+      signOut: mockSignOut,
+    },
   },
 }))
 
@@ -65,6 +80,12 @@ describe('AuthContext', () => {
     // Clear localStorage before each test
     localStorage.clear()
     vi.clearAllMocks()
+
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockOnAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    })
+    mockSignOut.mockResolvedValue({} as any)
   })
 
   it('should render loading state initially', async () => {
@@ -81,6 +102,7 @@ describe('AuthContext', () => {
   })
 
   it('should show not authenticated state when no user is logged in', async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
     renderWithProvider()
 
     await waitFor(() => {
@@ -91,15 +113,20 @@ describe('AuthContext', () => {
   })
 
   it('should handle AI login successfully', async () => {
-    const mockUser = { id: '1', name: 'Demo User', email: 'demo@alca.fin' }
-    const mockResponse = {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSignInWithPassword.mockResolvedValue({
       data: {
-        access_token: 'mock_access_token',
-        refresh_token: 'mock_refresh_token',
-        user: mockUser
-      }
-    }
-    vi.mocked(authAPI.login).mockResolvedValue(mockResponse as any)
+        session: {
+          access_token: 'mock_access_token',
+          user: {
+            id: '1',
+            email: 'demo@alca.fin',
+            user_metadata: { name: 'Demo User' },
+          },
+        },
+      },
+      error: null,
+    })
 
     const user = userEvent.setup()
     renderWithProvider()
@@ -118,22 +145,24 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('user-info')).toHaveTextContent('User: Demo User (demo@alca.fin)')
-
-    // Check localStorage
-    expect(localStorage.getItem('user_data')).toBeTruthy()
-    expect(localStorage.getItem('auth_token')).toBeTruthy()
   })
 
   it('should handle logout correctly', async () => {
-    const mockUser = { id: '1', name: 'Demo User', email: 'demo@alca.fin' }
-    const mockResponse = {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSignInWithPassword.mockResolvedValue({
       data: {
-        access_token: 'mock_access_token',
-        refresh_token: 'mock_refresh_token',
-        user: mockUser
-      }
-    }
-    vi.mocked(authAPI.login).mockResolvedValue(mockResponse as any)
+        session: {
+          access_token: 'mock_access_token',
+          user: {
+            id: '1',
+            email: 'demo@alca.fin',
+            user_metadata: { name: 'Demo User' },
+          },
+        },
+      },
+      error: null,
+    })
+    mockSignUp.mockResolvedValue({ data: { session: null, user: null }, error: null })
 
     const user = userEvent.setup()
     renderWithProvider()
@@ -157,20 +186,22 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('user-info')).toHaveTextContent('No user')
-
-    // Check localStorage is cleared
-    expect(localStorage.getItem('user_data')).toBeNull()
-    expect(localStorage.getItem('auth_token')).toBeNull()
   })
 
-  it('should restore user from localStorage on mount', async () => {
-    // Pre-populate localStorage
-    const mockUser = { id: 1, name: 'Test User', email: 'test@example.com' }
-    // Prepend space to avoid 'eyJ' prefix (which would be treated as real JWT)
-    const mockToken = btoa(' ' + JSON.stringify({ user: mockUser, exp: Date.now() + 10000 }))
-
-    localStorage.setItem('user_data', JSON.stringify(mockUser))
-    localStorage.setItem('auth_token', mockToken)
+  it('should restore user from Supabase session on mount', async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'mock_access_token',
+          user: {
+            id: '1',
+            email: 'test@example.com',
+            user_metadata: { name: 'Test User' },
+          },
+        },
+      },
+      error: null,
+    })
 
     renderWithProvider()
 
@@ -182,13 +213,10 @@ describe('AuthContext', () => {
   })
 
   it('should handle expired token correctly', async () => {
-    // Pre-populate localStorage with expired token
-    const mockUser = { id: 1, name: 'Test User', email: 'test@example.com' }
-    // Prepend space to avoid 'eyJ' prefix
-    const expiredToken = btoa(' ' + JSON.stringify({ user: mockUser, exp: Date.now() - 10000 }))
-
-    localStorage.setItem('user_data', JSON.stringify(mockUser))
-    localStorage.setItem('auth_token', expiredToken)
+    // Simula ausência de sessão (token expirado) retornando session null
+    localStorage.setItem('user_data', JSON.stringify({ id: 1, name: 'Test User', email: 'test@example.com' }))
+    localStorage.setItem('auth_token', 'stale')
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
 
     renderWithProvider()
 
@@ -198,7 +226,7 @@ describe('AuthContext', () => {
 
     expect(screen.getByTestId('user-info')).toHaveTextContent('No user')
 
-    // Check localStorage is cleared for expired token
+    // Storage legado é limpo quando não há sessão válida
     expect(localStorage.getItem('user_data')).toBeNull()
     expect(localStorage.getItem('auth_token')).toBeNull()
   })
