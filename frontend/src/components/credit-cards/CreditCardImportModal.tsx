@@ -49,13 +49,14 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
     setSuccess('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('card_id', cardId);
-
       const response = await accountsAPI.import(cardId, selectedFile);
       const result = response.data;
-      let successMessage = `Fatura importada com sucesso! ${result.imported_count || 0} transações adicionadas.`;
+      const imported = result.imported_count || 0;
+      const skipped = result.duplicates_skipped || 0;
+      let successMessage = `Fatura importada com sucesso! ${imported} transação(ões) adicionada(s).`;
+      if (skipped > 0) {
+        successMessage += ` ${skipped} duplicada(s) ignorada(s).`;
+      }
       
       if (result.categories_created && result.categories_created > 0) {
         const categoriesList = result.categories_created_list?.join(', ') || '';
@@ -68,7 +69,11 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
         onSuccess();
       }, 3000);
     } catch (err: any) {
-      setError(err.message || 'Erro ao importar fatura');
+      const apiMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message;
+      setError(apiMsg || 'Erro ao importar fatura');
     } finally {
       setLoading(false);
     }
