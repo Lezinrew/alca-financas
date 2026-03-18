@@ -121,7 +121,7 @@ const Transactions = () => {
 
       // Enriquecer categorias com contagem (facets)
       if (facets?.categories?.length) {
-        const withCounts = validCategories.map((cat) => {
+        const withCounts = validCategories.map((cat: TransactionCategory) => {
           const facet = facets.categories.find((f) => f.id === cat.id);
           return facet ? { ...cat, count: facet.count } : cat;
         });
