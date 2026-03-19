@@ -253,6 +253,9 @@ const Transactions = () => {
       return;
     }
 
+    // Salva estado anterior para possível rollback
+    const previousTransactions = [...transactions];
+
     try {
       setLoading(true);
       setError('');
@@ -261,12 +264,26 @@ const Transactions = () => {
       await transactionsAPI.delete(transactionId);
       console.log('Transação deletada com sucesso');
 
-      // Recarrega a lista de transações
-      await loadData();
+      // Optimistic update: Remove da lista imediatamente
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      toast.success('Transação excluída com sucesso!');
+
+      // Tenta recarregar dados completos (para atualizar totais, etc)
+      try {
+        await loadData();
+      } catch (loadErr) {
+        console.warn('Falha ao recarregar dados após delete (UI já atualizada):', loadErr);
+        // UI já foi atualizada com optimistic update, então não é crítico
+      }
     } catch (err: any) {
       console.error('Delete transaction error:', err);
+
+      // Rollback: Restaura estado anterior se delete falhou
+      setTransactions(previousTransactions);
+
       const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Erro ao deletar transação';
       setError(errorMessage);
+      toast.error(errorMessage);
 
       // Remove a mensagem de erro após 5 segundos
       setTimeout(() => setError(''), 5000);
