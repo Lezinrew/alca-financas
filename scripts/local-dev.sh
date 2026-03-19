@@ -31,24 +31,57 @@ case "$COMMAND" in
       exit 1
     fi
 
+    # Verificar variáveis críticas
+    if ! grep -q "SUPABASE_URL=" .env || ! grep -q "SUPABASE_SERVICE_ROLE_KEY=" .env; then
+      log_warning "Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env!"
+    fi
+
+    # Verificar se OpenClaw está configurado
+    if ! grep -q "OPENCLAW_GATEWAY_TOKEN=" .env || [ -z "$(grep OPENCLAW_GATEWAY_TOKEN= .env | cut -d'=' -f2)" ]; then
+      log_warning "⚠️  OPENCLAW_GATEWAY_TOKEN não configurado - OpenClaw será desabilitado"
+      log_info "Para gerar token: openssl rand -hex 32"
+    fi
+
     # Iniciar serviços
+    log_info "🐳 Subindo containers..."
     docker compose up -d
 
-    # Aguardar
-    log_info "⏳ Aguardando serviços iniciarem..."
-    sleep 5
+    # Aguardar serviços ficarem saudáveis
+    log_info "⏳ Aguardando serviços iniciarem (30s)..."
+    sleep 15
 
-    # Status
+    # Verificar health
+    log_info "🔍 Verificando health dos serviços..."
     docker compose ps
 
+    # Health check backend
+    if curl -f -s http://localhost:8001/api/health > /dev/null 2>&1; then
+      log_success "✅ Backend saudável"
+    else
+      log_warning "⚠️  Backend ainda inicializando ou com erro"
+    fi
+
+    # Health check frontend
+    if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
+      log_success "✅ Frontend saudável"
+    else
+      log_warning "⚠️  Frontend ainda inicializando ou com erro"
+    fi
+
+    echo ""
     log_success "✅ Ambiente iniciado!"
     echo ""
     echo "Acesse:"
     echo "  Frontend: http://localhost:3000"
     echo "  Backend:  http://localhost:8001"
+    echo "  Health:   http://localhost:8001/api/health"
     echo ""
-    echo "Ver logs:  ./scripts/local-dev.sh logs"
-    echo "Parar:     ./scripts/local-dev.sh stop"
+    echo "Comandos úteis:"
+    echo "  Ver logs:       ./scripts/local-dev.sh logs"
+    echo "  Ver logs erro:  ./scripts/local-dev.sh logs | grep -i error"
+    echo "  Status:         ./scripts/local-dev.sh status"
+    echo "  Parar:          ./scripts/local-dev.sh stop"
+    echo "  Rebuild:        ./scripts/local-dev.sh rebuild"
     ;;
 
   stop)
