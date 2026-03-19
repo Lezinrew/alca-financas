@@ -32,6 +32,7 @@ const Import = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [progressMessage, setProgressMessage] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -121,12 +122,14 @@ const Import = () => {
     setLoading(true);
     setError('');
     setSuccess('');
+    setProgressMessage('Enviando arquivo...');
 
     try {
       let response: { data: ImportResult };
-      
+
       if (activeTab === 'credit_card' && selectedCreditCardId) {
         // Importação de cartão de crédito
+        setProgressMessage('Processando fatura do cartão de crédito...');
         const formData = new FormData();
         formData.append('file', selectedFile);
 
@@ -134,9 +137,12 @@ const Import = () => {
         response = { data: fetchResponse.data as ImportResult };
       } else {
         // Importação geral (débito)
+        setProgressMessage('Processando transações...');
         const apiResponse = await transactionsAPI.import(selectedFile, selectedAccountId || undefined);
         response = { data: apiResponse.data as ImportResult };
       }
+
+      setProgressMessage('Finalizando importação...');
       
       setImportResult(response.data);
       
@@ -175,6 +181,7 @@ const Import = () => {
       setImportResult(err.response?.data);
     } finally {
       setLoading(false);
+      setProgressMessage('');
     }
   };
 
@@ -273,6 +280,25 @@ const Import = () => {
             <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2">
               <i className="bi bi-check-circle-fill text-green-600 dark:text-green-400"></i>
               <span className="text-green-800 dark:text-green-200 text-sm">{success}</span>
+            </div>
+          )}
+
+          {/* Feedback de Progresso */}
+          {loading && progressMessage && (
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <i className="bi bi-arrow-repeat text-2xl text-blue-600 dark:text-blue-400 animate-spin"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                    {progressMessage}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    Por favor, aguarde. Não feche esta página.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -433,8 +459,8 @@ const Import = () => {
             >
               {loading ? (
                 <>
-                  <i className="bi bi-hourglass-split animate-spin"></i>
-                  Importando...
+                  <i className="bi bi-arrow-repeat animate-spin"></i>
+                  Processando...
                 </>
               ) : (
                 <>
