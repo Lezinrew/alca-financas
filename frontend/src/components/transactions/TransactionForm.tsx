@@ -57,50 +57,58 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState<boolean>(false);
+  const [accountsError, setAccountsError] = useState<string>('');
 
   // Carrega contas ao montar o componente
-  useEffect(() => {
-    const loadAccounts = async () => {
-      try {
-        const response = await accountsAPI.getAll();
-        if (response.data) {
-          const data = response.data;
-          console.log('TransactionForm: Dados brutos da API:', data);
-          
-          // Garante que data seja um array
-          const accountsArray = Array.isArray(data) ? data : [];
-          console.log('TransactionForm: Total de contas recebidas:', accountsArray.length);
-          
-          // Filtra apenas contas ativas e exclui cartões de crédito
-          // O backend já converte _id para id, mas vamos garantir
-          const activeAccounts = accountsArray
-            .filter((acc: any) => {
-              // Considera is_active como true se não estiver definido (compatibilidade)
-              const isActive = acc.is_active !== false;
-              const isNotCreditCard = acc.type !== 'credit_card';
-              return isActive && isNotCreditCard;
-            })
-            .map((acc: any) => ({
-              ...acc,
-              id: acc.id || acc._id || '',
-              name: acc.name || 'Sem nome'
-            }))
-            .filter((acc: any) => acc.id); // Remove contas sem ID válido
-          
-          console.log('TransactionForm: Contas filtradas e normalizadas:', activeAccounts);
-          console.log('TransactionForm: Número de contas disponíveis:', activeAccounts.length);
-          setAccounts(activeAccounts);
-        } else {
-          console.error('Erro ao carregar contas: resposta não OK', response.status);
-          const errorText = response.data || response.statusText || 'Erro desconhecido';
-          console.error('Erro detalhado:', errorText);
-        }
-      } catch (err) {
-        console.error('Erro ao carregar contas:', err);
-        setAccounts([]); // Garante que accounts seja sempre um array
+  const loadAccounts = async () => {
+    try {
+      setAccountsLoading(true);
+      setAccountsError('');
+      const response = await accountsAPI.getAll();
+      if (response.data) {
+        const data = response.data;
+        console.log('TransactionForm: Dados brutos da API:', data);
+
+        // Garante que data seja um array
+        const accountsArray = Array.isArray(data) ? data : [];
+        console.log('TransactionForm: Total de contas recebidas:', accountsArray.length);
+
+        // Filtra apenas contas ativas e exclui cartões de crédito
+        // O backend já converte _id para id, mas vamos garantir
+        const activeAccounts = accountsArray
+          .filter((acc: any) => {
+            // Considera is_active como true se não estiver definido (compatibilidade)
+            const isActive = acc.is_active !== false;
+            const isNotCreditCard = acc.type !== 'credit_card';
+            return isActive && isNotCreditCard;
+          })
+          .map((acc: any) => ({
+            ...acc,
+            id: acc.id || acc._id || '',
+            name: acc.name || 'Sem nome'
+          }))
+          .filter((acc: any) => acc.id); // Remove contas sem ID válido
+
+        console.log('TransactionForm: Contas filtradas e normalizadas:', activeAccounts);
+        console.log('TransactionForm: Número de contas disponíveis:', activeAccounts.length);
+        setAccounts(activeAccounts);
+      } else {
+        console.error('Erro ao carregar contas: resposta não OK', response.status);
+        const errorText = response.data || response.statusText || 'Erro desconhecido';
+        console.error('Erro detalhado:', errorText);
+        setAccountsError('Erro ao carregar contas. Tente novamente.');
       }
-    };
-    
+    } catch (err: any) {
+      console.error('Erro ao carregar contas:', err);
+      setAccounts([]); // Garante que accounts seja sempre um array
+      setAccountsError(err.response?.data?.error || err.message || 'Erro ao carregar contas. Verifique sua conexão.');
+    } finally {
+      setAccountsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (show) {
       loadAccounts();
     }
@@ -438,19 +446,36 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     className={`form-select ${formData.account_id ? 'border-success' : 'border-warning'}`}
                     value={formData.account_id}
                     onChange={handleChange}
-                    disabled={loading}
+                    disabled={loading || accountsLoading}
                   >
                     <option value="">Selecione uma conta</option>
-                    {accounts.length > 0 ? (
+                    {accountsLoading ? (
+                      <option value="" disabled>Carregando contas...</option>
+                    ) : accounts.length > 0 ? (
                       accounts.map((account) => (
                         <option key={account.id || account._id} value={account.id || account._id}>
                           {account.name} {account.type && `(${account.type === 'checking' ? 'Conta Corrente' : account.type === 'savings' ? 'Poupança' : account.type === 'wallet' ? 'Carteira' : account.type === 'investment' ? 'Investimento' : account.type})`}
                         </option>
                       ))
                     ) : (
-                      <option value="" disabled>Carregando contas...</option>
+                      <option value="" disabled>Nenhuma conta disponível</option>
                     )}
                   </select>
+                  {accountsError && (
+                    <div className="form-text text-danger d-flex align-items-center gap-2">
+                      <i className="bi bi-exclamation-circle"></i>
+                      <span>{accountsError}</span>
+                      <button
+                        type="button"
+                        onClick={loadAccounts}
+                        className="btn btn-sm btn-outline-primary ms-2"
+                        disabled={accountsLoading}
+                      >
+                        <i className="bi bi-arrow-clockwise me-1"></i>
+                        Tentar novamente
+                      </button>
+                    </div>
+                  )}
                   {formData.account_id ? (
                     <div className="form-text text-success">
                       <i className="bi bi-check-circle me-1"></i>
