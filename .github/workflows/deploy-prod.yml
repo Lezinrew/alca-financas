@@ -1,0 +1,273 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-prod.yml'
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip smoke tests (NOT RECOMMENDED)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false  # Nunca cancelar deploy de produção
+
+env:
+  NODE_VERSION: "20.x"
+  PYTHON_VERSION: "3.9"
+  DEPLOY_SHA: ${{ github.sha }}
+
+jobs:
+  pre-flight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: TypeScript Check (fast fail)
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Python Critical Lint
+        working-directory: ./backend
+        run: |
+          pip install flake8
+          flake8 . --select=E9,F63,F7,F82 --max-line-length=120
+
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    environment: production
+    needs: pre-flight
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          load: true
+          tags: alcahub-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save backend image
+        run: docker save alcahub-backend:latest | gzip > backend-image.tar.gz
+
+      - name: Copy image to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          password: ${{ secrets.PROD_PASSWORD }}
+          source: "backend-image.tar.gz"
+          target: "/tmp/"
+
+      - name: Deploy backend to production
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          password: ${{ secrets.PROD_PASSWORD }}
+          script: |
+            set -e
+            echo "🔄 Loading backend image..."
+            gunzip -c /tmp/backend-image.tar.gz | docker load
+            rm -f /tmp/backend-image.tar.gz
+
+            echo "📂 Updating repository..."
+            cd /var/www/alca-financas
+            git fetch origin
+            git reset --hard ${{ env.DEPLOY_SHA }}
+            git clean -fd
+
+            echo "🚀 Deploying backend..."
+            docker compose -f docker-compose.prod.yml up -d backend
+
+            echo "⏳ Waiting for backend to be healthy..."
+            sleep 10
+
+            echo "✅ Backend deployment complete"
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    environment: production
+    needs: deploy-backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and deploy frontend
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          password: ${{ secrets.PROD_PASSWORD }}
+          script: |
+            set -e
+            cd /var/www/alca-financas
+
+            echo "📂 Syncing repository..."
+            git fetch origin
+            git reset --hard ${{ env.DEPLOY_SHA }}
+            git clean -fd
+
+            echo "🧹 Cleaning old builds..."
+            rm -rf frontend/dist build/frontend
+            mkdir -p build/frontend
+
+            echo "📦 Building frontend..."
+            docker run --rm \
+              -v /var/www/alca-financas/frontend:/app \
+              -w /app \
+              node:22-alpine \
+              sh -c "npm ci && npm run build"
+
+            echo "📋 Copying build to nginx directory..."
+            cp -a frontend/dist/. build/frontend/
+
+            echo "🔄 Recreating frontend container..."
+            docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
+
+            echo "✅ Frontend deployment complete"
+
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    steps:
+      - name: Check Backend Health
+        run: |
+          echo "🔍 Checking backend health..."
+          for i in {1..5}; do
+            if curl -f -s http://${{ secrets.PROD_HOST }}:8001/api/health; then
+              echo "✅ Backend is healthy"
+              exit 0
+            fi
+            echo "⏳ Attempt $i/5 failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "❌ Backend health check failed"
+          exit 1
+
+      - name: Check Frontend
+        run: |
+          echo "🔍 Checking frontend..."
+          if curl -f -I http://${{ secrets.PROD_HOST }}:3000 | grep "200 OK"; then
+            echo "✅ Frontend is accessible"
+          else
+            echo "❌ Frontend health check failed"
+            exit 1
+          fi
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    environment: production
+    needs: health-check
+    if: github.event.inputs.skip_tests != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Playwright
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run critical smoke tests
+        working-directory: ./frontend
+        env:
+          TEST_ENV: production
+          BASE_URL: http://${{ secrets.PROD_HOST }}:3000
+        run: |
+          npx playwright test e2e/auth.spec.ts e2e/dashboard.spec.ts --project=chromium || exit 1
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: smoke-tests
+    if: failure()
+    steps:
+      - name: Notify and prepare rollback
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            🚨 PRODUCTION DEPLOYMENT FAILED
+            Repository: ${{ github.repository }}
+            Commit: ${{ env.DEPLOY_SHA }}
+            Author: ${{ github.actor }}
+
+            ⚠️ Smoke tests failed. Manual rollback required.
+
+            Rollback command:
+            ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}
+            cd /var/www/alca-financas
+            git reset --hard <previous-commit>
+            docker compose -f docker-compose.prod.yml up -d --force-recreate
+
+  success-notification:
+    name: Success Notification
+    runs-on: ubuntu-latest
+    needs: smoke-tests
+    if: success()
+    steps:
+      - name: Notify success
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ PRODUCTION DEPLOYMENT SUCCESS
+            Repository: ${{ github.repository }}
+            Commit: ${{ env.DEPLOY_SHA }}
+            Author: ${{ github.actor }}
+
+            🚀 All services deployed and smoke tests passed

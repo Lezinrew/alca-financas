@@ -1,0 +1,16 @@
+# Dockerfile para desenvolvimento local com hot-reload
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instala dependências
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copia código fonte (será sobrescrito por volume mount)
+COPY . .
+
+EXPOSE 3000
+
+# Hot reload com Vite
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

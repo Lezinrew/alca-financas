@@ -15,4 +15,5 @@ WORKDIR /app
 # A imagem base já expõe 18789; não adicionamos portas aqui.
 
 ENTRYPOINT ["node", "dist/index.js", "gateway"]
-CMD ["--bind", "0.0.0.0", "--port", "18789"]
+# CMD removido - argumentos devem vir do docker-compose.yml via command
+# Isso permite configurar --bind via compose sem rebuild
