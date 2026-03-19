@@ -281,7 +281,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       if (!formData.category_id) {
         throw new Error('Categoria é obrigatória');
       }
-      
+
+      if (!formData.account_id) {
+        throw new Error('Conta é obrigatória');
+      }
+
       // Normaliza a data para formato ISO (YYYY-MM-DD)
       const normalizedDate = normalizeDate(formData.date);
       
@@ -301,7 +305,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         amount: amountValue,
         type: formData.type,
         category_id: formData.category_id,
-        account_id: formData.account_id || undefined,
+        account_id: formData.account_id, // Validado como obrigatório acima
         date: dateString, // Envia apenas YYYY-MM-DD
         is_recurring: formData.is_recurring,
         installments: parseInt(formData.installments.toString()) || 1,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, accountsAPI } from '../../utils/api';
 import { Account, AccountPayload } from '../../types/account';
@@ -75,8 +76,10 @@ const Accounts: React.FC = () => {
 
       if (editingAccount?.id) {
         await accountsAPI.update(editingAccount.id, formData);
+        toast.success('Conta atualizada com sucesso!');
       } else {
         await accountsAPI.create(formData);
+        toast.success('Conta criada com sucesso!');
       }
 
       console.log('Accounts: Conta salva com sucesso');

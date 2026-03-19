@@ -1,8 +1,11 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
+import logging
 from utils.exceptions import ValidationException, NotFoundException
 from utils.money_utils import parse_money_value
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_date(d):
@@ -102,10 +105,15 @@ class AccountService:
             if aid and str(aid).strip():
                 account_data['account_id'] = str(aid).strip()
         
-        created_id = self.account_repo.create(account_data)
-        if created_id:
-            account_data['id'] = created_id
-        return account_data
+        try:
+            created_id = self.account_repo.create(account_data)
+            if created_id:
+                account_data['id'] = created_id
+            logger.info(f'Conta criada: {name} (tipo: {account_type}) - user_id: {user_id}')
+            return account_data
+        except Exception as e:
+            logger.error(f'Erro ao criar conta: {str(e)}', exc_info=True)
+            raise ValidationException(f'Erro ao salvar conta no banco de dados. Detalhe: {str(e)}')
 
     def update_account(self, user_id: str, account_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         account = self.account_repo.find_by_id(account_id)
@@ -113,14 +121,26 @@ class AccountService:
             raise NotFoundException('Conta não encontrada')
 
         update_data = {}
+
+        # Valida e aplica nome (verifica duplicatas se nome mudou)
         if 'name' in data:
-            update_data['name'] = data['name']
+            new_name = data['name'].strip() if data['name'] else ''
+            if not new_name:
+                raise ValidationException('Nome da conta não pode ser vazio')
+            if new_name != account.get('name'):
+                # Verifica se já existe outra conta com mesmo nome
+                tenant_id = account.get('tenant_id')
+                existing = self.account_repo.find_by_name(user_id, new_name, tenant_id=tenant_id)
+                if existing and (existing.get('id') or existing.get('_id')) != account_id:
+                    raise ValidationException(f'Conta "{new_name}" já existe')
+            update_data['name'] = new_name
+
+        # NÃO permite alterar tipo (evita inconsistência - ex: credit_card para checking)
+        if 'type' in data and data['type'] != account.get('type'):
+            raise ValidationException('Não é possível alterar o tipo da conta. Crie uma nova conta se necessário.')
+
         if 'color' in data:
             update_data['color'] = data['color']
-        if 'type' in data:
-             if data['type'] not in ['wallet', 'checking', 'savings', 'credit_card', 'investment']:
-                raise ValidationException('Tipo de conta inválido')
-             update_data['type'] = data['type']
         if 'institution' in data:
             update_data['institution'] = data['institution']
         if 'icon' in data:
@@ -147,8 +167,13 @@ class AccountService:
                 update_data['account_id'] = str(aid).strip() if aid and str(aid).strip() else None
 
         if update_data:
-            self.account_repo.update(account_id, update_data)
-            
+            try:
+                self.account_repo.update(account_id, update_data)
+                logger.info(f'Conta atualizada: {account_id} - user_id: {user_id}')
+            except Exception as e:
+                logger.error(f'Erro ao atualizar conta {account_id}: {str(e)}', exc_info=True)
+                raise ValidationException(f'Erro ao atualizar conta no banco de dados. Detalhe: {str(e)}')
+
         # Return updated account
         updated_account = self.account_repo.find_by_id(account_id)
         updated_account['id'] = updated_account.get('id') or updated_account.get('_id')
@@ -218,11 +243,21 @@ class AccountService:
         if not account or account.get('user_id') != user_id:
             raise NotFoundException('Conta não encontrada')
 
-        if getattr(self.transactions_repo, 'count_documents', None) is not None:
-            count = self.transactions_repo.count_documents({'account_id': account_id})
-        else:
-            count = len(self.transactions_repo.find_all({'account_id': account_id}))
-        if count > 0:
-            raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta conta')
+        try:
+            # Verifica se há transações usando esta conta
+            if getattr(self.transactions_repo, 'count_documents', None) is not None:
+                count = self.transactions_repo.count_documents({'account_id': account_id})
+            else:
+                count = len(self.transactions_repo.find_all({'account_id': account_id}))
+            if count > 0:
+                raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta conta')
 
-        return self.account_repo.delete(account_id)
+            result = self.account_repo.delete(account_id)
+            logger.info(f'Conta deletada: {account_id} ({account.get("name")}) - user_id: {user_id}')
+            return result
+        except ValidationException:
+            # Re-raise ValidationException sem logar (já é esperada)
+            raise
+        except Exception as e:
+            logger.error(f'Erro ao deletar conta {account_id}: {str(e)}', exc_info=True)
+            raise ValidationException(f'Erro ao deletar conta no banco de dados. Detalhe: {str(e)}')

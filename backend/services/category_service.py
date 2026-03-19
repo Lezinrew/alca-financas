@@ -1,6 +1,9 @@
 from typing import List, Dict, Any, Optional
 import uuid
+import logging
 from utils.exceptions import ValidationException, NotFoundException
+
+logger = logging.getLogger(__name__)
 
 
 class CategoryService:
@@ -43,10 +46,16 @@ class CategoryService:
             'icon': data.get('icon', 'circle'),
             'description': data.get('description', '')
         }
-        created_id = self.category_repo.create(category_data)
-        if created_id:
-            category_data['id'] = created_id
-        return category_data
+
+        try:
+            created_id = self.category_repo.create(category_data)
+            if created_id:
+                category_data['id'] = created_id
+            logger.info(f'Categoria criada: {name} ({category_type}) - user_id: {user_id}')
+            return category_data
+        except Exception as e:
+            logger.error(f'Erro ao criar categoria: {str(e)}', exc_info=True)
+            raise ValidationException(f'Erro ao salvar categoria no banco de dados. Detalhe: {str(e)}')
 
     def get_category(self, user_id: str, category_id: str) -> Dict[str, Any]:
         category = self.category_repo.find_by_id(category_id)
@@ -62,8 +71,25 @@ class CategoryService:
             raise NotFoundException('Categoria não encontrada')
 
         update_data = {}
+
+        # Valida e aplica nome (verifica duplicatas se nome mudou)
         if 'name' in data:
-            update_data['name'] = data['name']
+            new_name = data['name'].strip() if data['name'] else ''
+            if not new_name:
+                raise ValidationException('Nome da categoria não pode ser vazio')
+            if new_name != category.get('name'):
+                # Verifica se já existe outra categoria com mesmo nome e tipo
+                tenant_id = category.get('tenant_id')
+                category_type = category.get('type')
+                existing = self.category_repo.find_by_name_and_type(user_id, new_name, category_type, tenant_id=tenant_id)
+                if existing and (existing.get('id') or existing.get('_id')) != category_id:
+                    raise ValidationException(f'Categoria "{new_name}" já existe para este tipo')
+            update_data['name'] = new_name
+
+        # NÃO permite alterar tipo (evita inconsistência com transações existentes)
+        if 'type' in data and data['type'] != category.get('type'):
+            raise ValidationException('Não é possível alterar o tipo da categoria. Crie uma nova categoria se necessário.')
+
         if 'color' in data:
             update_data['color'] = data['color']
         if 'icon' in data:
@@ -72,7 +98,12 @@ class CategoryService:
             update_data['description'] = data['description']
 
         if update_data:
-            self.category_repo.update(category_id, update_data)
+            try:
+                self.category_repo.update(category_id, update_data)
+                logger.info(f'Categoria atualizada: {category_id} - user_id: {user_id}')
+            except Exception as e:
+                logger.error(f'Erro ao atualizar categoria {category_id}: {str(e)}', exc_info=True)
+                raise ValidationException(f'Erro ao atualizar categoria no banco de dados. Detalhe: {str(e)}')
 
         updated_category = self.category_repo.find_by_id(category_id)
         updated_category['id'] = updated_category.get('id') or updated_category.get('_id')
@@ -84,11 +115,21 @@ class CategoryService:
         if not category or category.get('user_id') != user_id:
             raise NotFoundException('Categoria não encontrada')
 
-        if getattr(self.transactions_repo, 'count_documents', None) is not None:
-            count = self.transactions_repo.count_documents({'category_id': category_id})
-        else:
-            count = len(self.transactions_repo.find_all({'category_id': category_id}))
-        if count > 0:
-            raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta categoria')
+        try:
+            # Verifica se há transações usando esta categoria
+            if getattr(self.transactions_repo, 'count_documents', None) is not None:
+                count = self.transactions_repo.count_documents({'category_id': category_id})
+            else:
+                count = len(self.transactions_repo.find_all({'category_id': category_id}))
+            if count > 0:
+                raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta categoria')
 
-        return self.category_repo.delete(category_id)
+            result = self.category_repo.delete(category_id)
+            logger.info(f'Categoria deletada: {category_id} ({category.get("name")}) - user_id: {user_id}')
+            return result
+        except ValidationException:
+            # Re-raise ValidationException sem logar (já é esperada)
+            raise
+        except Exception as e:
+            logger.error(f'Erro ao deletar categoria {category_id}: {str(e)}', exc_info=True)
+            raise ValidationException(f'Erro ao deletar categoria no banco de dados. Detalhe: {str(e)}')

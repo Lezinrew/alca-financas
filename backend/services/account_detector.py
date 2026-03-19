@@ -175,7 +175,7 @@ def extract_account_info_from_csv(filename: str, content: bytes) -> Optional[Dic
     """
     try:
         filename_lower = filename.lower()
-        
+
         # Detecta instituição pelo nome do arquivo
         institution = None
         if 'nubank' in filename_lower:
@@ -190,12 +190,22 @@ def extract_account_info_from_csv(filename: str, content: bytes) -> Optional[Dic
             institution = 'Santander'
         elif 'bb' in filename_lower or 'brasil' in filename_lower:
             institution = 'Banco do Brasil'
-        
+
         # Tenta extrair número da conta do nome do arquivo
         # Exemplo: NU_93015865_01OUT2025_31OUT2025.ofx ou NU_93015865_01OUT2025_31OUT2025.csv
         # Padrões: NU_XXXXX, NUBANK_XXXXX, etc.
         account_number_match = re.search(r'[A-Z]+[_-](\d+)', filename.upper())
         account_number = account_number_match.group(1) if account_number_match else None
+
+        # Se não encontrou número da conta, gera identificador único baseado no nome do arquivo
+        # para evitar criação de contas duplicadas sem distinção
+        if not account_number and institution:
+            import hashlib
+            from datetime import datetime
+            # Usa hash dos primeiros 100 bytes do conteúdo + timestamp (últimos 4 chars)
+            content_hash = hashlib.md5(content[:100]).hexdigest()[:4]
+            timestamp_suffix = datetime.now().strftime('%m%d')
+            account_number = f"{content_hash}{timestamp_suffix}"
         
         # Se não encontrou no nome, tenta no conteúdo do CSV (primeira linha pode ter info)
         if not account_number:
@@ -239,11 +249,15 @@ def find_or_create_account(
     user_id: str,
     account_info: Dict[str, Any],
     filename: str = None,
-    account_service=None
+    account_service=None,
+    tenant_id: str = None
 ) -> Tuple[Optional[str], bool]:
     """
     Busca uma conta existente ou cria uma nova baseado nas informações extraídas.
     Retorna: (account_id, was_created)
+
+    Args:
+        tenant_id: Workspace ID para associar à conta criada (obrigatório em multi-tenant)
     """
     if not account_info:
         return None, False
@@ -333,22 +347,25 @@ def find_or_create_account(
         'icon': config['icon'],
         'is_active': True
     }
-    
+
     # Se for cartão de crédito, adiciona campos específicos
     if account_type == 'credit_card':
         account_data['closing_day'] = 10  # Padrão
         account_data['due_day'] = 15  # Padrão
-    
+
     try:
         if account_service is not None:
-            new_account = account_service.create_account(user_id, account_data)
+            new_account = account_service.create_account(user_id, account_data, tenant_id=tenant_id)
             return new_account.get('id'), True
         from repositories.account_repository import AccountRepository
         from services.account_service import AccountService
         account_repo = AccountRepository(accounts)
         account_svc = AccountService(account_repo, None)
-        new_account = account_svc.create_account(user_id, account_data)
+        new_account = account_svc.create_account(user_id, account_data, tenant_id=tenant_id)
         return new_account.get('id'), True
-    except Exception:
+    except Exception as e:
+        # Log erro para facilitar debugging em produção
+        import logging
+        logging.error(f'Erro ao criar conta automaticamente: {str(e)}', exc_info=True)
         return None, False
 

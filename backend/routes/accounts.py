@@ -28,7 +28,8 @@ def accounts():
     service = AccountService(account_repo, transactions_repo)
 
     if request.method == 'GET':
-        accounts = service.list_accounts(request.user_id, tenant_id=getattr(request, 'tenant_id', None))
+        # tenant_id é garantido pelo decorator @require_tenant
+        accounts = service.list_accounts(request.user_id, tenant_id=request.tenant_id)
         filtered_accounts = [acc for acc in accounts if acc.get('user_id') == request.user_id]
         for acc in filtered_accounts:
             aid = _account_id(acc)
@@ -47,7 +48,8 @@ def accounts():
             return jsonify({'error': 'Dados não fornecidos. Certifique-se de enviar JSON válido.'}), 400
         
         print(f"DEBUG: Criando conta - user_id={request.user_id}, data={request_data}")
-        account = service.create_account(request.user_id, request_data, tenant_id=getattr(request, 'tenant_id', None))
+        # tenant_id é garantido pelo decorator @require_tenant
+        account = service.create_account(request.user_id, request_data, tenant_id=request.tenant_id)
         return jsonify(account), 201
     except ValidationException as e:
         print(f"DEBUG: ValidationException: {e.to_dict()}")
@@ -60,6 +62,7 @@ def accounts():
 
 @bp.route('/<account_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
+@require_tenant
 def account_detail(account_id: str):
     account_repo = current_app.config['ACCOUNTS']
     transactions_repo = current_app.config['TRANSACTIONS']
@@ -87,6 +90,7 @@ def account_detail(account_id: str):
 
 @bp.route('/<account_id>/import', methods=['POST'])
 @require_auth
+@require_tenant
 def import_credit_card_statement(account_id: str):
     """Importa fatura de cartão de crédito via PDF, OFX ou CSV"""
     from services.import_service import parse_import_file

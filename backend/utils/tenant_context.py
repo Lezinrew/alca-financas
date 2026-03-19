@@ -87,16 +87,25 @@ def require_tenant(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not hasattr(request, "user_id"):
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"require_tenant: Tentativa de acesso sem user_id - Path: {request.path}")
             return jsonify({"error": "Autenticação necessária"}), 401
 
         # Payload opcional pode ter sido colocado por decorators de auth no futuro
         token_payload = getattr(request, "jwt_payload", None)
         tenant_id, error_response = resolve_tenant_id(request.user_id, token_payload)
         if error_response is not None:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"require_tenant: Resolução de tenant falhou - User: {request.user_id} - Path: {request.path}")
             return error_response
 
         # Rotas que exigem tenant (ex.: criar conta) precisam de tenant_id preenchido
         if tenant_id is None:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"require_tenant: Nenhum workspace disponível - User: {request.user_id} - Path: {request.path}")
             return (
                 jsonify({
                     "error": "Nenhum workspace disponível. Não foi possível criar um workspace padrão.",
@@ -106,6 +115,9 @@ def require_tenant(f):
             )
 
         setattr(request, "tenant_id", tenant_id)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"require_tenant: Tenant resolvido - User: {request.user_id} - Tenant: {tenant_id} - Path: {request.path}")
         return f(*args, **kwargs)
 
     return decorated

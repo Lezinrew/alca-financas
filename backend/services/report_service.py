@@ -12,11 +12,20 @@ def _period_iso(month: int, year: int):
 
 
 def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str, month: int, year: int) -> Dict[str, Any]:
-    """Dashboard summary usando repositórios Supabase (find_all, find_by_id, etc.)."""
+    """
+    Dashboard summary usando repositórios Supabase.
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
+    """
     start_iso, end_iso = _period_iso(month, year)
     transactions_list = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
-    total_income = sum(float(t.get('amount', 0)) for t in transactions_list if t.get('type') == 'income')
-    total_expense = sum(float(t.get('amount', 0)) for t in transactions_list if t.get('type') == 'expense')
+
+    # Filtra apenas transações pagas para consistência com saldo das contas
+    paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
+
+    total_income = sum(float(t.get('amount', 0)) for t in paid_transactions if t.get('type') == 'income')
+    total_expense = sum(float(t.get('amount', 0)) for t in paid_transactions if t.get('type') == 'expense')
     balance = total_income - total_expense
 
     recent_raw = transactions_repo.find_by_user_limit(user_id, 10)
@@ -40,7 +49,9 @@ def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str,
     income_by_category = []
     by_cat_expense: Dict[str, Dict[str, Any]] = {}
     by_cat_income: Dict[str, Dict[str, Any]] = {}
-    for t in transactions_list:
+
+    # Agrupa por categoria (apenas transações pagas)
+    for t in paid_transactions:
         cat_id = t.get('category_id') or ''
         amount = float(t.get('amount', 0))
         typ = t.get('type', 'expense')
@@ -87,7 +98,8 @@ def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str,
             'total_income': total_income,
             'total_expense': total_expense,
             'balance': balance,
-            'transactions_count': len(transactions_list)
+            'transactions_count': len(paid_transactions),
+            'pending_transactions_count': len(transactions_list) - len(paid_transactions)
         },
         'recent_transactions': recent_transactions,
         'expense_by_category': expense_by_category,
@@ -96,7 +108,12 @@ def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str,
 
 
 def monthly_evolution_supabase(transactions_repo, user_id: str, months_back: int) -> List[Dict[str, Any]]:
-    """Evolução mensal usando repositório Supabase."""
+    """
+    Evolução mensal usando repositório Supabase.
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
+    """
     evolution_data: List[Dict[str, Any]] = []
     current_date = datetime.now()
     for i in range(months_back - 1, -1, -1):
@@ -109,8 +126,12 @@ def monthly_evolution_supabase(transactions_repo, user_id: str, months_back: int
         start_iso = month_start.strftime('%Y-%m-%d')
         end_iso = month_end.strftime('%Y-%m-%d')
         month_transactions = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
-        month_income = sum(float(t.get('amount', 0)) for t in month_transactions if t.get('type') == 'income')
-        month_expense = sum(float(t.get('amount', 0)) for t in month_transactions if t.get('type') == 'expense')
+
+        # Filtra apenas transações pagas para consistência com saldo das contas
+        paid_month_transactions = [t for t in month_transactions if t.get('status') == 'paid']
+
+        month_income = sum(float(t.get('amount', 0)) for t in paid_month_transactions if t.get('type') == 'income')
+        month_expense = sum(float(t.get('amount', 0)) for t in paid_month_transactions if t.get('type') == 'expense')
         evolution_data.append({
             'period': target_date.strftime('%m/%Y'),
             'month': target_date.month,
@@ -118,19 +139,29 @@ def monthly_evolution_supabase(transactions_repo, user_id: str, months_back: int
             'income': month_income,
             'expense': month_expense,
             'balance': month_income - month_expense,
-            'transactions_count': len(month_transactions)
+            'transactions_count': len(paid_month_transactions)
         })
     return evolution_data
 
 
 def dashboard_summary(transactions_collection, categories_collection, user_id: str, month: int, year: int) -> Dict[str, Any]:
+    """
+    Dashboard summary usando MongoDB.
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
+    """
     start_date = datetime(year, month, 1)
     end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     period_filter = {'user_id': user_id, 'date': {'$gte': start_date, '$lt': end_date}}
 
     transactions_list = list(transactions_collection.find(period_filter))
-    total_income = sum(t['amount'] for t in transactions_list if t['type'] == 'income')
-    total_expense = sum(t['amount'] for t in transactions_list if t['type'] == 'expense')
+
+    # Filtra apenas transações pagas para consistência com saldo das contas
+    paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
+
+    total_income = sum(t['amount'] for t in paid_transactions if t['type'] == 'income')
+    total_expense = sum(t['amount'] for t in paid_transactions if t['type'] == 'expense')
     balance = total_income - total_expense
 
     recent_transactions = list(transactions_collection.find({'user_id': user_id}).sort('date', -1).limit(10))
@@ -146,8 +177,9 @@ def dashboard_summary(transactions_collection, categories_collection, user_id: s
             transaction['id'] = transaction['_id']
             transaction.pop('_id', None)
 
+    # Agrega despesas por categoria (apenas transações pagas)
     expense_pipeline = [
-        {'$match': {**period_filter, 'type': 'expense'}},
+        {'$match': {**period_filter, 'type': 'expense', 'status': 'paid'}},
         {'$group': {'_id': '$category_id', 'total': {'$sum': '$amount'}, 'count': {'$sum': 1}}},
         {'$sort': {'total': -1}}
     ]
@@ -165,8 +197,9 @@ def dashboard_summary(transactions_collection, categories_collection, user_id: s
                 'percentage': (item['total'] / total_expense * 100) if total_expense > 0 else 0
             })
 
+    # Agrega receitas por categoria (apenas transações pagas)
     income_pipeline = [
-        {'$match': {**period_filter, 'type': 'income'}},
+        {'$match': {**period_filter, 'type': 'income', 'status': 'paid'}},
         {'$group': {'_id': '$category_id', 'total': {'$sum': '$amount'}, 'count': {'$sum': 1}}},
         {'$sort': {'total': -1}}
     ]
@@ -195,7 +228,8 @@ def dashboard_summary(transactions_collection, categories_collection, user_id: s
             'total_income': total_income,
             'total_expense': total_expense,
             'balance': balance,
-            'transactions_count': len(transactions_list)
+            'transactions_count': len(paid_transactions),
+            'pending_transactions_count': len(transactions_list) - len(paid_transactions)
         },
         'recent_transactions': recent_transactions,
         'expense_by_category': expense_by_category,
@@ -204,6 +238,12 @@ def dashboard_summary(transactions_collection, categories_collection, user_id: s
 
 
 def monthly_evolution(transactions_collection, user_id: str, months_back: int):
+    """
+    Evolução mensal usando MongoDB.
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
+    """
     evolution_data: List[Dict[str, Any]] = []
     current_date = datetime.now()
     for i in range(months_back - 1, -1, -1):
@@ -212,8 +252,12 @@ def monthly_evolution(transactions_collection, user_id: str, months_back: int):
         month_end = target_date.replace(year=target_date.year + 1, month=1, day=1) if target_date.month == 12 else target_date.replace(month=target_date.month + 1, day=1)
         month_filter = {'user_id': user_id, 'date': {'$gte': month_start, '$lt': month_end}}
         month_transactions = list(transactions_collection.find(month_filter))
-        month_income = sum(t['amount'] for t in month_transactions if t['type'] == 'income')
-        month_expense = sum(t['amount'] for t in month_transactions if t['type'] == 'expense')
+
+        # Filtra apenas transações pagas para consistência com saldo das contas
+        paid_month_transactions = [t for t in month_transactions if t.get('status') == 'paid']
+
+        month_income = sum(t['amount'] for t in paid_month_transactions if t['type'] == 'income')
+        month_expense = sum(t['amount'] for t in paid_month_transactions if t['type'] == 'expense')
         evolution_data.append({
             'period': target_date.strftime('%m/%Y'),
             'month': target_date.month,
@@ -221,7 +265,7 @@ def monthly_evolution(transactions_collection, user_id: str, months_back: int):
             'income': month_income,
             'expense': month_expense,
             'balance': month_income - month_expense,
-            'transactions_count': len(month_transactions)
+            'transactions_count': len(paid_month_transactions)
         })
     return evolution_data
 
@@ -356,9 +400,15 @@ def overview_report(transactions_collection, categories_collection, accounts_col
         accounts_data: List[Dict[str, Any]] = []
         for account in accounts_list:
             account_transactions = list(transactions_collection.find({'user_id': user_id, 'account_id': account.get('_id')}))
-            income_total = sum(t.get('amount', 0) for t in account_transactions if t.get('type') == 'income')
-            expense_total = sum(t.get('amount', 0) for t in account_transactions if t.get('type') == 'expense')
-            current_balance = account.get('initial_balance', 0) + income_total - expense_total
+            # Filtra apenas transações pagas (consistência com current_balance)
+            paid_account_transactions = [t for t in account_transactions if t.get('status') == 'paid']
+
+            income_total = sum(t.get('amount', 0) for t in paid_account_transactions if t.get('type') == 'income')
+            expense_total = sum(t.get('amount', 0) for t in paid_account_transactions if t.get('type') == 'expense')
+
+            # IMPORTANTE: Usa current_balance direto do banco (fonte da verdade)
+            current_balance_db = account.get('current_balance', 0)
+
             accounts_data.append({
                 'account_id': account.get('_id'),
                 'account_name': account.get('name', 'Sem nome'),
@@ -366,7 +416,7 @@ def overview_report(transactions_collection, categories_collection, accounts_col
                 'account_icon': account.get('icon', 'wallet2'),
                 'account_type': account.get('type', 'wallet'),
                 'initial_balance': account.get('initial_balance', 0),
-                'current_balance': current_balance,
+                'current_balance': current_balance_db,  # Usa valor do banco (fonte da verdade)
                 'total_income': income_total,
                 'total_expense': expense_total
             })
@@ -387,6 +437,12 @@ def overview_report(transactions_collection, categories_collection, accounts_col
 
 
 def comparison_report(transactions_collection, user_id: str, current_month: int, current_year: int) -> Dict[str, Any]:
+    """
+    Relatório de comparação usando MongoDB.
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
+    """
     current_start = datetime(current_year, current_month, 1)
     current_end = datetime(current_year + 1, 1, 1) if current_month == 12 else datetime(current_year, current_month + 1, 1)
     if current_month == 1:
@@ -396,16 +452,27 @@ def comparison_report(transactions_collection, user_id: str, current_month: int,
         prev_start = datetime(current_year, current_month - 1, 1)
         prev_end = current_start
 
-    current_transactions = list(transactions_collection.find({'user_id': user_id, 'date': {'$gte': current_start, '$lt': current_end}}))
+    current_transactions_all = list(transactions_collection.find({'user_id': user_id, 'date': {'$gte': current_start, '$lt': current_end}}))
+    prev_transactions_all = list(transactions_collection.find({'user_id': user_id, 'date': {'$gte': prev_start, '$lt': prev_end}}))
+
+    # Filtra apenas transações pagas para consistência
+    current_transactions = [t for t in current_transactions_all if t.get('status') == 'paid']
+    prev_transactions = [t for t in prev_transactions_all if t.get('status') == 'paid']
+
     current_income = sum(t['amount'] for t in current_transactions if t['type'] == 'income')
     current_expense = sum(t['amount'] for t in current_transactions if t['type'] == 'expense')
 
-    prev_transactions = list(transactions_collection.find({'user_id': user_id, 'date': {'$gte': prev_start, '$lt': prev_end}}))
     prev_income = sum(t['amount'] for t in prev_transactions if t['type'] == 'income')
     prev_expense = sum(t['amount'] for t in prev_transactions if t['type'] == 'expense')
 
     income_variation = ((current_income - prev_income) / prev_income * 100) if prev_income > 0 else 0
     expense_variation = ((current_expense - prev_expense) / prev_expense * 100) if prev_expense > 0 else 0
+
+    # Calcula variação de saldo (absoluta e percentual)
+    current_balance = current_income - current_expense
+    prev_balance = prev_income - prev_expense
+    balance_variation_absolute = current_balance - prev_balance
+    balance_variation_percent = (balance_variation_absolute / prev_balance * 100) if prev_balance != 0 else 0
 
     return {
         'current_period': {
@@ -413,7 +480,7 @@ def comparison_report(transactions_collection, user_id: str, current_month: int,
             'end_date': current_end.isoformat(),
             'income': current_income,
             'expense': current_expense,
-            'balance': current_income - current_expense,
+            'balance': current_balance,
             'transactions_count': len(current_transactions)
         },
         'previous_period': {
@@ -421,13 +488,14 @@ def comparison_report(transactions_collection, user_id: str, current_month: int,
             'end_date': prev_end.isoformat(),
             'income': prev_income,
             'expense': prev_expense,
-            'balance': prev_income - prev_expense,
+            'balance': prev_balance,
             'transactions_count': len(prev_transactions)
         },
         'variations': {
             'income_variation': income_variation,
             'expense_variation': expense_variation,
-            'balance_variation': ((current_income - current_expense) - (prev_income - prev_expense)),
+            'balance_variation': balance_variation_absolute,
+            'balance_variation_percent': balance_variation_percent,
             'transactions_variation': len(current_transactions) - len(prev_transactions)
         }
     }
@@ -608,13 +676,18 @@ def overview_report_supabase(
 
         for account in accounts_list:
             acc_id = account.get('id') or account.get('_id')
-            # Busca todas as transações da conta
+            # Busca todas as transações PAGAS da conta (consistência com current_balance)
             account_transactions = transactions_repo.find_all({'user_id': user_id, 'account_id': acc_id})
+            paid_account_transactions = [t for t in account_transactions if t.get('status') == 'paid']
 
-            income_total = sum(float(t.get('amount', 0)) for t in account_transactions if t.get('type') == 'income')
-            expense_total = sum(float(t.get('amount', 0)) for t in account_transactions if t.get('type') == 'expense')
+            income_total = sum(float(t.get('amount', 0)) for t in paid_account_transactions if t.get('type') == 'income')
+            expense_total = sum(float(t.get('amount', 0)) for t in paid_account_transactions if t.get('type') == 'expense')
             initial_balance = float(account.get('initial_balance', 0))
-            current_balance = initial_balance + income_total - expense_total
+
+            # IMPORTANTE: Usa current_balance direto do banco (sempre consistente)
+            # mas também recalcula para validação (pode ser útil em debug)
+            current_balance_db = float(account.get('current_balance', 0))
+            current_balance_calculated = initial_balance + income_total - expense_total
 
             accounts_data.append({
                 'account_id': acc_id,
@@ -623,7 +696,7 @@ def overview_report_supabase(
                 'account_icon': account.get('icon', 'wallet2'),
                 'account_type': account.get('type', 'wallet'),
                 'initial_balance': initial_balance,
-                'current_balance': current_balance,
+                'current_balance': current_balance_db,  # Usa valor do banco (fonte da verdade)
                 'total_income': income_total,
                 'total_expense': expense_total
             })
@@ -648,6 +721,9 @@ def comparison_report_supabase(
     """
     Relatório de comparação usando repositório Supabase.
     Substitui comparison_report() que usava MongoDB find().
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
     """
     # Período atual
     current_start = datetime(current_year, current_month, 1)
@@ -662,16 +738,20 @@ def comparison_report_supabase(
         prev_end = current_start
 
     # Busca transações dos dois períodos
-    current_transactions = transactions_repo.find_by_user_and_date_range(
+    current_transactions_all = transactions_repo.find_by_user_and_date_range(
         user_id,
         current_start.strftime('%Y-%m-%d'),
         current_end.strftime('%Y-%m-%d')
     )
-    prev_transactions = transactions_repo.find_by_user_and_date_range(
+    prev_transactions_all = transactions_repo.find_by_user_and_date_range(
         user_id,
         prev_start.strftime('%Y-%m-%d'),
         prev_end.strftime('%Y-%m-%d')
     )
+
+    # Filtra apenas transações pagas para consistência
+    current_transactions = [t for t in current_transactions_all if t.get('status') == 'paid']
+    prev_transactions = [t for t in prev_transactions_all if t.get('status') == 'paid']
 
     # Calcula totais
     current_income = sum(float(t.get('amount', 0)) for t in current_transactions if t.get('type') == 'income')
@@ -680,9 +760,15 @@ def comparison_report_supabase(
     prev_income = sum(float(t.get('amount', 0)) for t in prev_transactions if t.get('type') == 'income')
     prev_expense = sum(float(t.get('amount', 0)) for t in prev_transactions if t.get('type') == 'expense')
 
-    # Calcula variações
+    # Calcula variações percentuais
     income_variation = ((current_income - prev_income) / prev_income * 100) if prev_income > 0 else 0
     expense_variation = ((current_expense - prev_expense) / prev_expense * 100) if prev_expense > 0 else 0
+
+    # Calcula variação de saldo (absoluta e percentual)
+    current_balance = current_income - current_expense
+    prev_balance = prev_income - prev_expense
+    balance_variation_absolute = current_balance - prev_balance
+    balance_variation_percent = (balance_variation_absolute / prev_balance * 100) if prev_balance != 0 else 0
 
     return {
         'current_period': {
@@ -690,7 +776,7 @@ def comparison_report_supabase(
             'end_date': current_end.isoformat(),
             'income': current_income,
             'expense': current_expense,
-            'balance': current_income - current_expense,
+            'balance': current_balance,
             'transactions_count': len(current_transactions)
         },
         'previous_period': {
@@ -698,12 +784,14 @@ def comparison_report_supabase(
             'end_date': prev_end.isoformat(),
             'income': prev_income,
             'expense': prev_expense,
-            'balance': prev_income - prev_expense,
+            'balance': prev_balance,
             'transactions_count': len(prev_transactions)
         },
         'variations': {
             'income_variation': income_variation,
             'expense_variation': expense_variation,
-            'balance_variation': ((current_income - current_expense) - (prev_income - prev_expense)) / (prev_income - prev_expense) * 100 if (prev_income - prev_expense) != 0 else 0
+            'balance_variation': balance_variation_absolute,
+            'balance_variation_percent': balance_variation_percent,
+            'transactions_variation': len(current_transactions) - len(prev_transactions)
         }
     }

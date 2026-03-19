@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -279,8 +280,10 @@ const Transactions = () => {
       setError(''); // Limpa erros anteriores
       if (editingTransaction) {
         await transactionsAPI.update(editingTransaction.id, formData);
+        toast.success('Transação atualizada com sucesso!');
       } else {
         await transactionsAPI.create(formData);
+        toast.success('Transação criada com sucesso!');
       }
 
       // Fecha o modal apenas se a requisição foi bem-sucedida
