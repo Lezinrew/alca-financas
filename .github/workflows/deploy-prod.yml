@@ -130,10 +130,14 @@ jobs:
 
       - name: Build and deploy frontend
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           password: ${{ secrets.PROD_PASSWORD }}
+          envs: VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY
           script: |
             set -e
             cd /var/www/alca-financas
@@ -147,8 +151,11 @@ jobs:
             rm -rf frontend/dist build/frontend
             mkdir -p build/frontend
 
-            echo "📦 Building frontend..."
+            echo "📦 Building frontend with Supabase config..."
             docker run --rm \
+              -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
+              -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
+              -e VITE_API_URL="http://localhost:8001" \
               -v /var/www/alca-financas/frontend:/app \
               -w /app \
               node:22-alpine \
