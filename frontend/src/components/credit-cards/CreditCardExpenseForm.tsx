@@ -507,7 +507,6 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
             </form>
           </div>
         </div>
-      </div>
     </>
   );
 };
