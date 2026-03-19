@@ -93,6 +93,12 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
         if (monthlyIncomeValue <= 0) {
           throw new Error('A renda mensal deve ser maior que zero');
         }
+
+        // Validação de percentual de economia (0-100%)
+        if (formData.savings_percentage < 0 || formData.savings_percentage > 100) {
+          throw new Error('Percentual de economia deve estar entre 0% e 100%');
+        }
+
         setStep(2);
         setLoading(false);
         return;

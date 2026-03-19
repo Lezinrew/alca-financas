@@ -64,6 +64,7 @@ def require_auth_supabase(f):
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
+            logger.warning(f"Tentativa de acesso sem token - Path: {request.path} - IP: {request.remote_addr}")
             return jsonify({'error': 'Token de autorização necessário'}), 401
 
         access_token = auth_header[7:]  # Remove 'Bearer '
@@ -72,14 +73,16 @@ def require_auth_supabase(f):
             user = _get_authenticated_user(access_token)
 
             if not user:
+                logger.warning(f"Token inválido ou expirado - Path: {request.path} - IP: {request.remote_addr}")
                 return jsonify({'error': 'Token inválido ou expirado'}), 401
 
             request.user_id = user['id']
             request.user = user
+            logger.debug(f"Autenticação bem-sucedida - User: {user['id']} - Path: {request.path}")
 
             return f(*args, **kwargs)
         except Exception as e:
-            logger.error(f"Erro ao verificar autenticação: {e}")
+            logger.error(f"Erro ao verificar autenticação - Path: {request.path} - IP: {request.remote_addr} - Erro: {e}", exc_info=True)
             return jsonify({'error': 'Erro ao verificar autenticação'}), 401
 
     return decorated
@@ -113,6 +116,7 @@ def token_required(f):
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
+            logger.warning(f"token_required: Tentativa de acesso sem token - Path: {request.path} - IP: {request.remote_addr}")
             return jsonify({'error': 'Token de autorização necessário'}), 401
 
         access_token = auth_header[7:]  # Remove 'Bearer '
@@ -121,14 +125,16 @@ def token_required(f):
             user = _get_authenticated_user(access_token)
 
             if not user:
+                logger.warning(f"token_required: Token inválido ou expirado - Path: {request.path} - IP: {request.remote_addr}")
                 return jsonify({'error': 'Token inválido ou expirado'}), 401
 
             request.user_id = user['id']
             request.user = user
+            logger.debug(f"token_required: Autenticação bem-sucedida - User: {user['id']} - Path: {request.path}")
 
             return f(user, *args, **kwargs)
         except Exception as e:
-            logger.error(f"Erro ao verificar autenticação: {e}")
+            logger.error(f"token_required: Erro ao verificar autenticação - Path: {request.path} - IP: {request.remote_addr} - Erro: {e}", exc_info=True)
             return jsonify({'error': 'Erro ao verificar autenticação'}), 401
 
     return decorated

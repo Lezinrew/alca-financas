@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { categoriesAPI } from '../../utils/api';
@@ -141,8 +142,10 @@ const Categories = () => {
     try {
       if (editingCategory) {
         await categoriesAPI.update(editingCategory.id, formData);
+        toast.success('Categoria atualizada com sucesso!');
       } else {
         await categoriesAPI.create(formData);
+        toast.success('Categoria criada com sucesso!');
       }
 
       setShowForm(false);

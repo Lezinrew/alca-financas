@@ -1,9 +1,12 @@
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import uuid
+import logging
 from utils.exceptions import ValidationException, NotFoundException
 from utils.money_utils import parse_money_value
 from utils.date_utils import parse_date_value
+
+logger = logging.getLogger(__name__)
 
 
 def _category_for(categories_repo, category_id):
@@ -153,7 +156,9 @@ class TransactionService:
             created_id = self.transaction_repo.create(transaction_data)
             if created_id:
                 transaction_data['id'] = created_id
+            logger.info(f'Transação criada: {transaction_data["description"]} - R$ {amount_val} - user_id: {user_id}')
         except Exception as e:
+            logger.error(f'Erro ao criar transação: {str(e)}', exc_info=True)
             raise ValidationException(f'Erro ao salvar no banco de dados. Detalhe: {str(e)}')
 
         if account_id and transaction_data['status'] == 'paid':
@@ -241,17 +246,20 @@ class TransactionService:
         # 2) Aplica impacto novo (se transação nova é paga e tem conta)
         try:
             # Passo 1: reverter saldo antigo
+            # Para reverter: aplica o tipo oposto com mesmo amount
             if old_account_id and old_status == 'paid' and old_amount:
-                # Usa amount negativo com o mesmo tipo para inverter o sinal
-                self._update_account_balance(old_account_id, -old_amount, old_type)
+                opposite_type = self._get_opposite_type(old_type)
+                self._update_account_balance(old_account_id, old_amount, opposite_type)
 
             # Atualiza transação no repositório
             self.transaction_repo.update(transaction_id, update_data)
+            logger.info(f'Transação atualizada: {transaction_id} - user_id: {user_id}')
 
             # Passo 2: aplicar saldo novo
             if new_account_id and new_status == 'paid' and new_amount:
                 self._update_account_balance(new_account_id, new_amount, new_type)
         except Exception as e:
+            logger.error(f'Erro ao atualizar transação {transaction_id}: {str(e)}', exc_info=True)
             raise ValidationException(f'Erro ao atualizar no banco de dados. Detalhe: {str(e)}')
 
         return {'message': 'Transação atualizada com sucesso'}
@@ -261,20 +269,21 @@ class TransactionService:
         if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
 
-        if transaction.get('account_id') and transaction.get('status') == 'paid':
-            reverse_amount = -float(transaction['amount']) if transaction.get('type') == 'income' else float(transaction['amount'])
-            if getattr(self.accounts_repo, 'update_one', None) is not None:
-                self.accounts_repo.update_one(
-                    {'_id': transaction['account_id']},
-                    {'$inc': {'current_balance': reverse_amount}}
-                )
-            elif hasattr(self.accounts_repo, 'find_by_id') and hasattr(self.accounts_repo, 'update'):
-                acc = self.accounts_repo.find_by_id(transaction['account_id'])
-                if acc:
-                    new_balance = (acc.get('current_balance') or 0) + reverse_amount
-                    self.accounts_repo.update(transaction['account_id'], {'current_balance': new_balance})
+        try:
+            # Reverter impacto no saldo (se transação era paga)
+            # Usa mesma lógica de update_transaction para consistência
+            if transaction.get('account_id') and transaction.get('status') == 'paid':
+                amount = float(transaction.get('amount', 0))
+                tx_type = transaction.get('type', 'expense')
+                opposite_type = self._get_opposite_type(tx_type)
+                self._update_account_balance(transaction['account_id'], amount, opposite_type)
 
-        return self.transaction_repo.delete(transaction_id)
+            result = self.transaction_repo.delete(transaction_id)
+            logger.info(f'Transação deletada: {transaction_id} ({transaction.get("description")}) - user_id: {user_id}')
+            return result
+        except Exception as e:
+            logger.error(f'Erro ao deletar transação {transaction_id}: {str(e)}', exc_info=True)
+            raise ValidationException(f'Erro ao deletar transação no banco de dados. Detalhe: {str(e)}')
 
     def _create_installments(
         self,
@@ -323,7 +332,9 @@ class TransactionService:
 
         try:
             self.transaction_repo.create_many(to_create)
+            logger.info(f'Parcelamento criado: {installments}x de {data["description"]} - user_id: {user_id}')
         except Exception as e:
+            logger.error(f'Erro ao criar parcelamento: {str(e)}', exc_info=True)
             raise ValidationException(f'Erro ao salvar parcelamentos no banco de dados. Detalhe: {str(e)}')
         
         # Update balance for paid installments (usually only the first one if status is paid, or all? 
@@ -337,7 +348,22 @@ class TransactionService:
                 
         return {'count': len(to_create), 'transactions': to_create}
 
+    def _get_opposite_type(self, type: str) -> str:
+        """
+        Retorna o tipo oposto para reversão de impacto.
+        Usar para reverter transações: aplica o tipo oposto com mesmo amount.
+        """
+        return 'expense' if type == 'income' else 'income'
+
     def _update_account_balance(self, account_id: str, amount: float, type: str):
+        """
+        Aplica impacto de transação no saldo da conta.
+        - income: aumenta saldo (+amount)
+        - expense: diminui saldo (-amount)
+
+        Para REVERTER uma transação, use _get_opposite_type:
+        self._update_account_balance(account_id, amount, self._get_opposite_type(old_type))
+        """
         balance_change = amount if type == 'income' else -amount
         if getattr(self.accounts_repo, 'update_one', None) is not None:
             self.accounts_repo.update_one(

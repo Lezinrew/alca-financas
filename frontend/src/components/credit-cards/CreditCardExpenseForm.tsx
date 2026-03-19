@@ -116,6 +116,11 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
         throw new Error('Categoria é obrigatória');
       }
 
+      // Validação de data obrigatória
+      if (!formData.date || formData.date === 'other') {
+        throw new Error('Data é obrigatória');
+      }
+
       const submitData = {
         ...formData,
         amount: amountValue,
@@ -147,57 +152,73 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
 
   return (
     <>
-      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }}></div>
-      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
-        <div className="modal-dialog modal-lg" role="document">
-          <div className="modal-content">
-            {/* Header */}
-            <div className="modal-header">
-              <h5 className="modal-title">Nova despesa cartão de crédito</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={onHide}
-                disabled={loading}
-                aria-label="Fechar"
-              ></button>
-            </div>
+      {/* Backdrop com blur */}
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1040] animate-fade-in"
+        onClick={onHide}
+      ></div>
+
+      {/* Modal */}
+      <div className="fixed inset-0 z-[1050] flex items-center justify-center p-4 pointer-events-none">
+        <div className="modal-content pointer-events-auto max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700/50">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+              Nova despesa cartão de crédito
+            </h2>
+            <button
+              type="button"
+              onClick={onHide}
+              disabled={loading}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
+              aria-label="Fechar"
+            >
+              <i className="bi bi-x-lg text-xl"></i>
+            </button>
+          </div>
 
             <form onSubmit={handleSubmit}>
-              <div className="modal-body">
+              <div className="p-6">
                 {error && (
-                  <div className="alert alert-danger mb-3" role="alert">
-                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                    {error}
+                  <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 animate-shake" role="alert">
+                    <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
+                    <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
                   </div>
                 )}
 
-                <div className="row g-3">
+                <div className="space-y-4">
                   {/* Valor */}
-                  <div className="col-12">
-                    <label htmlFor="expense-amount" className="form-label">Valor</label>
-                    <CurrencyInput
-                      id="expense-amount"
-                      name="amount"
-                      className="form-control form-control-lg border-0 border-bottom rounded-0 px-0 text-primary fw-bold fs-3"
-                      value={formData.amount}
-                      onValueChange={handleAmountChange}
-                      placeholder="0,00"
-                      disabled={loading}
-                      required
-                      autoComplete="transaction-amount"
-                    />
+                  <div>
+                    <label htmlFor="expense-amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Valor
+                    </label>
+                    <div className="relative">
+                      <i className="bi bi-currency-dollar absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none"></i>
+                      <CurrencyInput
+                        id="expense-amount"
+                        name="amount"
+                        className="w-full h-14 pl-12 pr-4 text-2xl font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                        value={formData.amount}
+                        onValueChange={handleAmountChange}
+                        placeholder="0,00"
+                        disabled={loading}
+                        required
+                        autoComplete="transaction-amount"
+                      />
+                    </div>
                   </div>
 
                   {/* Data - Botões de Seleção Rápida */}
-                  <div className="col-12">
-                    <label className="form-label">Data</label>
-                    <div className="btn-group w-100" role="group">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Data
+                    </label>
+                    <div className="flex gap-2" role="group">
                       {dateOptions.map((option) => (
                         <React.Fragment key={option.value}>
                           <input
                             type="radio"
-                            className="btn-check"
+                            className="sr-only"
                             name="date"
                             id={`date-${option.value}`}
                             value={option.value}
@@ -205,7 +226,14 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                             onChange={handleChange}
                             disabled={loading}
                           />
-                          <label className="btn btn-outline-primary" htmlFor={`date-${option.value}`}>
+                          <label
+                            htmlFor={`date-${option.value}`}
+                            className={`flex-1 px-4 py-2 text-sm font-medium text-center rounded-lg border transition-all cursor-pointer ${
+                              formData.date === option.value || (option.value === 'other' && !['today', 'yesterday'].includes(formData.date))
+                                ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500 text-white'
+                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                            }`}
+                          >
                             {option.label}
                           </label>
                         </React.Fragment>
@@ -215,116 +243,133 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       <input
                         type="date"
                         name="date"
-                        className="form-control mt-2"
+                        className="mt-2 w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                         value={formData.date === 'other' ? '' : formData.date}
                         onChange={handleChange}
                         disabled={loading}
+                        required
                       />
                     )}
                   </div>
 
                   {/* Descrição */}
-                  <div className="col-12">
-                    <label htmlFor="expense-description" className="form-label">Descrição</label>
-                    <input
-                      type="text"
-                      id="expense-description"
-                      name="description"
-                      className="form-control"
-                      value={formData.description}
-                      onChange={handleChange}
-                      placeholder="Digite a descrição"
-                      disabled={loading}
-                      autoComplete="off"
-                    />
+                  <div>
+                    <label htmlFor="expense-description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Descrição
+                    </label>
+                    <div className="relative">
+                      <i className="bi bi-chat-left-text absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                      <input
+                        type="text"
+                        id="expense-description"
+                        name="description"
+                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                        value={formData.description}
+                        onChange={handleChange}
+                        placeholder="Digite a descrição"
+                        disabled={loading}
+                        autoComplete="off"
+                      />
+                    </div>
                   </div>
 
                   {/* Categoria */}
-                  <div className="col-12">
-                    <label htmlFor="expense-category" className="form-label">Categoria</label>
-                    <select
-                      id="expense-category"
-                      name="category_id"
-                      className="form-select"
-                      value={formData.category_id}
-                      onChange={handleChange}
-                      required
-                      disabled={loading}
-                    >
-                      <option value="">Selecionar categoria</option>
-                      {expenseCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
+                  <div>
+                    <label htmlFor="expense-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Categoria
+                    </label>
+                    <div className="relative">
+                      <i className="bi bi-tag absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                      <select
+                        id="expense-category"
+                        name="category_id"
+                        className="w-full h-11 pl-10 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all appearance-none"
+                        value={formData.category_id}
+                        onChange={handleChange}
+                        required
+                        disabled={loading}
+                      >
+                        <option value="">Selecionar categoria</option>
+                        {expenseCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      <i className="bi bi-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
                   </div>
 
                   {/* Cartão de Crédito - Exibição apenas */}
-                  <div className="col-12">
-                    <label className="form-label">Cartão de crédito</label>
-                    <div className="p-3 bg-light dark:bg-slate-700 rounded">
-                      <div className="d-flex align-items-center gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Cartão de crédito
+                    </label>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                      <div className="flex items-center gap-3">
                         <div
-                          className="rounded"
+                          className="rounded-lg flex items-center justify-center"
                           style={{
-                            width: '40px',
-                            height: '26px',
-                            backgroundColor: card.color,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
+                            width: '48px',
+                            height: '32px',
+                            backgroundColor: card.color
                           }}
                         >
-                          <i className="bi bi-credit-card-fill text-white"></i>
+                          <i className="bi bi-credit-card-fill text-white text-lg"></i>
                         </div>
                         <div>
-                          <div className="fw-medium">{card.name}</div>
-                          <div className="small text-muted">Fecha dia {card.closingDay}</div>
+                          <div className="font-medium text-slate-900 dark:text-white">{card.name}</div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400">Fecha dia {card.closingDay}</div>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Data de Vencimento */}
-                  <div className="col-12">
-                    <label htmlFor="expense-due-date" className="form-label">Data de vencimento</label>
-                    <select
-                      id="expense-due-date"
-                      className="form-select"
-                      disabled={loading}
-                    >
-                      <option>15 de dez de 2025</option>
-                    </select>
+                  <div>
+                    <label htmlFor="expense-due-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Data de vencimento
+                    </label>
+                    <div className="relative">
+                      <i className="bi bi-calendar-check absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                      <select
+                        id="expense-due-date"
+                        className="w-full h-11 pl-10 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all appearance-none"
+                        disabled={loading}
+                      >
+                        <option>15 de dez de 2025</option>
+                      </select>
+                      <i className="bi bi-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
                   </div>
 
                   {/* Toggle: Ignorar transação */}
-                  <div className="col-12">
-                    <div className="form-check form-switch">
+                  <div>
+                    <label className="flex items-center gap-3 cursor-pointer group">
                       <input
                         type="checkbox"
-                        className="form-check-input"
                         id="ignore-transaction"
                         name="ignore_transaction"
                         checked={formData.ignore_transaction}
                         onChange={handleChange}
                         disabled={loading}
+                        className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all"
                       />
-                      <label className="form-check-label" htmlFor="ignore-transaction">
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
                         Ignorar transação
-                      </label>
-                    </div>
+                      </span>
+                    </label>
                   </div>
 
                   {/* Botão Mais/Menos Detalhes */}
-                  <div className="col-12">
+                  <div>
                     <button
                       type="button"
-                      className="btn btn-link text-decoration-none p-0"
+                      className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       onClick={() => setShowMoreDetails(!showMoreDetails)}
                     >
                       {showMoreDetails ? 'Menos detalhes' : 'Mais detalhes'}
-                      <i className={`bi bi-chevron-${showMoreDetails ? 'up' : 'down'} ms-2`}></i>
+                      <i className={`bi bi-chevron-${showMoreDetails ? 'up' : 'down'}`}></i>
                     </button>
                   </div>
 
@@ -332,13 +377,15 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                   {showMoreDetails && (
                     <>
                       {/* Tags */}
-                      <div className="col-12">
-                        <label htmlFor="expense-tags" className="form-label">Tags</label>
+                      <div>
+                        <label htmlFor="expense-tags" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                          Tags
+                        </label>
                         <input
                           type="text"
                           id="expense-tags"
                           name="tags"
-                          className="form-control"
+                          className="w-full h-11 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                           value={formData.tags}
                           onChange={handleChange}
                           placeholder="Digite as tags"
@@ -348,12 +395,14 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       </div>
 
                       {/* Observação */}
-                      <div className="col-12">
-                        <label htmlFor="expense-observation" className="form-label">Observação</label>
+                      <div>
+                        <label htmlFor="expense-observation" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                          Observação
+                        </label>
                         <textarea
                           id="expense-observation"
                           name="observation"
-                          className="form-control"
+                          className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all resize-none"
                           rows={3}
                           value={formData.observation}
                           onChange={handleChange}
@@ -363,58 +412,62 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       </div>
 
                       {/* Despesa Fixa */}
-                      <div className="col-12">
-                        <div className="form-check form-switch">
+                      <div>
+                        <label className="flex items-center gap-3 cursor-pointer group">
                           <input
                             type="checkbox"
-                            className="form-check-input"
                             id="is-fixed"
                             name="is_fixed"
                             checked={formData.is_fixed}
                             onChange={handleChange}
                             disabled={loading}
+                            className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all"
                           />
-                          <label className="form-check-label" htmlFor="is-fixed">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
                             Despesa fixa
-                          </label>
-                        </div>
+                          </span>
+                        </label>
                       </div>
 
                       {/* Parcelado */}
-                      <div className="col-12">
-                        <div className="form-check form-switch">
+                      <div>
+                        <label className="flex items-center gap-3 cursor-pointer group">
                           <input
                             type="checkbox"
-                            className="form-check-input"
                             id="is-installment"
                             name="is_installment"
                             checked={formData.is_installment}
                             onChange={handleChange}
                             disabled={loading}
+                            className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all"
                           />
-                          <label className="form-check-label" htmlFor="is-installment">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
                             Parcelado
-                          </label>
-                        </div>
+                          </span>
+                        </label>
                       </div>
 
                       {/* Número de Parcelas */}
                       {formData.is_installment && (
-                        <div className="col-12">
-                          <label htmlFor="expense-installments" className="form-label">Número de parcelas</label>
-                          <div className="input-group">
+                        <div>
+                          <label htmlFor="expense-installments" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Número de parcelas
+                          </label>
+                          <div className="flex items-center gap-2">
                             <input
                               type="number"
                               id="expense-installments"
                               name="installments"
-                              className="form-control"
+                              className="flex-1 h-11 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                               value={formData.installments}
                               onChange={handleChange}
                               min="2"
                               max="60"
                               disabled={loading}
                             />
-                            <span className="input-group-text">vezes</span>
+                            <span className="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium">
+                              vezes
+                            </span>
                           </div>
                         </div>
                       )}
@@ -423,27 +476,31 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                 </div>
               </div>
 
-              <div className="modal-footer">
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700/50">
                 <button
                   type="button"
-                  className="btn btn-secondary"
                   onClick={onHide}
                   disabled={loading}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                  Salvar e criar nova
+                  Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
                   disabled={loading}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {loading ? (
                     <>
-                      <span className="loading-spinner me-2"></span>
+                      <i className="bi bi-hourglass-split animate-spin"></i>
                       Salvando...
                     </>
                   ) : (
-                    'Salvar'
+                    <>
+                      <i className="bi bi-check-lg"></i>
+                      Salvar
+                    </>
                   )}
                 </button>
               </div>

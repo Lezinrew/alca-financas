@@ -54,19 +54,17 @@ def transactions():
                 filters,
                 page,
                 per_page,
-                tenant_id=getattr(request, 'tenant_id', None),
+                tenant_id=request.tenant_id,
             )
         )
 
     try:
         data = request.get_json() or {}
-        tenant_id = getattr(request, 'tenant_id', None)
-        if not tenant_id:
-            return jsonify({'error': 'Workspace não identificado. Recarregue a página ou faça login novamente.'}), 403
+        # tenant_id é garantido pelo decorator @require_tenant
         result = service.create_transaction(
             request.user_id,
             data,
-            tenant_id=tenant_id,
+            tenant_id=request.tenant_id,
         )
         return jsonify({'message': f"{result['count']} transação(ões) criada(s) com sucesso", 'count': result['count']}), 201
     except ValidationException as e:
@@ -75,6 +73,7 @@ def transactions():
 
 @bp.route('/<transaction_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
+@require_tenant
 def transaction_detail(transaction_id: str):
     transaction_repo = current_app.config['TRANSACTIONS']
     categories_repo = current_app.config['CATEGORIES']
@@ -156,7 +155,8 @@ def import_transactions():
                     request.user_id,
                     account_info,
                     file.filename,
-                    account_service=account_service
+                    account_service=account_service,
+                    tenant_id=tenant_id
                 )
                 if account_created and account_id:
                     account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None

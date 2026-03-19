@@ -15,7 +15,8 @@ def categories():
     service = CategoryService(category_repo, transactions_repo)
 
     if request.method == 'GET':
-        return jsonify(service.list_categories(request.user_id, tenant_id=getattr(request, 'tenant_id', None)))
+        # tenant_id é garantido pelo decorator @require_tenant
+        return jsonify(service.list_categories(request.user_id, tenant_id=request.tenant_id))
     
     try:
         # Debug: verifica Content-Type
@@ -38,17 +39,9 @@ def categories():
         if not isinstance(data, dict):
             return jsonify({'error': 'Dados devem ser um objeto JSON'}), 400
         
-        tenant_id = getattr(request, 'tenant_id', None)
-        if not tenant_id:
-            return (
-                jsonify({
-                    'error': 'Workspace não identificado. Recarregue a página ou faça login novamente.',
-                    'code': 'tenant_required',
-                }),
-                403,
-            )
-        print(f"DEBUG: Chamando create_category com user_id={request.user_id}, tenant_id={tenant_id}, data={data}")
-        category = service.create_category(request.user_id, data, tenant_id=tenant_id)
+        # tenant_id é garantido pelo decorator @require_tenant
+        print(f"DEBUG: Chamando create_category com user_id={request.user_id}, tenant_id={request.tenant_id}, data={data}")
+        category = service.create_category(request.user_id, data, tenant_id=request.tenant_id)
         return jsonify(category), 201
     except ValidationException as e:
         print(f"DEBUG: ValidationException: {e.to_dict()}")
@@ -61,6 +54,7 @@ def categories():
 
 @bp.route('/<category_id>', methods=['GET', 'PUT', 'DELETE'])
 @require_auth
+@require_tenant
 def category_detail(category_id: str):
     category_repo = current_app.config['CATEGORIES']
     transactions_repo = current_app.config['TRANSACTIONS']
