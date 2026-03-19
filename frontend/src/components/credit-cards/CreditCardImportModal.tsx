@@ -94,13 +94,13 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
     <>
       {/* Backdrop */}
       <div
-        className="modal-backdrop"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in"
         onClick={handleClose}
       ></div>
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="modal-content pointer-events-auto max-w-lg w-full">
+        <div className="modal-content pointer-events-auto max-w-lg w-full animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700/50">
             <h2 className="text-xl font-semibold text-primary">
@@ -120,14 +120,14 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
           {/* Body */}
           <div className="p-6">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 animate-shake">
                 <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
                 <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
               </div>
             )}
 
             {success && (
-              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2">
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 animate-fade-in">
                 <i className="bi bi-check-circle-fill text-green-600 dark:text-green-400"></i>
                 <span className="text-green-800 dark:text-green-200 text-sm">{success}</span>
               </div>
@@ -153,9 +153,11 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
               </div>
 
               {selectedFile && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <i className="bi bi-file-earmark text-blue-600 dark:text-blue-400"></i>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                      <i className="bi bi-file-earmark text-blue-600 dark:text-blue-400 text-lg"></i>
+                    </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
                         {selectedFile.name}
@@ -164,6 +166,7 @@ const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
                         {(selectedFile.size / 1024).toFixed(2)} KB
                       </p>
                     </div>
+                    <i className="bi bi-check-circle-fill text-blue-600 dark:text-blue-400"></i>
                   </div>
                 </div>
               )}

@@ -363,17 +363,17 @@ const CreditCardDetail: React.FC = () => {
             <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{card.name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setShowImportModal(true)}
-            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            className="px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-all shadow-sm hover:shadow flex items-center gap-2"
           >
             <i className="bi bi-upload"></i>
             Importar Fatura
           </button>
           <button
             onClick={() => setShowExpenseForm(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white rounded-lg font-medium transition-all shadow-sm hover:shadow-md flex items-center gap-2"
           >
             <i className="bi bi-plus-circle"></i>
             Adicionar Despesa
@@ -443,51 +443,51 @@ const CreditCardDetail: React.FC = () => {
           </div>
 
           {/* Expenses Table */}
-          <div className="card-base overflow-hidden">
+          <div className="card-base overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="table-header">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Situação
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                       onClick={() => handleSort('date')}
                     >
                       <div className="flex items-center gap-2">
                         Data
                         {sortField === 'date' && (
-                          <i className={`bi bi-arrow-${sortDirection === 'asc' ? 'up' : 'down'}`}></i>
+                          <i className={`bi bi-arrow-${sortDirection === 'asc' ? 'up' : 'down'} text-blue-600 dark:text-blue-400`}></i>
                         )}
                       </div>
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                       onClick={() => handleSort('description')}
                     >
                       <div className="flex items-center gap-2">
                         Descrição
                         {sortField === 'description' && (
-                          <i className={`bi bi-arrow-${sortDirection === 'asc' ? 'up' : 'down'}`}></i>
+                          <i className={`bi bi-arrow-${sortDirection === 'asc' ? 'up' : 'down'} text-blue-600 dark:text-blue-400`}></i>
                         )}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Categoria
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                       onClick={() => handleSort('amount')}
                     >
                       <div className="flex items-center gap-2">
                         Valor
                         {sortField === 'amount' && (
-                          <i className={`bi bi-arrow-${sortDirection === 'asc' ? 'up' : 'down'}`}></i>
+                          <i className={`bi bi-arrow-${sortDirection === 'asc' ? 'up' : 'down'} text-blue-600 dark:text-blue-400`}></i>
                         )}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Ações
                     </th>
                   </tr>
@@ -511,38 +511,38 @@ const CreditCardDetail: React.FC = () => {
                     sortedExpenses
                       .filter((expense) => expense && expense.id) // Filtra itens inválidos
                       .map((expense) => (
-                        <tr key={expense.id} className="table-row">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                        <tr key={expense.id} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
                               {expense.status === 'paid' ? 'Pago' : 'Pendente'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-secondary">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
                             {expense.date ? formatDate(expense.date) : '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-primary font-medium">
+                          <td className="px-4 py-4 text-sm text-slate-900 dark:text-white font-medium">
                             {expense.description || 'Sem descrição'}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-4 whitespace-nowrap">
                             {expense.category && expense.category.name ? (
                               <div className="flex items-center gap-2">
                                 <div
-                                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center shadow-sm"
                                   style={{ backgroundColor: expense.category.color || '#6b7280' }}
                                 >
                                   <i className={`bi bi-${expense.category.icon || 'circle'} text-white text-xs`}></i>
                                 </div>
-                                <span className="text-sm text-secondary">{expense.category.name}</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{expense.category.name}</span>
                               </div>
                             ) : (
                               <span className="text-sm text-slate-400">Sem categoria</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-red-600 dark:text-red-400">
                             {formatCurrency(expense.amount || 0)}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm">
-                            <button className="text-blue-600 dark:text-blue-400 hover:underline">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm">
+                            <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
                               Editar
                             </button>
                           </td>
@@ -558,91 +558,95 @@ const CreditCardDetail: React.FC = () => {
         {/* Sidebar */}
         <div className="space-y-4">
           {/* Valor da Fatura */}
-          <div className="card-base p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Valor da fatura</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(totalExpenses)}</p>
+          <div className="card-base p-5 relative overflow-hidden group hover:shadow-lg transition-shadow">
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+            <div className="relative flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Valor da fatura</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalExpenses)}</p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <i className="bi bi-currency-dollar text-blue-600 dark:text-blue-400 text-xl"></i>
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <i className="bi bi-currency-dollar text-white text-2xl"></i>
               </div>
             </div>
           </div>
 
           {/* Limite disponível */}
-          <div className="card-base p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Limite disponível</p>
-                <p className={`text-2xl font-bold ${availableLimit >= 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-red-600 dark:text-red-400'
-                  }`}>
-                  {formatCurrency(availableLimit)}
-                </p>
-                <p className="text-xs text-secondary mt-1">
-                  Limite total: {formatCurrency(card.limit)} | Usado: {formatCurrency(totalUsed)}
-                </p>
+          <div className="card-base p-5 relative overflow-hidden group hover:shadow-lg transition-shadow">
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Limite disponível</p>
+                  <p className={`text-2xl font-bold ${availableLimit >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-red-600 dark:text-red-400'
+                    }`}>
+                    {formatCurrency(availableLimit)}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-500 mt-1.5">
+                    Total: {formatCurrency(card.limit)} · Usado: {formatCurrency(totalUsed)}
+                  </p>
+                </div>
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-400 dark:to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                  <i className="bi bi-speedometer text-white text-2xl"></i>
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <i className="bi bi-speedometer text-amber-600 dark:text-amber-400 text-xl"></i>
+              <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${availableLimit >= 0
+                      ? 'bg-gradient-to-r from-emerald-500 to-blue-500'
+                      : 'bg-gradient-to-r from-red-500 to-red-600'
+                    }`}
+                  style={{
+                    width: `${Math.min(
+                      card.limit > 0 ? Math.max(0, (totalUsed / card.limit) * 100) : 0,
+                      100
+                    )}%`
+                  }}
+                ></div>
               </div>
-            </div>
-            <div className="mt-4 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${availableLimit >= 0
-                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500'
-                    : 'bg-red-500'
-                  }`}
-                style={{
-                  width: `${Math.min(
-                    card.limit > 0 ? Math.max(0, (totalUsed / card.limit) * 100) : 0,
-                    100
-                  )}%`
-                }}
-              ></div>
             </div>
           </div>
 
           {/* Status */}
-          <div className="card-base p-4">
+          <div className="card-base p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Status</p>
-                <p className="text-lg font-semibold text-primary">Fatura aberta</p>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Status</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">Fatura aberta</p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <i className="bi bi-file-text text-green-600 dark:text-green-400 text-xl"></i>
               </div>
             </div>
           </div>
 
           {/* Dia de Fechamento */}
-          <div className="card-base p-4">
+          <div className="card-base p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Dia de fechamento</p>
-                <p className="text-lg font-semibold text-primary">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Dia de fechamento</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">
                   {getNextClosingDate()?.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                 <i className="bi bi-calendar text-purple-600 dark:text-purple-400 text-xl"></i>
               </div>
             </div>
           </div>
 
           {/* Data Vencimento */}
-          <div className="card-base p-4">
+          <div className="card-base p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Data vencimento</p>
-                <p className="text-lg font-semibold text-primary">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Data vencimento</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">
                   {getNextDueDate()?.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                 <i className="bi bi-check-circle text-emerald-600 dark:text-emerald-400 text-xl"></i>
               </div>
             </div>
