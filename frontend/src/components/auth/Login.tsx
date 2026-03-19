@@ -113,7 +113,7 @@ const Login: React.FC = () => {
                     placeholder="seu@email.com"
                     value={formData.email}
                     onChange={handleChange}
-                    className="h-11 pl-10 border-slate-200 dark:border-slate-600"
+                    className="h-11 pl-10 border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
                     aria-invalid={!!error}
                   />
                 </div>
@@ -134,7 +134,7 @@ const Login: React.FC = () => {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="h-11 pl-10 pr-10 border-slate-200 dark:border-slate-600"
+                    className="h-11 pl-10 pr-10 border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
                     aria-invalid={!!error}
                   />
                   <button
@@ -171,9 +171,10 @@ const Login: React.FC = () => {
 
               {error && (
                 <div
-                  className="text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5"
+                  className="text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5 animate-shake"
                   role="alert"
                 >
+                  <i className="bi bi-exclamation-triangle-fill text-amber-500 dark:text-amber-400 mr-2"></i>
                   {error}
                 </div>
               )}

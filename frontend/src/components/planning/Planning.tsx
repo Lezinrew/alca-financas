@@ -193,32 +193,35 @@ const Planning: React.FC = () => {
       )}
 
       {!planningData ? (
-        <div className="card-base p-12 text-center">
+        <div className="card-base p-12 text-center shadow-sm">
           <div className="max-w-md mx-auto">
-            <div className="mb-6">
-              <div className="w-48 h-48 mx-auto bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-full flex items-center justify-center">
-                <i className="bi bi-graph-up-arrow text-6xl text-purple-600 dark:text-purple-400" />
+            <div className="mb-8 relative">
+              <div className="w-48 h-48 mx-auto bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-full flex items-center justify-center relative animate-float">
+                <div className="absolute inset-0 rounded-full bg-purple-500/10 dark:bg-purple-400/10 blur-2xl animate-glow-pulse"></div>
+                <i className="bi bi-graph-up-arrow text-6xl text-purple-600 dark:text-purple-400 relative" />
               </div>
             </div>
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-              Não foi possível carregar o planejamento
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
+              Nenhum planejamento encontrado
             </h3>
-            <p className="text-slate-600 dark:text-slate-300 mb-6">
-              Verifique sua conexão e tente novamente, ou defina um novo planejamento.
+            <p className="text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
+              Crie seu primeiro planejamento mensal para acompanhar receitas, despesas e metas financeiras.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 type="button"
                 onClick={() => setShowForm(true)}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-500 dark:to-purple-600 dark:hover:from-purple-600 dark:hover:to-purple-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40"
               >
+                <i className="bi bi-plus-circle mr-2"></i>
                 Definir planejamento
               </button>
               <button
                 type="button"
                 onClick={loadData}
-                className="px-6 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
+                className="px-6 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg font-medium transition-all shadow-sm hover:shadow"
               >
+                <i className="bi bi-arrow-clockwise mr-2"></i>
                 Tentar novamente
               </button>
             </div>
@@ -255,7 +258,7 @@ const Planning: React.FC = () => {
             <button
               type="button"
               onClick={handleCopyPreviousMonth}
-              className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors flex items-center gap-2"
+              className="px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg font-medium transition-all shadow-sm hover:shadow flex items-center gap-2"
             >
               <i className="bi bi-copy" />
               Copiar mês anterior

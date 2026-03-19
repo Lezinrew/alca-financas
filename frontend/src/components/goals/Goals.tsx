@@ -80,7 +80,7 @@ const Goals: React.FC = () => {
           <button
             type="button"
             onClick={handleCreate}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 flex items-center gap-2"
           >
             <i className="bi bi-plus-lg" />
             Nova meta
@@ -96,73 +96,86 @@ const Goals: React.FC = () => {
       )}
 
       {goals.length === 0 ? (
-        <div className="card-base p-12 text-center">
+        <div className="card-base p-12 text-center shadow-sm">
           <div className="max-w-md mx-auto">
-            <div className="w-32 h-32 mx-auto bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4">
-              <i className="bi bi-bullseye text-5xl text-indigo-600 dark:text-indigo-400" />
+            <div className="relative mb-8">
+              <div className="w-40 h-40 mx-auto bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center relative animate-float">
+                <div className="absolute inset-0 rounded-full bg-indigo-500/10 dark:bg-indigo-400/10 blur-2xl animate-glow-pulse"></div>
+                <i className="bi bi-bullseye text-6xl text-indigo-600 dark:text-indigo-400 relative" />
+              </div>
             </div>
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
               Nenhuma meta ainda
             </h3>
-            <p className="text-slate-600 dark:text-slate-300 mb-6">
-              Crie uma meta (viagem, reserva de emergência, carro, etc.) e acompanhe seu progresso.
+            <p className="text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
+              Crie metas financeiras (viagem, reserva de emergência, carro) e acompanhe seu progresso em direção aos seus objetivos.
             </p>
             <button
               type="button"
               onClick={handleCreate}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg font-medium transition-colors"
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40"
             >
+              <i className="bi bi-plus-circle mr-2"></i>
               Criar primeira meta
             </button>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {goals.map((goal) => (
             <button
               type="button"
               key={goal.id}
               onClick={() => handleCardClick(goal.id)}
-              className="card-base p-0 overflow-hidden text-left hover:ring-2 hover:ring-indigo-500 dark:hover:ring-indigo-400 transition-all"
+              className="card-base p-0 overflow-hidden text-left hover:shadow-xl hover:scale-[1.02] transition-all duration-200 group relative"
             >
-              <div className="aspect-[2/1] bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="aspect-[2/1] bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 relative overflow-hidden">
                 {goal.image_url ? (
                   <img
                     src={goal.image_url}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <i className="bi bi-bullseye text-4xl text-slate-400 dark:text-slate-500" />
+                    <i className="bi bi-bullseye text-5xl text-slate-400 dark:text-slate-500 group-hover:scale-110 transition-transform" />
                   </div>
                 )}
-                <span className="absolute top-2 right-2 px-2 py-0.5 rounded text-xs font-medium bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                <span className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold bg-white/95 dark:bg-slate-800/95 text-slate-700 dark:text-slate-300 backdrop-blur-sm shadow-lg">
                   {STATUS_LABELS[goal.status] || goal.status}
                 </span>
               </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-slate-900 dark:text-white truncate">
+              <div className="p-5 relative">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate mb-2">
                   {goal.title}
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  Meta: {formatCurrency(goal.target_amount)}
-                  {goal.target_date && ` · ${formatDate(goal.target_date)}`}
+                <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                  <i className="bi bi-currency-dollar"></i>
+                  <span>Meta: {formatCurrency(goal.target_amount)}</span>
+                  {goal.target_date && (
+                    <>
+                      <span className="text-slate-400">·</span>
+                      <i className="bi bi-calendar3"></i>
+                      <span>{formatDate(goal.target_date)}</span>
+                    </>
+                  )}
                 </p>
-                <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    {formatCurrency(goal.current_amount)} guardados
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    {formatCurrency(goal.current_amount)}
                   </span>
-                  <span className="text-slate-500 dark:text-slate-400">
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">
                     {goal.progress_percent != null ? `${goal.progress_percent.toFixed(0)}%` : '—'}
                   </span>
                 </div>
-                <div className="mt-2 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="mt-2.5 h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all"
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 dark:from-indigo-400 dark:to-purple-400 rounded-full transition-all duration-500"
                     style={{
                       width: `${Math.min(goal.progress_percent ?? 0, 100)}%`,
                     }}

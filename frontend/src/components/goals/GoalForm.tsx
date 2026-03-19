@@ -87,103 +87,134 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card-base p-6 space-y-4 max-w-xl">
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+    <form onSubmit={handleSubmit} className="card-base p-6 space-y-5 max-w-xl shadow-lg">
+      <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
         {goal ? 'Editar meta' : 'Nova meta'}
       </h2>
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 text-sm">
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 text-sm flex items-center gap-2 animate-shake">
+          <i className="bi bi-exclamation-triangle-fill"></i>
           {error}
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Título *
         </label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Ex: Viagem para Porto de Galinhas"
-          className="input-base w-full"
-          required
-        />
+        <div className="relative">
+          <i className="bi bi-bullseye absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex: Viagem para Porto de Galinhas"
+            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+            required
+          />
+        </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Descrição (opcional)
         </label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-          className="input-base w-full"
-        />
+        <div className="relative">
+          <i className="bi bi-chat-left-text absolute left-3 top-3 text-slate-400 pointer-events-none"></i>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Descreva sua meta..."
+            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all resize-none"
+          />
+        </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Valor da meta (R$) *
         </label>
-        <input
-          type="text"
-          value={targetAmount}
-          onChange={(e) => setTargetAmount(e.target.value)}
-          placeholder="0,00"
-          className="input-base w-full"
-          required
-        />
+        <div className="relative">
+          <i className="bi bi-currency-dollar absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
+          <input
+            type="text"
+            value={targetAmount}
+            onChange={(e) => setTargetAmount(e.target.value)}
+            placeholder="0,00"
+            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+            required
+          />
+        </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Data alvo (opcional)
         </label>
-        <input
-          type="date"
-          value={targetDate}
-          onChange={(e) => setTargetDate(e.target.value)}
-          className="input-base w-full"
-        />
+        <div className="relative">
+          <i className="bi bi-calendar3 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+          />
+        </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           URL da imagem inspiracional (opcional)
         </label>
-        <input
-          type="url"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://..."
-          className="input-base w-full"
-        />
+        <div className="relative">
+          <i className="bi bi-image absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+          />
+        </div>
       </div>
       {goal && (
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Status
           </label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as GoalStatus)}
-            className="input-base w-full"
-          >
-            <option value="active">Em andamento</option>
-            <option value="paused">Pausada</option>
-            <option value="completed">Concluída</option>
-          </select>
+          <div className="relative">
+            <i className="bi bi-flag absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as GoalStatus)}
+              className="w-full h-11 pl-10 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all appearance-none"
+            >
+              <option value="active">Em andamento</option>
+              <option value="paused">Pausada</option>
+              <option value="completed">Concluída</option>
+            </select>
+            <i className="bi bi-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+          </div>
         </div>
       )}
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-3 pt-4">
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium"
+          className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 disabled:shadow-none flex items-center gap-2"
         >
-          {loading ? 'Salvando...' : goal ? 'Salvar' : 'Criar meta'}
+          {loading ? (
+            <>
+              <i className="bi bi-hourglass-split animate-spin"></i>
+              Salvando...
+            </>
+          ) : (
+            <>
+              <i className="bi bi-check-lg"></i>
+              {goal ? 'Salvar' : 'Criar meta'}
+            </>
+          )}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium"
+          className="px-6 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium transition-all"
         >
           Cancelar
         </button>
