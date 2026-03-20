@@ -9,6 +9,22 @@ Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no 
 ## Solução
 Adicionar os secrets do Supabase no GitHub Actions para que sejam injetados durante o build do frontend.
 
+### Rebuild manual no VPS (imediato)
+
+Se o site já está no ar mas o bundle foi gerado **sem** as variáveis, o erro continua até **voltar a fazer o build** com `VITE_SUPABASE_*` definidas.
+
+1. No servidor, garanta `/var/www/alca-financas/.env` com **pelo menos**:
+   - `VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY=` (chave **anon** do dashboard)
+
+2. Execute na raiz do projeto:
+   ```bash
+   chmod +x scripts/rebuild-frontend-prod-on-server.sh
+   ./scripts/rebuild-frontend-prod-on-server.sh
+   ```
+
+3. Confirme que a URL do Supabase entrou no JS: `grep -r supabase.co build/frontend/assets/ | head -1`
+
 ---
 
 ## 📋 Passo a Passo
@@ -67,10 +83,11 @@ git push origin main
 ```
 
 Isso vai:
-1. Disparar o workflow `deploy-prod.yml`
-2. Fazer build do frontend **COM** as variáveis do Supabase
-3. Deploy em produção
-4. Executar smoke tests
+1. Disparar CI/CD Pipeline - Supabase
+2. Após CI passar, disparar `deploy-production.yml`
+3. Fazer build do frontend **COM** as variáveis do Supabase
+4. Deploy em produção
+5. Executar smoke tests
 
 ### Opção 2: Deploy manual via SSH (mais rápido, sem CI/CD)
 ```bash
@@ -135,7 +152,7 @@ grep -r "blutjlzyvhdvnkvrzdcm" /var/www/alca-financas/build/frontend/assets/*.js
 
 ## 📝 O que foi alterado?
 
-### `.github/workflows/deploy-prod.yml`
+### `.github/workflows/deploy-production.yml`
 ```yaml
 # ANTES (SEM variáveis):
 docker run --rm \

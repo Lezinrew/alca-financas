@@ -75,6 +75,32 @@ cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys
 cat ~/.ssh/deploy_key
 ```
 
+**PROD_PASSWORD** (se o workflow usar `appleboy/ssh-action` com senha em vez de chave)
+
+---
+
+### Supabase — build do frontend (produção)
+
+O Vite **embute** `VITE_*` no JavaScript na hora do `npm run build`. Sem isso, o site quebra com:
+
+`Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY...`
+
+Configure no GitHub (**Settings → Secrets → Actions**), no ambiente **production** se aplicável:
+
+**VITE_SUPABASE_URL**
+```
+https://xxxx.supabase.co
+```
+(igual a **SUPABASE_URL** do projeto, URL pública do projeto.)
+
+**VITE_SUPABASE_ANON_KEY**
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+(chave **anon** / **publishable** em Project Settings → API no Supabase — **não** use a `service_role` no frontend.)
+
+Usado por: [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-production.yml). Ver também [`SUPABASE-SECRETS-SETUP.md`](../SUPABASE-SECRETS-SETUP.md) na raiz do repo.
+
 ---
 
 ### 📱 Notificações Telegram (Opcional)
@@ -183,7 +209,9 @@ Você deve ver (nomes exatos dos secrets):
 - ✅ DOCKER_PASSWORD
 - ✅ PROD_HOST
 - ✅ PROD_USER
-- ✅ PROD_SSH_KEY
+- ✅ PROD_PASSWORD ou PROD_SSH_KEY (conforme o workflow)
+- ✅ VITE_SUPABASE_URL (build frontend em produção)
+- ✅ VITE_SUPABASE_ANON_KEY (build frontend em produção)
 - ✅ TELEGRAM_CHAT_ID (opcional)
 - ✅ TELEGRAM_BOT_TOKEN (opcional)
 
