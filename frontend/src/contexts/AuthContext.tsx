@@ -105,6 +105,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (credentials: { email: string; password: string }, rememberMe = false) => {
     try {
+      // Após apagar/recriar usuário no Supabase, tokens antigos no browser invalidam refresh e derrubam a sessão.
+      clearAuthStorage();
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: credentials.email,
         password: credentials.password,
