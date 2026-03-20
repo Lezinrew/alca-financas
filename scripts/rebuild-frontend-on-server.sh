@@ -20,18 +20,18 @@ fi
 
 cd /var/www/alca-financas
 
-echo "🧹 Limpando builds antigos..."
-rm -rf frontend/dist build/frontend
+echo "🧹 Limpando builds antigos e node_modules..."
+rm -rf frontend/node_modules frontend/dist build/frontend
 mkdir -p build/frontend
 
-echo "📦 Rebuilding frontend com Supabase config..."
+echo "📦 Rebuilding frontend com Supabase config (fresh install)..."
 docker run --rm \
   -e VITE_SUPABASE_URL="https://blutjlzyvhdvnkvrzdcm.supabase.co" \
   -e VITE_SUPABASE_ANON_KEY="***REMOVED_SUPABASE_ANON_KEY***" \
   -v /var/www/alca-financas/frontend:/app \
   -w /app \
   node:22-alpine \
-  sh -c "npm ci && npm run build"
+  sh -c "rm -rf node_modules package-lock.json && npm install && npm run build"
 
 echo "📋 Copiando build para nginx..."
 cp -a frontend/dist/. build/frontend/
