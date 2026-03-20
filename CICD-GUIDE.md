@@ -5,7 +5,7 @@
 ```
 .github/workflows/
 ├── deploy-dev.yml          ✅ CI/CD para branch develop
-├── deploy-prod.yml         ✅ Deploy automático para produção
+├── deploy-production.yml   ✅ Deploy automático para produção (dispara após CI)
 ├── validate-migrations.yml ✅ Validação de migrations (mantido)
 └── gitleaks.yml            ✅ Security scan (mantido)
 ```
@@ -290,7 +290,7 @@ cd frontend && npm run test:run
 | Workflow | Duração Média | Máximo Aceitável |
 |----------|---------------|------------------|
 | **deploy-dev.yml** | 5-8 min | 12 min |
-| **deploy-prod.yml** | 10-15 min | 20 min |
+| **deploy-production.yml** | 10-15 min | 20 min |
 | **validate-migrations.yml** | 1-2 min | 5 min |
 | **gitleaks.yml** | 30s | 2 min |
 
@@ -333,9 +333,14 @@ cd frontend && npm run test:run
 
 ## 📝 CHANGELOG
 
+### 2026-03-20 - Workflow único de produção
+- ✅ Removido `deploy-prod.yml` (redundante)
+- ✅ Mantido apenas `deploy-production.yml` (mais completo, com smoke tests)
+- ✅ Secrets configurados no ambiente `production`
+
 ### 2026-03-18 - Simplificação CI/CD
 - ✅ Criado `deploy-dev.yml` (CI para develop)
-- ✅ Atualizado `deploy-prod.yml` (deploy produção otimizado)
+- ✅ Atualizado `deploy-production.yml` (deploy produção otimizado)
 - ✅ Removido `ci.yml` (substituído por deploy-dev)
 - ✅ Removido `docker-compose.dev.yml` (redundante)
 - ✅ OpenClaw isolado do fluxo principal
