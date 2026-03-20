@@ -55,6 +55,9 @@ docker compose -f docker-compose.prod.yml ps
 
 echo ""
 echo "🧪 Teste agora:"
-echo "  http://76.13.239.220:3000"
-echo "  ou"
-echo "  https://alcahub.cloud"
+echo "   🌐 https://alcahub.cloud"
+echo ""
+echo "Checklist:"
+echo "  ✓ Fazer login"
+echo "  ✓ Fazer logout (NÃO deve dar erro 'Supabase não configurado')"
+echo "  ✓ Testar recuperação de senha (deve redirecionar para alcahub.cloud)"
