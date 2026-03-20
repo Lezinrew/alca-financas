@@ -1,5 +1,5 @@
-# Legacy (scripts/docs antigos de deploy - mantidos só localmente)
-legacy/
+# Legacy - REMOVIDO: agora versionamos scripts legados para referência histórica
+# legacy/
 
 # Environment files (nunca commitar arquivos com segredos)
 .env
