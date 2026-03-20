@@ -62,8 +62,6 @@ def _resolve_supabase_key() -> str:
 
 def init_db():
     """Inicializa conexão com o Supabase."""
-    global _supabase_client, _db_pool
-
     supabase_url = (os.getenv('SUPABASE_URL') or '').strip()
     supabase_key = _resolve_supabase_key()
 

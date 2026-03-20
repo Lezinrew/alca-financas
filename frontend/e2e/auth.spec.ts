@@ -1,18 +1,27 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+/** App protege `/` e redireciona para `/login`; ir direto evita timeout em spinner/redirect. */
+async function openLoginPage(page: Page) {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
+  await page.waitForURL(/\/login\/?(\?.*)?$/, { timeout: 15_000 })
+  await page.getByRole('button', { name: 'Entrar' }).waitFor({ state: 'visible', timeout: 15_000 })
+}
 
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/')
+    await openLoginPage(page)
   })
 
   test('should display login page', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText(/Login|Entrar/i)
+    await expect(
+      page.getByRole('heading', { name: /Bem-vindo de volta|Login|Entrar/i })
+    ).toBeVisible()
     await expect(page.locator('input[type="email"]')).toBeVisible()
     await expect(page.locator('input[type="password"]')).toBeVisible()
   })
 
   test('should show validation errors for empty fields', async ({ page }) => {
-    const loginButton = page.locator('button[type="submit"]')
+    const loginButton = page.getByRole('button', { name: 'Entrar' })
     await loginButton.click()
 
     // Wait for validation messages
@@ -41,7 +50,7 @@ test.describe('Authentication Flow', () => {
     await page.fill('input[type="email"]', 'test@alcahub.com.br')
     await page.fill('input[type="password"]', 'TestPassword123!')
 
-    await page.click('button[type="submit"]')
+    await page.getByRole('button', { name: 'Entrar' }).click()
 
     // Wait for navigation or error
     await page.waitForTimeout(2000)
@@ -58,7 +67,7 @@ test.describe('Authentication Flow', () => {
     await page.fill('input[type="email"]', 'wrong@alcahub.com.br')
     await page.fill('input[type="password"]', 'WrongPassword123!')
 
-    await page.click('button[type="submit"]')
+    await page.getByRole('button', { name: 'Entrar' }).click()
 
     // Wait for error message
     await page.waitForTimeout(1000)

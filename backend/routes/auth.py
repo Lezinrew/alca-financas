@@ -11,7 +11,7 @@ import json
 import jwt
 import requests
 
-from utils.auth_utils import require_auth
+from utils.auth_utils import require_auth, generate_jwt
 from services.user_service import create_user, create_default_categories, get_user_public
 from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
 from extensions import limiter
@@ -412,7 +412,7 @@ def google_callback():
             users_collection.insert_one(user_data)
             user = user_data
             create_default_categories(categories_collection, user['_id'])
-        jwt_token = generate_jwt(user['_id'])
+        jwt_token = generate_jwt(_user_id(user))
         user_data = get_user_public(user)
         
         # Redireciona para o frontend com o token e dados do usuário
