@@ -242,6 +242,7 @@ jobs:
     if: failure()
     steps:
       - name: Notify and prepare rollback
+        continue-on-error: true
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -267,6 +268,7 @@ jobs:
     if: success()
     steps:
       - name: Notify success
+        continue-on-error: true
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
