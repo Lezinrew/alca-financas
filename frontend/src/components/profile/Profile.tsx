@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../utils/supabaseClient';
 
 interface ProfileData {
   name: string;
@@ -81,17 +82,47 @@ const Profile = () => {
       return;
     }
 
-    // Simulação - em produção implementar API
-    setTimeout(() => {
+    if (!user?.email) {
+      setError('Sessão inválida. Faça login novamente.');
       setLoading(false);
+      return;
+    }
+
+    try {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: passwordData.currentPassword,
+      });
+      if (signInErr) {
+        setError('Senha atual incorreta.');
+        setLoading(false);
+        return;
+      }
+
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+      if (updateErr) {
+        setError(updateErr.message || 'Não foi possível alterar a senha.');
+        setLoading(false);
+        return;
+      }
+
+      await supabase.auth.refreshSession();
+
       setSuccess('Senha alterada com sucesso!');
       setPasswordData({
         currentPassword: '',
         newPassword: '',
-        confirmPassword: ''
+        confirmPassword: '',
       });
-      setTimeout(() => setSuccess(''), 3000);
-    }, 1000);
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro ao alterar senha.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

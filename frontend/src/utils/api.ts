@@ -47,21 +47,46 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor para tratar 401: sessão expirada → toast + limpar storage + redirect
+// Interceptor 401: tenta refresh do Supabase uma vez e repete o pedido; se continuar 401 → logout
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password' && !currentPath.startsWith('/reset-password')) {
-        const token = getAuthToken();
-        if (token) {
-          clearAuthStorage();
-          toast.error('Sua sessão expirou. Entre novamente.');
-          window.location.href = '/login';
+  async (error) => {
+    const status = error.response?.status;
+    const original = error.config as typeof error.config & { _retry401?: boolean };
+
+    if (status !== 401 || !original) {
+      return Promise.reject(error);
+    }
+
+    const currentPath = window.location.pathname;
+    const publicAuth =
+      currentPath === '/login' ||
+      currentPath === '/register' ||
+      currentPath === '/forgot-password' ||
+      currentPath.startsWith('/reset-password');
+
+    if (publicAuth) {
+      return Promise.reject(error);
+    }
+
+    if (!original._retry401) {
+      original._retry401 = true;
+      try {
+        const { data, error: refreshErr } = await supabase.auth.refreshSession();
+        if (!refreshErr && data.session?.access_token) {
+          original.headers = original.headers ?? {};
+          original.headers.Authorization = `Bearer ${data.session.access_token}`;
+          return api.request(original);
         }
+      } catch {
+        /* logout abaixo */
       }
     }
+
+    clearAuthStorage();
+    await supabase.auth.signOut().catch(() => {});
+    toast.error('Sessão inválida ou expirada. Entre novamente.');
+    window.location.href = '/login';
     return Promise.reject(error);
   }
 );
