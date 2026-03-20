@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: false  # Nunca cancelar deploy de produção
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   NODE_VERSION: "20.x"
   PYTHON_VERSION: "3.9"
   DEPLOY_SHA: ${{ github.sha }}
@@ -34,10 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -48,7 +49,7 @@ jobs:
           npx tsc --noEmit
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -65,13 +66,13 @@ jobs:
     needs: pre-flight
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: backend/Dockerfile
@@ -126,7 +127,7 @@ jobs:
     needs: deploy-backend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build and deploy frontend
         uses: appleboy/ssh-action@v1.2.0
@@ -206,10 +207,10 @@ jobs:
     if: github.event.inputs.skip_tests != 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
