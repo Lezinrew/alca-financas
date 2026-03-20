@@ -140,7 +140,8 @@ def require_auth(f):
         try:
             payload = verify_supabase_jwt(token)
         except Exception as e:
-            current_app.logger.debug(f"Auth inválida (Supabase JWT): {e}")
+            # WARNING: ajuda a diagnosticar 401 em produção (issuer/secret/aud) sem logar o token
+            current_app.logger.warning("Auth inválida (Supabase JWT): %s", str(e))
             return jsonify({"error": "Token inválido ou expirado"}), 401
 
         user_id = payload.get("sub")
