@@ -8,6 +8,7 @@ services:
       # Supabase (required)
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
       # Backend config
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
@@ -40,6 +41,8 @@ services:
       dockerfile: Dockerfile.dev
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+      VITE_SUPABASE_URL: ${SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     volumes:
