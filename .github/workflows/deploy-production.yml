@@ -106,10 +106,14 @@ jobs:
 
       - name: Build frontend on server into build/frontend
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           password: ${{ secrets.PROD_PASSWORD }}
+          envs: VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY
           script: |
             set -e
             cd /var/www/alca-financas
@@ -121,8 +125,14 @@ jobs:
             rm -rf frontend/dist build/frontend
             mkdir -p build/frontend
 
-            echo "==> Buildando frontend com Node 22 em container"
+            echo "==> Buildando frontend (Vite precisa de VITE_SUPABASE_* no build)"
+            if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+              echo "ERRO: Defina os secrets VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no ambiente production do GitHub."
+              exit 1
+            fi
             docker run --rm \
+              -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
+              -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
               -v /var/www/alca-financas/frontend:/app \
               -w /app \
               node:22-alpine \
@@ -130,6 +140,9 @@ jobs:
 
             echo "==> Copiando dist para build/frontend"
             cp -a frontend/dist/. build/frontend/
+            # Nginx no container (user nginx) precisa ler os ficheiros; build como root → 403 sem isto
+            chmod -R a+rX build/frontend
+            test -f build/frontend/index.html || { echo "ERRO: build/frontend/index.html ausente após o build"; exit 1; }
 
             echo "==> Recriando container frontend"
             docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
