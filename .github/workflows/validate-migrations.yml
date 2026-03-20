@@ -13,6 +13,9 @@ on:
       - 'supabase/migrations/**'
       - 'scripts/db/**'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   validate-migrations:
     name: Validate Migrations (PostgreSQL 15)
@@ -34,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6
 
       - name: Install PostgreSQL client
         run: |
