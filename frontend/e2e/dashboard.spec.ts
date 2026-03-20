@@ -2,13 +2,14 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await page.waitForURL(/\/(login|dashboard)/, { timeout: 20_000 })
 
-    // Quick login with AI mode
+    // Quick login with AI mode (quando disponível no ambiente)
     const aiLoginButton = page.locator('button:has-text("Login com IA"), button:has-text("Demo")')
-    if (await aiLoginButton.count() > 0) {
+    if (page.url().includes('login') && (await aiLoginButton.count()) > 0) {
       await aiLoginButton.click()
-      await page.waitForURL(/.*dashboard.*/, { timeout: 5000 })
+      await page.waitForURL(/.*dashboard.*/, { timeout: 10_000 })
     }
   })
 

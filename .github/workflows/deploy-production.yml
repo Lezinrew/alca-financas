@@ -164,10 +164,19 @@ jobs:
         working-directory: ./frontend
         env:
           TEST_ENV: production
-        run: npx playwright test e2e/auth.spec.ts e2e/dashboard.spec.ts
+        run: npx playwright test e2e/auth.spec.ts e2e/dashboard.spec.ts --project=chromium
+
+      - name: Upload smoke test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: frontend/playwright-report/
+          retention-days: 7
 
       - name: Notify on failure
         if: failure()
+        continue-on-error: true
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}

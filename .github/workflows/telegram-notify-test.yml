@@ -1,0 +1,21 @@
+# Teste manual dos secrets TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID.
+# Actions → este workflow → Run workflow
+name: Telegram — teste de secrets
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send-test-message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar mensagem de teste
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            Alça Finanças — teste de CI
+            Secrets TELEGRAM_* OK.
+            Repo: ${{ github.repository }}
+            Por: ${{ github.actor }}

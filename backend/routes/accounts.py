@@ -199,12 +199,16 @@ def import_credit_card_statement(account_id: str):
                     
                     # Se não conseguiu detectar, usa categoria padrão
                     if not category_id:
-                        default_expense_category = categories_collection.find_one({
+                        default_expense_category = categories_repo.find_one({
                             'user_id': request.user_id,
-                            'type': 'expense'
+                            'type': 'expense',
+                            'tenant_id': request.tenant_id,
                         })
                         if default_expense_category:
-                            category_id = default_expense_category['_id']
+                            category_id = (
+                                default_expense_category.get('id')
+                                or default_expense_category.get('_id')
+                            )
                         else:
                             errors.append(f'Transação {idx + 1}: Não foi possível determinar a categoria')
                             continue

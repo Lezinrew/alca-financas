@@ -156,7 +156,7 @@ def import_transactions():
                     account_info,
                     file.filename,
                     account_service=account_service,
-                    tenant_id=tenant_id
+                    tenant_id=request.tenant_id,
                 )
                 if account_created and account_id:
                     account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None

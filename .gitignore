@@ -42,6 +42,10 @@ mongo_data/
 node_modules/
 frontend/node_modules/
 
+# Playwright (gerados localmente / CI)
+frontend/playwright-report/
+frontend/test-results/
+
 # Scripts (debug)
 debug_google_login.sh
 fix_google_login.sh
@@ -77,4 +81,3 @@ scripts/db/_exports/
 scripts/insecure-legacy/
 scripts/**/insecure*.sh
 scripts/**/*password*.sh
-backend/.env

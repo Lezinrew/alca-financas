@@ -5,9 +5,12 @@ import { defineConfig, devices } from '@playwright/test'
  * Supports both local and production environments
  */
 const isProduction = process.env.TEST_ENV === 'production'
-const baseURL = isProduction
-  ? 'https://alcahub.cloud'
-  : 'http://localhost:3000'
+/** Permite sobrescrever em CI (ex.: host interno) via PLAYWRIGHT_BASE_URL ou BASE_URL. */
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL?.trim() ||
+  (isProduction
+    ? (process.env.BASE_URL?.trim() || 'https://alcahub.cloud')
+    : 'http://localhost:3000')
 
 export default defineConfig({
   testDir: './e2e',

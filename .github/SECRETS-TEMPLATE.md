@@ -83,21 +83,45 @@ cat ~/.ssh/deploy_key
 ```
 123456789
 ```
+(ID numérico do chat que **recebe** o aviso: sua conta, grupo ou canal — não é o `@nome_do_bot`.)
 
 **TELEGRAM_BOT_TOKEN**
+
+Formato real (do BotFather): `<id_numérico_do_bot>:<string_secreta>` — dois trechos separados por `:`.
+
+Exemplo **somente de formato** (fictício — **nunca** use este valor nem cole token real em issue/chat/doc versionado):
+
 ```
-123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+7123456789:AAHbExemplo_FORMATO_igual_ao_BotFather_nao_e_token_valido
 ```
+
+**Segurança:** se um token verdadeiro vazar (chat, print, commit), use no @BotFather **`/revoke`** ou **`/token`** e gere outro. Tokens em documentação devem ser sempre placeholders como o acima.
 
 Como obter:
 1. Abra Telegram
 2. Procure por @BotFather
-3. Envie `/newbot` e siga as instruções
-4. Copie o token fornecido
-5. Para obter chat_id:
-   - Envie uma mensagem para seu bot
-   - Acesse: `https://api.telegram.org/bot<TOKEN>/getUpdates`
-   - Copie o `chat.id` da resposta
+3. Envie `/newbot` e siga as instruções (ou `/token` em um bot existente)
+4. Copie o token fornecido e guarde só em **GitHub Secrets** ou `.env` local (não commitar)
+5. Para obter `chat_id`:
+   - Envie uma mensagem para seu bot (`/start`)
+   - Acesse: `https://api.telegram.org/bot<SEU_TOKEN>/getUpdates`
+   - Copie o `chat.id` da resposta JSON
+
+**Como testar no repositório (GitHub Actions):**
+
+1. Faça push do workflow `.github/workflows/telegram-notify-test.yml` (se ainda não estiver na branch padrão).
+2. No GitHub: **Actions** → **Telegram — teste de secrets** → **Run workflow** → escolha a branch → **Run workflow**.
+3. Se os secrets estiverem corretos, você recebe a mensagem no Telegram. Erro `missing telegram token or user list` indica token ou `chat_id` vazio/errado.
+
+**Teste local (opcional):** no terminal (não commite o token):
+
+```bash
+curl -sS "https://api.telegram.org/bot<SEU_TOKEN>/sendMessage" \
+  -d "chat_id=<SEU_CHAT_ID>" \
+  --data-urlencode "text=Teste manual Alça Finanças"
+```
+
+Substitua `<SEU_TOKEN>` e `<SEU_CHAT_ID>` pelos valores reais.
 
 ---
 
@@ -153,7 +177,7 @@ Após adicionar os secrets, você pode verificar se estão corretos:
 
 No repositório GitHub → Settings → Secrets and variables → Actions
 
-Você deve ver:
+Você deve ver (nomes exatos dos secrets):
 - ✅ DOCKER_REGISTRY
 - ✅ DOCKER_USERNAME
 - ✅ DOCKER_PASSWORD
@@ -162,6 +186,21 @@ Você deve ver:
 - ✅ PROD_SSH_KEY
 - ✅ TELEGRAM_CHAT_ID (opcional)
 - ✅ TELEGRAM_BOT_TOKEN (opcional)
+
+**Como configurar `DOCKER_REGISTRY`, `DOCKER_USERNAME` e `DOCKER_PASSWORD` no GitHub**
+
+Use estes três secrets **somente** se algum workflow do repositório fizer login/push em um registry (Docker Hub, GHCR, etc.). Se o deploy for só SSH + build no servidor (sem push de imagem), você pode omiti-los.
+
+1. No repositório: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
+2. Crie cada um dos três com o nome **exatamente** como na lista acima (maiúsculas e sublinhado).
+
+| Secret | O que colar no valor | Observação |
+|--------|----------------------|------------|
+| `DOCKER_REGISTRY` | Host do registry, **sem** `https://` e **sem** barra no final | Ex.: `registry.hub.docker.com` (Docker Hub) ou `ghcr.io` (GitHub Container Registry) |
+| `DOCKER_USERNAME` | Seu usuário no registry | No GHCR costuma ser seu **username do GitHub** (não o e-mail) |
+| `DOCKER_PASSWORD` | Senha ou **token de acesso** | Docker Hub: [Access Tokens](https://hub.docker.com/settings/security). GHCR: PAT com escopo `write:packages` em [Fine-grained ou classic token](https://github.com/settings/tokens) |
+
+Detalhes e exemplos de valores estão na seção **Docker Registry** (tópico com ícone de baleia 🐳) no início deste documento, em **Secrets Necessários**.
 
 ### Teste 2: Executar Pipeline
 
