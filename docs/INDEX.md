@@ -63,6 +63,11 @@ This file is IDE-agnostic and all paths are relative to the repository root.
 - `docs/06-ops/DADOS-DEPLOY.md` — Dados e configurações de deploy.
 - `docs/06-ops/COMANDOS-FIX-TRAEFIK-ALCAHUB.md` — Comandos de ajuste Traefik.
 - `docs/06-ops/FIX-TRAEFIK-ALCAHUB-CLOUD.md` — Correções de Traefik na nuvem.
+- `docs/DEV-E-PROD-SEM-MISTURAR-ENV.md` — Evitar misturar `.env`/Supabase entre dev local e produção.
+- `docs/TROUBLESHOOTING-AUTH-LOGIN-LOOP.md` — 401 na API após login (JWT, nginx, refresh).
+- `docs/PROMPT-DIAGNOSTICO-DEV-PROD-AUTH.md` — Prompt para LLM: hipóteses dev/prod + auth + triagem.
+- `docs/PROMPT-HOSTINGER-SITE-APRESENTACAO-ALCA.md` — Prompt para site institucional (Hostinger, vibe coding).
+- `.ai_agents/README.md` — Modelfiles Ollama (`alca-senior`, `alca-ops`, `alca-writer`) e `update_agents.sh`.
 - `docs/CAREER-POSITIONING-DEVOPS.md` — Notas de posicionamento DevOps (contextual).
 
 ### 1.8 Contributing
@@ -125,6 +130,10 @@ This file is IDE-agnostic and all paths are relative to the repository root.
 ### 2.2 `docs/`
 - `docs/INDEX.md` — Este índice de documentação.
 - `docs/ENVIRONMENTS.md` — Guia completo de variáveis de ambiente.
+- `docs/DEV-E-PROD-SEM-MISTURAR-ENV.md` — Dev e prod em paralelo sem cruzar Supabase/JWT/build.
+- `docs/TROUBLESHOOTING-AUTH-LOGIN-LOOP.md` — Loop de login / 401 em rotas protegidas.
+- `docs/PROMPT-DIAGNOSTICO-DEV-PROD-AUTH.md` — Prompt de diagnóstico (todas as possibilidades).
+- `docs/PROMPT-HOSTINGER-SITE-APRESENTACAO-ALCA.md` — Site de apresentação Alça na Hostinger.
 - `docs/ANALISE-ALCA-FINANCAS.md` — Análise detalhada do projeto.
 - `docs/RAIO-X-ARQUITETURA-COMPLETO.md` — Raio-X de arquitetura (movido para `00-overview`).
 - `docs/TODO-MELHORIAS-ESTRUTURA.md` — Itens de melhoria estrutural.
@@ -189,6 +198,9 @@ This file is IDE-agnostic and all paths are relative to the repository root.
 
 > Para detalhes por skill, consulte `skills/SKILLS_REGISTRY.md` e o diretório específico em `skills/<nome-do-skill>/`.
 
+### 2.8 `.ai_agents/`
+- `.ai_agents/README.md` — Instalação dos modelos base, `ollama create` e uso dos agentes locais.
+
 ---
 
 ## 3. Docs Directory Layout (Target)
@@ -227,6 +239,7 @@ Diretrizes de colocação:
 - **Trabalhar em um módulo**: comece por `skills/README.md` e o `skill.md` específico.
 - **Fazer deploy**: use `docs/06-ops/DADOS-DEPLOY.md`, `DEPLOY_QUICK_START.md` e os scripts em `scripts/prod/`.
 - **Ver segurança**: concentre-se em `docs/05-security/*` e `docs/SUPABASE-RLS-SECURITY.md`.
+- **LLM local (Ollama)**: veja `.ai_agents/README.md` e execute `./.ai_agents/update_agents.sh` após alterar Modelfiles.
 
 ---
 
@@ -236,5 +249,5 @@ Diretrizes de colocação:
 - Ao mover um documento para dentro de `docs/0x-*`, deixe um stub no caminho antigo apontando para o novo local.
 - Mantenha títulos e descrições curtas para uso eficiente por agentes de IA.
 
-**Última atualização do índice:** 2026-02-27
+**Última atualização do índice:** 2026-04-07
 
