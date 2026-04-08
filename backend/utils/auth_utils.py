@@ -139,9 +139,18 @@ def require_auth(f):
 
         try:
             payload = verify_supabase_jwt(token)
+        except jwt.ExpiredSignatureError:
+            current_app.logger.warning("JWT expirado - user precisa fazer refresh")
+            return jsonify({"error": "Token expirado"}), 401
+        except jwt.InvalidSignatureError as e:
+            current_app.logger.error("JWT com assinatura inválida (SUPABASE_JWT_SECRET errado?): %s", str(e))
+            return jsonify({"error": "Token inválido"}), 401
+        except jwt.DecodeError as e:
+            current_app.logger.error("JWT malformado (não é um JWT válido): %s", str(e))
+            return jsonify({"error": "Token inválido"}), 401
         except Exception as e:
-            # WARNING: ajuda a diagnosticar 401 em produção (issuer/secret/aud) sem logar o token
-            current_app.logger.warning("Auth inválida (Supabase JWT): %s", str(e))
+            # Outros erros PyJWT (InvalidIssuerError, InvalidAudienceError, etc.)
+            current_app.logger.error("Falha ao validar JWT: %s (%s)", type(e).__name__, str(e))
             return jsonify({"error": "Token inválido ou expirado"}), 401
 
         user_id = payload.get("sub")
