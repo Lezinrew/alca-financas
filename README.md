@@ -162,6 +162,10 @@ cp .env.example .env.production
 
 # 4. Migre o banco de dados (se necessário)
 ./scripts/prod/migrate.sh
+
+# 5. (Recomendado na VPS) Garantir .env completo para Supabase Auth + Docker
+#    Sem SUPABASE_JWT_SECRET o login no browser funciona mas /api/* devolve 401.
+./scripts/prod/check-env.sh
 ```
 
 ### Frontend Scripts

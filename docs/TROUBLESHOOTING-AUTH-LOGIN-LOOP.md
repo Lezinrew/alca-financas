@@ -1,59 +1,108 @@
-# Login volta à tela de autenticação / Network com 401 e refresh falho
+# Troubleshooting: 401 Loop após Login (Dev vs Prod)
 
-## O que o Network mostra
+## Sintoma
 
-| Pedido | Significado |
-|--------|-------------|
-| `token?grant_type=password` **vermelho** | O **Supabase Auth** rejeitou email/senha (credenciais erradas, e-mail não confirmado, utilizador desativado) ou pedido bloqueado. Abra o pedido → **Resposta** / **Preview** e leia a mensagem JSON. |
-| `token?grant_type=refresh_token` **vermelho** | O **refresh token** guardado no browser **já não existe** no projeto (ex.: apagou o utilizador no Dashboard e recriou com o mesmo e-mail — o `sub`/sessão mudou). |
-| `bootstrap`, `accounts`, `dashboard-advanced` **401** | O **backend** não aceitou o JWT (`Authorization: Bearer`). Depois do interceptor: tenta `refreshSession`; se falhar → `signOut` → volta ao login. |
-| `logout?scope=global` | Limpeza de sessão (normal após falha em cadeia). |
+Após login aparentemente OK (ou após recriar utilizador no Supabase), o dashboard dispara **401** em:
+- `GET /api/accounts`
+- `GET /api/dashboard-advanced`
+- `POST /api/auth/bootstrap`
 
-## Causa típica após “apagar e recriar” o utilizador no Supabase
+Corpo da resposta: `{"error": "Token inválido ou expirado"}` (~40-44 bytes)
 
-1. O browser mantinha **sessão do utilizador antigo** (localStorage `sb-*`).
-2. O refresh token é inválido → falha em cadeia → a app desloga.
+## Causa Raiz Comum: Mistura de Configs Dev/Prod
 
-## O que fazer (ordem)
+O erro **mais frequente** é reutilizar um único `.env` ou copiar variáveis cruzadas entre dev e prod.
 
-1. **Limpar dados do site** em `alcahub.cloud`: DevTools → **Application** → **Storage** → **Clear site data** (ou janela anónima).
-2. Entrar de novo com a **nova** palavra-passe do utilizador **novo** no Auth.
-3. Confirmar no Supabase **Authentication → Users**: e-mail **Confirmed**, sem ban.
+### Por que isso causa 401?
 
-## O que o código já faz
+1. **Um projeto Supabase ≠ outro**
+   - Se o backend usa `SUPABASE_URL` / `SUPABASE_JWT_SECRET` do projeto **dev**
+   - E o frontend foi buildado com `VITE_SUPABASE_*` do projeto **prod**
+   - O token emitido por um projeto **nunca** passa na validação do backend configurado para o outro
 
-- No **login**, antes de `signInWithPassword`, a app chama `signOut({ scope: 'local' })` e limpa tokens legados — reduz resíduos após recriar utilizador.
-- No **Axios**, um **401** tenta `refreshSession` uma vez antes de deslogar.
+2. **JWT Secret tem de ser do mesmo projeto que emite o token**
+   - `SUPABASE_JWT_SECRET` no Flask **deve ser** o JWT Secret (Settings → API) do **mesmo** `SUPABASE_URL` que o utilizador usa no login
 
-## Se `password` continua vermelho
+3. **`VITE_*` é "congelado" no build**
+   - O que está em `npm run build` é fixo no bundle JavaScript
+   - Se buildaste com URLs de dev e o backend em prod usa outro Supabase → 401
 
-- Abra o pedido `token?grant_type=password` e veja o corpo (ex.: `invalid_grant`, `Email not confirmed`).
-- Confirme que `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` no **build** do frontend são do **mesmo projeto** que o backend (`SUPABASE_URL` / JWT).
+## Diagnóstico Passo a Passo
 
-## Logs do backend: `401` com ~40–44 bytes no access log
+### 1. Verificar Configuração do Backend
 
-Resposta típica: `{"error":"Token inválido ou expirado"}`. O **Bearer chegou** mas o Flask **não validou** o JWT.
+```bash
+# No servidor (SSH)
+cd /var/www/alca-financas
+grep -E "SUPABASE_URL|SUPABASE_JWT_SECRET" .env
+```
 
-1. **Mesmo projeto Supabase**  
-   - `.env` do backend: `SUPABASE_URL=https://<ref>.supabase.co`  
-   - Build do frontend: `VITE_SUPABASE_URL` com o **mesmo** `<ref>`.
+**Validar:**
+- `SUPABASE_JWT_SECRET` é o **JWT Secret** do Dashboard (Settings → API)
+  - ⚠️ **NÃO** use o anon key
+  - ⚠️ **NÃO** use o service role key
 
-2. **JWT Secret (HS256)**  
-   - Dashboard Supabase → **Project Settings → API → JWT Secret** (Legacy)  
-   - Backend: `SUPABASE_JWT_SECRET=<esse valor>`  
-   - Se estiver vazio, o backend usa **JWKS**; aí o projeto tem de emitir tokens RS256 com `kid` válido. Misturar secret errado → 401.
+### 2. Testar JWT Manualmente
 
-3. **Audience opcional**  
-   - Se definiste `SUPABASE_JWT_AUD` no backend, tem de coincidir com a claim `aud` do token (senão remove a variável).
+```bash
+python3 backend/debug_jwt.py <access_token>
+```
 
-4. **Nginx**  
-   - Garantir que o header `Authorization` é repassado até o Gunicorn (no repo: `proxy_set_header Authorization $http_authorization;` em `nginx.conf` e em `nginx-vps.conf` no `location /`).
+### 3. Verificar Logs do Backend
 
-5. **Diagnóstico no servidor**  
-   - Com `LOG_LEVEL` adequado, o backend regista `WARNING: Auth inválida (Supabase JWT): <motivo>` (sem expor o token).  
-   - Teste manual: obtenha um `access_token` no browser (Application → Local Storage `sb-...-auth-token`) e:  
-     `curl -s -H "Authorization: Bearer SEU_TOKEN" https://alcahub.cloud/api/auth/me`
+```bash
+docker compose logs -f backend | grep -i "auth\|jwt\|401"
+```
 
-## Scripts SQL manuais (`auth.users`)
+**Mensagens após o patch:**
+- `JWT expirado - user precisa fazer refresh` → Normal
+- `JWT com assinatura inválida (SUPABASE_JWT_SECRET errado?)` → **PROBLEMA**
+- `JWT malformado` → Token corrompido
 
-Não misture **edição direta** em `auth.users` com o fluxo do **Supabase Auth** (hash Argon2, etc.). Preferir sempre **Dashboard** ou **API Auth** para criar/alterar utilizadores.
+## Como Corrigir
+
+### Cenário 1: Backend com Secret Errado
+
+1. Acesse Supabase Dashboard → Settings → API → JWT Secret
+2. Copie o **JWT Secret**
+3. No servidor:
+   ```bash
+   nano /var/www/alca-financas/.env
+   # Atualizar: SUPABASE_JWT_SECRET=<jwt-secret-correto>
+   docker compose restart backend
+   ```
+
+### Cenário 2: Frontend Buildado com Projeto Errado
+
+```bash
+cd /var/www/alca-financas
+./scripts/rebuild-frontend-on-server.sh
+```
+
+### Cenário 3: Dois Projetos Supabase (Dev + Prod)
+
+**No servidor (prod):**
+```bash
+SUPABASE_URL=https://prod-project.supabase.co
+SUPABASE_JWT_SECRET=<prod-jwt-secret>
+VITE_SUPABASE_URL=https://prod-project.supabase.co
+```
+
+**No PC (dev local):**
+```bash
+SUPABASE_URL=https://dev-project.supabase.co
+SUPABASE_JWT_SECRET=<dev-jwt-secret>
+VITE_SUPABASE_URL=https://dev-project.supabase.co
+```
+
+## Validação Final
+
+1. Limpar dados do site (DevTools → Application → Clear storage)
+2. Fazer login novamente
+3. Verificar dashboard carrega sem 401
+
+## Referências
+
+- `backend/utils/supabase_jwt.py` - Validação JWT
+- `backend/debug_jwt.py` - Script de diagnóstico
+- `DEPLOY.md` - Deploy workflow
