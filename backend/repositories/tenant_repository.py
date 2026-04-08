@@ -12,36 +12,90 @@ class TenantRepository(BaseRepository):
         # Usa tenant_members como tabela principal para membership
         super().__init__("tenant_members")
 
-    def get_user_tenants(self, user_id: str) -> List[Dict[str, Any]]:
-        """
-        Retorna lista de tenants do usuário com role.
-        """
+    def _membership_rows(self, user_id: str) -> List[Dict[str, Any]]:
+        """Linhas em tenant_members (sem join). Evita falhas do embed PostgREST tenants!inner."""
         try:
             supabase = get_supabase()
-            # Usa join implícito: tenant_members + tenants
             response = (
                 supabase.table("tenant_members")
-                .select("tenant_id, role, tenants!inner(id, name, slug)")
+                .select("tenant_id, role")
                 .eq("user_id", user_id)
                 .execute()
             )
-            data = response.data or []
-            results: List[Dict[str, Any]] = []
-            for row in data:
-                tenant = row.get("tenants") or {}
-                results.append(
-                    {
-                        "tenant_id": row.get("tenant_id") or tenant.get("id"),
-                        "role": row.get("role"),
-                        "name": tenant.get("name"),
-                        "slug": tenant.get("slug"),
-                    }
-                )
-            return results
+            return response.data or []
         except Exception as e:
             import logging
-            logging.error(f"Erro ao buscar tenants para o usuário {user_id}: {e}")
+
+            logging.error(f"tenant_members list failed for user {user_id}: {e}")
             return []
+
+    def get_user_tenants(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Retorna lista de tenants do usuário com role.
+        Usa tenant_members como fonte de verdade e carrega tenants separadamente,
+        sem depender de embed implícito (ex.: tenants!inner) no caminho crítico de login.
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+        rows = self._membership_rows(user_id)
+        if not rows:
+            return []
+
+        supabase = get_supabase()
+        tenant_ids = [str(row.get("tenant_id")) for row in rows if row.get("tenant_id")]
+        tenant_map: Dict[str, Dict[str, Any]] = {}
+
+        if tenant_ids:
+            try:
+                batch = (
+                    supabase.table("tenants")
+                    .select("id, name, slug")
+                    .in_("id", tenant_ids)
+                    .execute()
+                )
+                for t in (batch.data or []):
+                    if t.get("id"):
+                        tenant_map[str(t["id"])] = t
+            except Exception as e:
+                logger.warning(f"batch tenant fetch failed for user_id={user_id}: {e}")
+
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            tid = row.get("tenant_id")
+            if not tid:
+                continue
+            tid = str(tid)
+            name: Optional[str] = None
+            slug: Optional[str] = None
+            tenant_data = tenant_map.get(tid)
+            if tenant_data is None:
+                try:
+                    tres = (
+                        supabase.table("tenants")
+                        .select("id, name, slug")
+                        .eq("id", tid)
+                        .limit(1)
+                        .execute()
+                    )
+                    if tres.data:
+                        tenant_data = tres.data[0]
+                except Exception as e:
+                    logger.warning(f"tenant fetch failed for tenant_id={tid}: {e}")
+
+            if tenant_data:
+                name = tenant_data.get("name")
+                slug = tenant_data.get("slug")
+
+            results.append(
+                {
+                    "tenant_id": tid,
+                    "role": row.get("role"),
+                    "name": name,
+                    "slug": slug,
+                }
+            )
+        return results
 
     def get_default_tenant_id(self, user_id: str) -> Optional[str]:
         """
@@ -75,31 +129,57 @@ class TenantRepository(BaseRepository):
             return tenants[0].get("tenant_id")
 
         supabase = get_supabase()
-        try:
-            # Slug único (usa user_id para garantir unicidade)
-            slug = f"personal-{user_id}"
-            # Nome amigável
-            name = "Meu espaço"
+        slug = f"personal-{user_id}"
+        name = "Meu espaço"
 
-            logger.info(f"ensure_default_tenant: Criando tenant para usuário {user_id} com slug {slug}")
-
-            # Cria o tenant
-            ins = supabase.table("tenants").insert({"name": name, "slug": slug}).execute()
-            if not ins.data or len(ins.data) == 0:
-                logger.error(f"ensure_default_tenant: Falha ao criar tenant - resposta vazia para usuário {user_id}")
-                return None
-
-            tenant_id = ins.data[0]["id"]
-            logger.info(f"ensure_default_tenant: Tenant {tenant_id} criado, adicionando membership para usuário {user_id}")
-
-            # Adiciona o usuário como owner
-            supabase.table("tenant_members").insert(
-                {"tenant_id": tenant_id, "user_id": user_id, "role": "owner"}
-            ).execute()
-
-            logger.info(f"ensure_default_tenant: Membership criado com sucesso para usuário {user_id} no tenant {tenant_id}")
-            return str(tenant_id)
-        except Exception as e:
-            logger.error(f"ensure_default_tenant: Erro ao criar tenant para usuário {user_id}: {str(e)}", exc_info=True)
+        def _tenant_id_for_slug() -> Optional[str]:
+            try:
+                r = supabase.table("tenants").select("id").eq("slug", slug).limit(1).execute()
+                if r.data:
+                    return str(r.data[0]["id"])
+            except Exception as ex:
+                logger.warning(f"ensure_default_tenant: lookup slug {slug}: {ex}")
             return None
 
+        def _link_membership(tenant_id: str) -> bool:
+            if self.user_is_member(user_id, tenant_id):
+                return True
+            try:
+                supabase.table("tenant_members").insert(
+                    {"tenant_id": tenant_id, "user_id": user_id, "role": "owner"}
+                ).execute()
+                return True
+            except Exception as ex:
+                logger.error(
+                    f"ensure_default_tenant: membership insert failed user={user_id} tenant={tenant_id}: {ex}",
+                    exc_info=True,
+                )
+                return False
+
+        try:
+            logger.info(f"ensure_default_tenant: Criando tenant para usuário {user_id} com slug {slug}")
+            ins = supabase.table("tenants").insert({"name": name, "slug": slug}).execute()
+            tenant_id = None
+            if ins.data and len(ins.data) > 0:
+                tenant_id = str(ins.data[0]["id"])
+            else:
+                # Inserção pode ter falhado por slug duplicado (tenant órfão sem membership)
+                tenant_id = _tenant_id_for_slug()
+
+            if not tenant_id:
+                logger.error(f"ensure_default_tenant: sem tenant_id após insert para user {user_id}")
+                return None
+
+            if not _link_membership(tenant_id):
+                return None
+            logger.info(f"ensure_default_tenant: OK user={user_id} tenant={tenant_id}")
+            return tenant_id
+        except Exception as e:
+            err = str(e).lower()
+            if "duplicate" in err or "unique" in err or "23505" in err:
+                tenant_id = _tenant_id_for_slug()
+                if tenant_id and _link_membership(tenant_id):
+                    logger.info(f"ensure_default_tenant: recuperado por slug duplicado user={user_id} tenant={tenant_id}")
+                    return tenant_id
+            logger.error(f"ensure_default_tenant: Erro ao criar tenant para usuário {user_id}: {str(e)}", exc_info=True)
+            return None
