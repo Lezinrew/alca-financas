@@ -273,18 +273,25 @@ class TransactionRepository(BaseRepository):
                 },
             }
 
-    def find_by_user_limit(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def find_by_user_limit(
+        self,
+        user_id: str,
+        limit: int = 10,
+        tenant_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Busca últimas transações do usuário (para recent_transactions)."""
         try:
-            response = (
+            query = (
                 get_supabase()
                 .table(self.table_name)
                 .select("*")
                 .eq("user_id", user_id)
                 .order("date", desc=True)
                 .limit(limit)
-                .execute()
             )
+            if tenant_id:
+                query = query.eq("tenant_id", tenant_id)
+            response = query.execute()
             return response.data if response.data else []
         except Exception as e:
             import logging
@@ -360,4 +367,3 @@ class TransactionRepository(BaseRepository):
             import logging
             logging.error(f"Erro ao criar múltiplas transações: {e}")
             return []
-

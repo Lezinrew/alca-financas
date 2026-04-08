@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 from utils.auth_utils import require_auth
+from utils.tenant_context import require_tenant
 from services.report_service import (
     dashboard_summary,
     dashboard_summary_supabase,
@@ -18,10 +19,11 @@ def _dashboard_data():
     transactions = current_app.config['TRANSACTIONS']
     categories = current_app.config['CATEGORIES']
     user_id = request.user_id
+    tenant_id = request.tenant_id
     if current_app.config.get('DB_TYPE') == 'supabase':
-        data = dashboard_summary_supabase(transactions, categories, user_id, month, year)
+        data = dashboard_summary_supabase(transactions, categories, user_id, month, year, tenant_id=tenant_id)
         if request.args.get('show_evolution', 'true').lower() in ('1', 'true', 'yes'):
-            data['monthly_evolution'] = monthly_evolution_supabase(transactions, user_id, 6)
+            data['monthly_evolution'] = monthly_evolution_supabase(transactions, user_id, 6, tenant_id=tenant_id)
     else:
         data = dashboard_summary(transactions, categories, user_id, month, year)
         if request.args.get('show_evolution', 'true').lower() in ('1', 'true', 'yes'):
@@ -31,13 +33,21 @@ def _dashboard_data():
 
 @bp.route('/dashboard', methods=['GET'])
 @require_auth
+@require_tenant
 def dashboard():
     month = int(request.args.get('month', datetime.now().month))
     year = int(request.args.get('year', datetime.now().year))
     transactions = current_app.config['TRANSACTIONS']
     categories = current_app.config['CATEGORIES']
     if current_app.config.get('DB_TYPE') == 'supabase':
-        data = dashboard_summary_supabase(transactions, categories, request.user_id, month, year)
+        data = dashboard_summary_supabase(
+            transactions,
+            categories,
+            request.user_id,
+            month,
+            year,
+            tenant_id=request.tenant_id,
+        )
     else:
         data = dashboard_summary(transactions, categories, request.user_id, month, year)
     return jsonify(data)
@@ -45,6 +55,7 @@ def dashboard():
 
 @bp.route('/dashboard-advanced', methods=['GET'])
 @require_auth
+@require_tenant
 def dashboard_advanced():
     data = _dashboard_data()
     return jsonify(data)
@@ -52,6 +63,7 @@ def dashboard_advanced():
 
 @bp.route('/dashboard-settings', methods=['GET', 'PUT'])
 @require_auth
+@require_tenant
 def dashboard_settings():
     users_repo = current_app.config['USERS']
     if request.method == 'GET':
@@ -119,5 +131,3 @@ def dashboard_settings():
         if update_data:
             users_repo.update_one({'_id': request.user_id}, {'$set': update_data})
     return jsonify({'message': 'Configurações do dashboard atualizadas com sucesso'})
-
-
