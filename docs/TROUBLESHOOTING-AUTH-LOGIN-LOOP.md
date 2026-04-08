@@ -9,6 +9,8 @@ Após login aparentemente OK (ou após recriar utilizador no Supabase), o dashbo
 
 Corpo da resposta: `{"error": "Token inválido ou expirado"}` (~40-44 bytes)
 
+Nota de fluxo tenant/bootstrap: o frontend deve disparar `POST /api/auth/bootstrap` após login **e** após restauração de sessão (refresh/reopen), para garantir `public.users` + tenant_membership antes das rotas de dados.
+
 ## Causa Raiz Comum: Mistura de Configs Dev/Prod
 
 O erro **mais frequente** é reutilizar um único `.env` ou copiar variáveis cruzadas entre dev e prod.

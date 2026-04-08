@@ -12,13 +12,12 @@ import jwt
 import requests
 
 from utils.auth_utils import require_auth, generate_jwt
-from services.user_service import create_user, create_default_categories, get_user_public
+from services.user_service import create_default_categories, get_user_public
+from services.bootstrap_service import AuthBootstrapService, TenantBootstrapError
 from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
 from extensions import limiter
 from pydantic import ValidationError
 from services.supabase_auth_service import SupabaseAuthService
-from utils.tenant_context import require_tenant
-from database.connection import get_supabase
 
 
 # Remova o 'url_prefix' daqui. Ele será definido em app.py
@@ -188,49 +187,36 @@ def get_user():
 
 @bp.route('/auth/bootstrap', methods=['POST'])
 @require_auth
-@require_tenant
 def bootstrap_user():
     """
-    Supabase-only (banco limpo):
-    - Garante que exista um registro na tabela `users` (custom) para o user_id do Supabase Auth.
-    - Garante tenant default via require_tenant.
-    - Se ainda não existirem categorias no tenant, cria categorias padrão.
+    Bootstrap pós-login (Supabase-only, banco limpo e idempotente).
+
+    Invariante obrigatória:
+    - NUNCA exigir tenant antes de `public.users` existir para o `user_id` autenticado.
+      `tenant_members.user_id` possui FK para `public.users(id)`.
+      Portanto esta rota usa apenas `@require_auth` (não `@require_tenant`).
+
+    Contrato de erro:
+    - `403 tenant_required`: usado em rotas de dados quando autenticação existe, mas tenant não foi resolvido.
+    - `503 tenant_bootstrap_failed`: usado aqui quando bootstrap mínimo (users/tenant_members/migração) falha.
     """
     user_id = request.user_id
-    tenant_id = getattr(request, "tenant_id", None)
-    if not tenant_id:
-        return jsonify({"error": "Workspace não identificado."}), 403
-
     users_repo = current_app.config["USERS"]
     categories_repo = current_app.config["CATEGORIES"]
+    auth_header = request.headers.get("Authorization") or ""
+    access_token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
 
-    # 1) Garantir user custom
-    existing_user = users_repo.find_by_id(user_id) if hasattr(users_repo, "find_by_id") else users_repo.find_one({"id": user_id})
-    if not existing_user:
-        # Busca dados do usuário diretamente do Supabase Auth usando o access_token
-        auth_header = request.headers.get("Authorization") or ""
-        access_token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
-        sb = get_supabase()
-        auth_user = sb.auth.get_user(access_token)
-        email = auth_user.user.email if auth_user and auth_user.user else None
-        name = None
-        if auth_user and auth_user.user:
-            name = (auth_user.user.user_metadata or {}).get("name")
-        if not name and email:
-            name = email.split("@")[0]
-
-        create_user(
-            users_repo,
-            {
-                "id": user_id,
-                "name": name or "Usuário",
-                "email": email or "",
-                "password": "",  # não usado no Supabase-only
-            },
-            hash_password=None,
+    try:
+        bootstrap_result = AuthBootstrapService().ensure_user_and_tenant(
+            user_id=user_id,
+            users_repo=users_repo,
+            access_token=access_token,
         )
+        tenant_id = bootstrap_result.tenant_id
+    except TenantBootstrapError as exc:
+        return jsonify({"error": exc.message, "code": exc.code}), exc.status_code
 
-    # 2) Seed de categorias por tenant (idempotente)
+    # 3) Seed de categorias por tenant (idempotente)
     existing_categories = []
     if hasattr(categories_repo, "find_by_user"):
         existing_categories = categories_repo.find_by_user(user_id, tenant_id=tenant_id) or []

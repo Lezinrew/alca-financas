@@ -7,9 +7,10 @@ Responsabilidades:
 - Anexar request.tenant_id para uso em serviços/repositórios.
 """
 from typing import Optional, Tuple
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 
 from repositories.tenant_repository import TenantRepository
+from services.bootstrap_service import AuthBootstrapService
 
 
 def _get_tenant_repo() -> TenantRepository:
@@ -65,11 +66,30 @@ def resolve_tenant_id(
     # C) Default tenant (first membership); se não existir, cria um tenant padrão
     import logging
     logger = logging.getLogger(__name__)
+    bootstrap_service = AuthBootstrapService(repo)
 
     default_tenant_id = repo.get_default_tenant_id(user_id)
     if default_tenant_id is None:
         logger.warning(f"resolve_tenant_id: Usuário {user_id} não tem tenant padrão, criando...")
-        default_tenant_id = repo.ensure_default_tenant(user_id)
+        auth_header = request.headers.get("Authorization") or ""
+        access_token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
+        if access_token:
+            users_repo = current_app.config.get("USERS")
+            if users_repo is not None:
+                try:
+                    # Fallback de segurança: cobre usuário que pulou /auth/bootstrap
+                    # e evita FK failure ao tentar membership sem public.users.
+                    result = bootstrap_service.ensure_user_and_tenant(
+                        user_id=user_id,
+                        users_repo=users_repo,
+                        access_token=access_token,
+                    )
+                    default_tenant_id = result.tenant_id
+                except Exception as exc:
+                    logger.warning(f"resolve_tenant_id: fallback user+tenant failed for user_id={user_id}: {exc}")
+
+        if default_tenant_id is None:
+            default_tenant_id = bootstrap_service.ensure_minimum_tenant(user_id)
         if default_tenant_id is None:
             logger.error(f"resolve_tenant_id: Falha ao criar tenant padrão para usuário {user_id}")
         else:
@@ -121,4 +141,3 @@ def require_tenant(f):
         return f(*args, **kwargs)
 
     return decorated
-

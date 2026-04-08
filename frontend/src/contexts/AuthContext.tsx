@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { clearAuthStorage } from '../utils/tokenStorage';
 import { authAPI } from '../utils/api';
@@ -46,6 +46,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const ensureBackendBootstrap = useCallback(async () => {
+    // Bootstrap precisa rodar também quando a sessão é restaurada (F5/reopen),
+    // não apenas no login manual.
+    try {
+      await authAPI.bootstrap();
+    } catch {
+      // Não bloqueia a sessão por falha transitória no bootstrap.
+    }
+  }, []);
+
   // Sessão do Supabase é a fonte de verdade (banco limpo / Supabase-only).
   useEffect(() => {
     const checkAuth = async () => {
@@ -76,6 +86,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           (sessionUser.email ? sessionUser.email.split('@')[0] : 'Usuário'),
       });
       setIsAuthenticated(true);
+      await ensureBackendBootstrap();
       setLoading(false);
     };
 
@@ -98,10 +109,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           (sessionUser.email ? sessionUser.email.split('@')[0] : 'Usuário'),
       });
       setIsAuthenticated(true);
+      void ensureBackendBootstrap();
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [ensureBackendBootstrap]);
 
   const login = async (credentials: { email: string; password: string }, rememberMe = false) => {
     try {
@@ -128,11 +140,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsAuthenticated(true);
 
       // Inicializa tenant/categorias/registro custom no backend (idempotente)
-      try {
-        await authAPI.bootstrap();
-      } catch {
-        // Não bloqueia login por bootstrap
-      }
+      await ensureBackendBootstrap();
 
       // Supabase persiste a sessão; "rememberMe" é controlado via storage customizado.
       // Aqui, mantemos compatibilidade mínima com o comportamento anterior limpando
@@ -177,11 +185,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           name: userData.name,
         });
         setIsAuthenticated(true);
-        try {
-          await authAPI.bootstrap();
-        } catch {
-          // ignore
-        }
+        await ensureBackendBootstrap();
         return { success: true };
       }
 
@@ -211,11 +215,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             (sessionUser.email ? sessionUser.email.split('@')[0] : 'Demo User'),
         });
         setIsAuthenticated(true);
-        try {
-          await authAPI.bootstrap();
-        } catch {
-          // ignore
-        }
+        await ensureBackendBootstrap();
         return { success: true };
       }
     } catch {
@@ -247,11 +247,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             (sessionUser.email ? sessionUser.email.split('@')[0] : 'Demo User'),
         });
         setIsAuthenticated(true);
-        try {
-          await authAPI.bootstrap();
-        } catch {
-          // ignore
-        }
+        await ensureBackendBootstrap();
       }
       return { success: true };
     } catch (e: any) {
