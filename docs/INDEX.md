@@ -67,6 +67,7 @@ This file is IDE-agnostic and all paths are relative to the repository root.
 - `docs/TROUBLESHOOTING-AUTH-LOGIN-LOOP.md` — 401 na API após login (JWT, nginx, refresh).
 - `docs/PROMPT-DIAGNOSTICO-DEV-PROD-AUTH.md` — Prompt para LLM: hipóteses dev/prod + auth + triagem.
 - `docs/PROMPT-HOSTINGER-SITE-APRESENTACAO-ALCA.md` — Prompt para site institucional (Hostinger, vibe coding).
+- `docs/PROMPT-CODEX-TENANT-BOOTSTRAP-REFATORACAO.md` — Prompt Codex: tenant/workspace, bootstrap, refatoração anti-regressão.
 - `.ai_agents/README.md` — Modelfiles Ollama (`alca-senior`, `alca-ops`, `alca-writer`) e `update_agents.sh`.
 - `docs/CAREER-POSITIONING-DEVOPS.md` — Notas de posicionamento DevOps (contextual).
 
@@ -134,6 +135,7 @@ This file is IDE-agnostic and all paths are relative to the repository root.
 - `docs/TROUBLESHOOTING-AUTH-LOGIN-LOOP.md` — Loop de login / 401 em rotas protegidas.
 - `docs/PROMPT-DIAGNOSTICO-DEV-PROD-AUTH.md` — Prompt de diagnóstico (todas as possibilidades).
 - `docs/PROMPT-HOSTINGER-SITE-APRESENTACAO-ALCA.md` — Site de apresentação Alça na Hostinger.
+- `docs/PROMPT-CODEX-TENANT-BOOTSTRAP-REFATORACAO.md` — Refatoração tenant/bootstrap para Codex.
 - `docs/ANALISE-ALCA-FINANCAS.md` — Análise detalhada do projeto.
 - `docs/RAIO-X-ARQUITETURA-COMPLETO.md` — Raio-X de arquitetura (movido para `00-overview`).
 - `docs/TODO-MELHORIAS-ESTRUTURA.md` — Itens de melhoria estrutural.
