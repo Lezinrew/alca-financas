@@ -30,6 +30,7 @@ def _validate_month_year(month: int, year: int) -> None:
 
 @bp.route("/month", methods=["GET"])
 @require_auth
+@require_tenant
 def planning_month_get():
     """
     Retorna payload único: summary, expense_categories, income_categories, alerts.
@@ -154,6 +155,7 @@ def planning_month_post():
 
 @bp.route("/month/categories", methods=["GET"])
 @require_auth
+@require_tenant
 def planning_month_categories():
     """
     Lista categorias disponíveis para planejamento, agrupadas por tipo (income / expense).

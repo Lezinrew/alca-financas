@@ -244,6 +244,96 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 ---
 
+## Verificar .env (dev local e VPS)
+
+Comandos **sem** imprimir segredos; só confirmam presença de chaves e respostas HTTP.
+
+### Máquina local (desenvolvimento)
+
+Na raiz do repositório:
+
+```bash
+./scripts/dev/doctor.sh
+./scripts/prod/check-env.sh
+curl -sS http://localhost:8001/api/health
+```
+
+### Smoke rápido: bootstrap de tenant após login
+
+No fluxo Supabase, `POST /api/auth/bootstrap` deve rodar com **apenas autenticação** e criar `public.users` antes de `tenant_members` (FK em `tenant_members.user_id -> users.id`).
+Se esta rota voltar a responder `403 tenant_required`, valide se o backend em produção está com imagem antiga e reconstrua:
+
+```bash
+docker compose build backend
+docker compose up -d backend
+```
+
+Smoke test (com access token Supabase válido):
+
+```bash
+curl -i -X POST "https://SEU_DOMINIO/api/auth/bootstrap" \
+  -H "Authorization: Bearer SEU_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+Esperado: `200` com `{\"ok\": true, \"tenant_id\": \"...\"}`.  
+`503` com `code=tenant_bootstrap_failed` indica problema de migração/BD no bootstrap, distinto de `tenant_required` em rotas de dados.
+
+Opcional — listar **nomes** de variáveis definidas no `.env` (não os valores):
+
+```bash
+grep -E '^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_JWT_SECRET|SECRET_KEY|CORS_ORIGINS)=' .env 2>/dev/null | cut -d= -f1 | sort -u
+```
+
+Frontend Vite (`up.sh` pode gerar `frontend/.env`):
+
+```bash
+test -f frontend/.env && grep -E '^VITE_' frontend/.env | cut -d= -f1 | sort -u
+```
+
+### Servidor remoto (produção)
+
+Por SSH, na pasta do projeto (ex.: `/var/www/alca-financas`):
+
+```bash
+./scripts/prod/check-env.sh
+docker compose -f docker-compose.prod.yml config > /dev/null && echo "compose prod OK"
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml exec -T backend python3 -c "import os; print('SUPABASE_JWT_SECRET:', 'ok' if (os.getenv('SUPABASE_JWT_SECRET') or '').strip() else 'VAZIO')"
+```
+
+### Health e auth em produção — dois arranjos comuns
+
+Escolhe o bloco que corresponde ao teu DNS/nginx.
+
+**A) Mesmo host:** o browser chama `https://SEU_DOMINIO/api/...` (proxy no contentor do front ou no host).
+
+```bash
+curl -sS https://SEU_DOMINIO/api/health
+```
+
+Exemplo: `https://alcahub.cloud/api/health`.
+
+**B) Subdomínio da API:** o browser chama `https://api.SEU_DOMINIO/api/...`.
+
+```bash
+curl -sS https://api.SEU_DOMINIO/api/health
+```
+
+Exemplo: `https://api.alcahub.cloud/api/health`.
+
+**Teste de JWT** (após login no site): copia o `access_token` do localStorage (`sb-…-auth-token`) e corre **só na tua máquina** (não colas o token em chats):
+
+```bash
+curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
+  -H "Authorization: Bearer SEU_ACCESS_TOKEN" \
+  https://SEU_DOMINIO/api/auth/me
+```
+
+Se usas subdomínio da API, substitui a URL por `https://api.SEU_DOMINIO/api/auth/me`. Resposta **200**: backend aceita o mesmo projeto Supabase que o front; **401**: rever `SUPABASE_JWT_SECRET` e `docs/TROUBLESHOOTING-AUTH-LOGIN-LOOP.md`.
+
+---
+
 ## Troubleshooting
 
 ### Backend can't connect to Supabase

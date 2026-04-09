@@ -61,6 +61,14 @@ def category_detail(category_id: str):
     service = CategoryService(category_repo, transactions_repo)
 
     try:
+        category = category_repo.find_by_id(category_id) if hasattr(category_repo, 'find_by_id') else None
+        if (
+            not category
+            or category.get('user_id') != request.user_id
+            or category.get('tenant_id') != request.tenant_id
+        ):
+            return jsonify({'error': 'Categoria não encontrada'}), 404
+
         if request.method == 'GET':
             return jsonify(service.get_category(request.user_id, category_id))
 
@@ -77,10 +85,12 @@ def category_detail(category_id: str):
 
 @bp.route('/import', methods=['POST'])
 @require_auth
+@require_tenant
 def import_categories():
     """Importa categorias de um arquivo JSON ou CSV"""
     try:
         user_id = request.user_id
+        tenant_id = request.tenant_id
         categories_repo = current_app.config['CATEGORIES']
         
         if 'file' not in request.files:
@@ -106,12 +116,17 @@ def import_categories():
                             errors.append(f'Linha {idx + 1}: Nome e tipo são obrigatórios')
                             continue
                         
-                        existing = categories_repo.find_one({'user_id': user_id, 'name': cat['name'], 'type': cat['type']}) if hasattr(categories_repo, 'find_one') else categories_repo.find_by_name_and_type(user_id, cat['name'], cat['type'])
+                        existing = (
+                            categories_repo.find_one({'user_id': user_id, 'tenant_id': tenant_id, 'name': cat['name'], 'type': cat['type']})
+                            if hasattr(categories_repo, 'find_one')
+                            else categories_repo.find_by_name_and_type(user_id, cat['name'], cat['type'], tenant_id=tenant_id)
+                        )
                         if existing:
                             errors.append(f'Categoria "{cat["name"]}" já existe')
                             continue
                         category_data = {
                             'user_id': user_id,
+                            'tenant_id': tenant_id,
                             'name': cat['name'],
                             'type': cat['type'],
                             'color': cat.get('color', '#6366f1'),
@@ -140,12 +155,17 @@ def import_categories():
                             errors.append(f'Linha {idx + 2}: Nome e tipo são obrigatórios')
                             continue
                         
-                        existing = categories_repo.find_one({'user_id': user_id, 'name': row['name'], 'type': row['type']}) if hasattr(categories_repo, 'find_one') else categories_repo.find_by_name_and_type(user_id, row['name'], row['type'])
+                        existing = (
+                            categories_repo.find_one({'user_id': user_id, 'tenant_id': tenant_id, 'name': row['name'], 'type': row['type']})
+                            if hasattr(categories_repo, 'find_one')
+                            else categories_repo.find_by_name_and_type(user_id, row['name'], row['type'], tenant_id=tenant_id)
+                        )
                         if existing:
                             errors.append(f'Categoria "{row["name"]}" já existe')
                             continue
                         category_data = {
                             'user_id': user_id,
+                            'tenant_id': tenant_id,
                             'name': row['name'],
                             'type': row['type'],
                             'color': row.get('color', '#6366f1'),
@@ -171,5 +191,4 @@ def import_categories():
     
     except Exception as e:
         return jsonify({'error': f'Erro ao importar categorias: {str(e)}'}), 500
-
 

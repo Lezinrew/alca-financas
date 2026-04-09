@@ -67,6 +67,27 @@ if not SECRET_KEY or SECRET_KEY == 'dev-secret-key' or len(SECRET_KEY) < 32:
     )
 app.secret_key = SECRET_KEY
 
+# Supabase Auth: tokens HS256 exigem o mesmo JWT Secret do projeto (Settings → API).
+# Sem isto o login no browser funciona mas /api/* devolve 401 (assinatura inválida).
+if (
+    os.getenv("FLASK_ENV", "").strip().lower() == "production"
+    and not SKIP_DB_INIT
+    and (os.getenv("SUPABASE_URL") or "").strip()
+    and not (os.getenv("SUPABASE_JWT_SECRET") or "").strip()
+):
+    raise RuntimeError(
+        "\n" + "=" * 60 + "\n"
+        "❌ ERRO: SUPABASE_JWT_SECRET não definido em produção.\n"
+        + "=" * 60 + "\n"
+        "O frontend envia access tokens assinados pelo Supabase; o backend precisa do\n"
+        "JWT Secret do MESMO projeto que SUPABASE_URL (Dashboard → Settings → API).\n"
+        "Sem isso, todas as rotas com @require_auth respondem 401.\n"
+        "\n"
+        "Adicione ao .env do servidor, reinicie o backend:\n"
+        "  SUPABASE_JWT_SECRET=<valor do dashboard>\n"
+        + "=" * 60
+    )
+
 # Configuração de sessão para OAuth
 # Em produção, usa HTTPS então pode usar SameSite=None para OAuth cross-site
 is_production = os.getenv('FLASK_ENV') == 'production'

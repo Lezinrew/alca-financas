@@ -61,6 +61,8 @@ class CategoryService:
         category = self.category_repo.find_by_id(category_id)
         if not category or category.get('user_id') != user_id:
             raise NotFoundException('Categoria não encontrada')
+        if not category.get('tenant_id'):
+            raise ValidationException('Categoria sem workspace. Recarregue a página.')
         category['id'] = category.get('id') or category.get('_id')
         category.pop('_id', None)
         return category
@@ -69,6 +71,8 @@ class CategoryService:
         category = self.category_repo.find_by_id(category_id)
         if not category or category.get('user_id') != user_id:
             raise NotFoundException('Categoria não encontrada')
+        if not category.get('tenant_id'):
+            raise ValidationException('Categoria sem workspace. Recarregue a página.')
 
         update_data = {}
 
@@ -114,13 +118,16 @@ class CategoryService:
         category = self.category_repo.find_by_id(category_id)
         if not category or category.get('user_id') != user_id:
             raise NotFoundException('Categoria não encontrada')
+        tenant_id = category.get('tenant_id')
+        if not tenant_id:
+            raise ValidationException('Categoria sem workspace. Recarregue a página.')
 
         try:
             # Verifica se há transações usando esta categoria
             if getattr(self.transactions_repo, 'count_documents', None) is not None:
-                count = self.transactions_repo.count_documents({'category_id': category_id})
+                count = self.transactions_repo.count_documents({'category_id': category_id, 'tenant_id': tenant_id})
             else:
-                count = len(self.transactions_repo.find_all({'category_id': category_id}))
+                count = len(self.transactions_repo.find_all({'category_id': category_id, 'tenant_id': tenant_id}))
             if count > 0:
                 raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta categoria')
 

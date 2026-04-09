@@ -81,6 +81,14 @@ def transaction_detail(transaction_id: str):
     service = TransactionService(transaction_repo, categories_repo, accounts_repo)
 
     try:
+        transaction = transaction_repo.find_by_id(transaction_id) if hasattr(transaction_repo, 'find_by_id') else None
+        if (
+            not transaction
+            or transaction.get('user_id') != request.user_id
+            or transaction.get('tenant_id') != request.tenant_id
+        ):
+            return jsonify({'error': 'Transação não encontrada'}), 404
+
         if request.method == 'GET':
             result = service.get_transaction(request.user_id, transaction_id)
             return jsonify(result)
@@ -175,7 +183,11 @@ def import_transactions():
     
     # Validação da conta escolhida/detectada
     account = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
-    if not account or account.get('user_id') != request.user_id:
+    if (
+        not account
+        or account.get('user_id') != request.user_id
+        or account.get('tenant_id') != request.tenant_id
+    ):
         return jsonify({'error': 'Conta não encontrada'}), 404
     
     try:
@@ -192,10 +204,18 @@ def import_transactions():
         # Importa serviço de detecção de categorias
         from services.category_detector import detect_category_from_description, get_or_create_category
         
-        user_cats = categories_repo.find_by_user(request.user_id)
+        user_cats = categories_repo.find_by_user(request.user_id, tenant_id=request.tenant_id)
         user_categories = {cat['name']: (cat.get('id') or cat.get('_id')) for cat in user_cats}
-        income_cats = categories_repo.find_by_type(request.user_id, 'income') if hasattr(categories_repo, 'find_by_type') else (categories_repo.find_all({'user_id': request.user_id, 'type': 'income'}) or [])
-        expense_cats = categories_repo.find_by_type(request.user_id, 'expense') if hasattr(categories_repo, 'find_by_type') else (categories_repo.find_all({'user_id': request.user_id, 'type': 'expense'}) or [])
+        income_cats = (
+            categories_repo.find_by_type(request.user_id, 'income', tenant_id=request.tenant_id)
+            if hasattr(categories_repo, 'find_by_type')
+            else (categories_repo.find_all({'user_id': request.user_id, 'type': 'income', 'tenant_id': request.tenant_id}) or [])
+        )
+        expense_cats = (
+            categories_repo.find_by_type(request.user_id, 'expense', tenant_id=request.tenant_id)
+            if hasattr(categories_repo, 'find_by_type')
+            else (categories_repo.find_all({'user_id': request.user_id, 'type': 'expense', 'tenant_id': request.tenant_id}) or [])
+        )
         default_income_category = income_cats[0] if income_cats else None
         default_expense_category = expense_cats[0] if expense_cats else None
         
@@ -497,4 +517,3 @@ def transactions_facets():
         'accounts': accounts,
         'types': types,
     })
-
