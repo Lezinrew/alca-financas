@@ -119,6 +119,8 @@ class AccountService:
         account = self.account_repo.find_by_id(account_id)
         if not account or account['user_id'] != user_id:
             raise NotFoundException('Conta não encontrada')
+        if not account.get('tenant_id'):
+            raise ValidationException('Conta sem workspace. Recarregue a página.')
 
         update_data = {}
 
@@ -202,6 +204,9 @@ class AccountService:
         account = self.account_repo.find_by_id(account_id)
         if not account or account.get('user_id') != user_id:
             return 0.0
+        tenant_id = account.get('tenant_id')
+        if not tenant_id:
+            return 0.0
         
         current_balance = account.get('current_balance', 0) or 0
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -210,6 +215,7 @@ class AccountService:
             pending_query = {
                 'user_id': user_id,
                 'account_id': account_id,
+                'tenant_id': tenant_id,
                 '$or': [
                     {'status': 'pending'},
                     {'date': {'$gt': today}, 'status': {'$ne': 'paid'}}
@@ -217,7 +223,7 @@ class AccountService:
             }
             pending_transactions = list(transactions_repo.find(pending_query))
         else:
-            all_txs = transactions_repo.find_all({'user_id': user_id, 'account_id': account_id})
+            all_txs = transactions_repo.find_all({'user_id': user_id, 'account_id': account_id, 'tenant_id': tenant_id})
             pending_transactions = []
             for tx in all_txs:
                 status = tx.get('status') or 'paid'
@@ -242,13 +248,16 @@ class AccountService:
         account = self.account_repo.find_by_id(account_id)
         if not account or account.get('user_id') != user_id:
             raise NotFoundException('Conta não encontrada')
+        tenant_id = account.get('tenant_id')
+        if not tenant_id:
+            raise ValidationException('Conta sem workspace. Recarregue a página.')
 
         try:
             # Verifica se há transações usando esta conta
             if getattr(self.transactions_repo, 'count_documents', None) is not None:
-                count = self.transactions_repo.count_documents({'account_id': account_id})
+                count = self.transactions_repo.count_documents({'account_id': account_id, 'tenant_id': tenant_id})
             else:
-                count = len(self.transactions_repo.find_all({'account_id': account_id}))
+                count = len(self.transactions_repo.find_all({'account_id': account_id, 'tenant_id': tenant_id}))
             if count > 0:
                 raise ValidationException(f'Não é possível deletar. Existem {count} transações nesta conta')
 

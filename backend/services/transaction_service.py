@@ -176,6 +176,8 @@ class TransactionService:
         transaction = self.transaction_repo.find_by_id(transaction_id)
         if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
+        if not transaction.get('tenant_id'):
+            raise ValidationException('Transação sem workspace. Recarregue a página.')
         cat_id = transaction.get('category_id')
         category = _category_for(self.categories_repo, cat_id)
         if category:
@@ -192,6 +194,8 @@ class TransactionService:
         transaction = self.transaction_repo.find_by_id(transaction_id)
         if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
+        if not transaction.get('tenant_id'):
+            raise ValidationException('Transação sem workspace. Recarregue a página.')
 
         # Valores antigos para reconciliação de saldo
         old_account_id = transaction.get('account_id')
@@ -268,6 +272,8 @@ class TransactionService:
         transaction = self.transaction_repo.find_by_id(transaction_id)
         if not transaction or transaction.get('user_id') != user_id:
             raise NotFoundException('Transação não encontrada')
+        if not transaction.get('tenant_id'):
+            raise ValidationException('Transação sem workspace. Recarregue a página.')
 
         try:
             # Reverter impacto no saldo (se transação era paga)

@@ -11,7 +11,14 @@ def _period_iso(month: int, year: int):
     return start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')
 
 
-def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str, month: int, year: int) -> Dict[str, Any]:
+def dashboard_summary_supabase(
+    transactions_repo,
+    categories_repo,
+    user_id: str,
+    month: int,
+    year: int,
+    tenant_id: str = None,
+) -> Dict[str, Any]:
     """
     Dashboard summary usando repositórios Supabase.
 
@@ -19,7 +26,12 @@ def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str,
     garantindo consistência com o saldo real das contas (current_balance).
     """
     start_iso, end_iso = _period_iso(month, year)
-    transactions_list = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
+    transactions_list = transactions_repo.find_by_user_and_date_range(
+        user_id,
+        start_iso,
+        end_iso,
+        tenant_id=tenant_id,
+    )
 
     # Filtra apenas transações pagas para consistência com saldo das contas
     paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
@@ -28,7 +40,7 @@ def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str,
     total_expense = sum(float(t.get('amount', 0)) for t in paid_transactions if t.get('type') == 'expense')
     balance = total_income - total_expense
 
-    recent_raw = transactions_repo.find_by_user_limit(user_id, 10)
+    recent_raw = transactions_repo.find_by_user_limit(user_id, 10, tenant_id=tenant_id)
     recent_transactions = []
     for t in recent_raw:
         row = dict(t)
@@ -107,7 +119,12 @@ def dashboard_summary_supabase(transactions_repo, categories_repo, user_id: str,
     }
 
 
-def monthly_evolution_supabase(transactions_repo, user_id: str, months_back: int) -> List[Dict[str, Any]]:
+def monthly_evolution_supabase(
+    transactions_repo,
+    user_id: str,
+    months_back: int,
+    tenant_id: str = None,
+) -> List[Dict[str, Any]]:
     """
     Evolução mensal usando repositório Supabase.
 
@@ -125,7 +142,12 @@ def monthly_evolution_supabase(transactions_repo, user_id: str, months_back: int
             month_end = target_date.replace(month=target_date.month + 1, day=1)
         start_iso = month_start.strftime('%Y-%m-%d')
         end_iso = month_end.strftime('%Y-%m-%d')
-        month_transactions = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
+        month_transactions = transactions_repo.find_by_user_and_date_range(
+            user_id,
+            start_iso,
+            end_iso,
+            tenant_id=tenant_id,
+        )
 
         # Filtra apenas transações pagas para consistência com saldo das contas
         paid_month_transactions = [t for t in month_transactions if t.get('status') == 'paid']
@@ -511,7 +533,8 @@ def overview_report_supabase(
     month: int,
     year: int,
     report_type: str,
-    account_id: str = None
+    account_id: str = None,
+    tenant_id: str = None,
 ) -> Dict[str, Any]:
     """
     Relatório de visão geral usando repositórios Supabase.
@@ -523,7 +546,12 @@ def overview_report_supabase(
     end_iso = end_date.strftime('%Y-%m-%d')
 
     # Busca transações do período
-    transactions_list = transactions_repo.find_by_user_and_date_range(user_id, start_iso, end_iso)
+    transactions_list = transactions_repo.find_by_user_and_date_range(
+        user_id,
+        start_iso,
+        end_iso,
+        tenant_id=tenant_id,
+    )
 
     # Filtra por conta se fornecido
     if account_id:
@@ -671,13 +699,19 @@ def overview_report_supabase(
 
     elif report_type == 'balance_by_account':
         # Busca todas as contas ativas do usuário
-        accounts_list = accounts_repo.find_all({'user_id': user_id, 'is_active': True})
+        accounts_query = {'user_id': user_id, 'is_active': True}
+        if tenant_id:
+            accounts_query['tenant_id'] = tenant_id
+        accounts_list = accounts_repo.find_all(accounts_query)
         accounts_data: List[Dict[str, Any]] = []
 
         for account in accounts_list:
             acc_id = account.get('id') or account.get('_id')
             # Busca todas as transações PAGAS da conta (consistência com current_balance)
-            account_transactions = transactions_repo.find_all({'user_id': user_id, 'account_id': acc_id})
+            account_tx_query = {'user_id': user_id, 'account_id': acc_id}
+            if tenant_id:
+                account_tx_query['tenant_id'] = tenant_id
+            account_transactions = transactions_repo.find_all(account_tx_query)
             paid_account_transactions = [t for t in account_transactions if t.get('status') == 'paid']
 
             income_total = sum(float(t.get('amount', 0)) for t in paid_account_transactions if t.get('type') == 'income')
@@ -716,7 +750,8 @@ def comparison_report_supabase(
     transactions_repo,
     user_id: str,
     current_month: int,
-    current_year: int
+    current_year: int,
+    tenant_id: str = None,
 ) -> Dict[str, Any]:
     """
     Relatório de comparação usando repositório Supabase.
@@ -741,12 +776,14 @@ def comparison_report_supabase(
     current_transactions_all = transactions_repo.find_by_user_and_date_range(
         user_id,
         current_start.strftime('%Y-%m-%d'),
-        current_end.strftime('%Y-%m-%d')
+        current_end.strftime('%Y-%m-%d'),
+        tenant_id=tenant_id,
     )
     prev_transactions_all = transactions_repo.find_by_user_and_date_range(
         user_id,
         prev_start.strftime('%Y-%m-%d'),
-        prev_end.strftime('%Y-%m-%d')
+        prev_end.strftime('%Y-%m-%d'),
+        tenant_id=tenant_id,
     )
 
     # Filtra apenas transações pagas para consistência

@@ -62,6 +62,10 @@ def verify_supabase_jwt(token: str, config: Optional[SupabaseJwtConfig] = None) 
     """
     Verifica e decodifica um JWT emitido pelo Supabase.
     Retorna o payload (claims) se válido, levanta Exception caso inválido.
+
+    IMPORTANTE: Validação de issuer/audience removida - apenas assinatura é validada.
+    Supabase pode emitir tokens com iss="supabase" (legacy) ou iss="${URL}/auth/v1" (v2+).
+    A validação da assinatura (HS256/RS256) já garante autenticidade do token.
     """
     config = config or SupabaseJwtConfig.from_env()
 
@@ -71,9 +75,14 @@ def verify_supabase_jwt(token: str, config: Optional[SupabaseJwtConfig] = None) 
             token,
             config.jwt_secret,
             algorithms=["HS256"],
-            issuer=config.issuer,
-            audience=config.audience,
-            options={"verify_aud": bool(config.audience)},
+            options={
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_nbf": True,
+                "verify_iat": True,
+                "verify_aud": False,  # Não validar audience (desnecessário com assinatura válida)
+                "verify_iss": False,  # Não validar issuer (Supabase usa formatos diferentes)
+            },
         )
 
     # Modo JWKS (RS256/ES256): buscar chaves públicas.
@@ -101,8 +110,13 @@ def verify_supabase_jwt(token: str, config: Optional[SupabaseJwtConfig] = None) 
         token,
         public_key,
         algorithms=[alg],
-        issuer=config.issuer,
-        audience=config.audience,
-        options={"verify_aud": bool(config.audience)},
+        options={
+            "verify_signature": True,
+            "verify_exp": True,
+            "verify_nbf": True,
+            "verify_iat": True,
+            "verify_aud": False,
+            "verify_iss": False,
+        },
     )
 

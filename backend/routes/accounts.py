@@ -69,10 +69,15 @@ def account_detail(account_id: str):
     service = AccountService(account_repo, transactions_repo)
 
     try:
+        account = account_repo.find_by_id(account_id)
+        if (
+            not account
+            or account.get('user_id') != request.user_id
+            or account.get('tenant_id') != request.tenant_id
+        ):
+            return jsonify({'error': 'Conta não encontrada'}), 404
+
         if request.method == 'GET':
-            account = account_repo.find_by_id(account_id)
-            if not account or account.get('user_id') != request.user_id:
-                return jsonify({'error': 'Conta não encontrada'}), 404
             if '_id' in account and 'id' not in account:
                 account['id'] = account['_id']
                 account.pop('_id', None)
@@ -104,7 +109,11 @@ def import_credit_card_statement(account_id: str):
     transaction_service = TransactionService(transactions_repo, categories_repo, account_repo)
     
     account = account_repo.find_by_id(account_id)
-    if not account or account['user_id'] != request.user_id:
+    if (
+        not account
+        or account.get('user_id') != request.user_id
+        or account.get('tenant_id') != request.tenant_id
+    ):
         return jsonify({'error': 'Conta não encontrada'}), 404
     
     if account.get('type') != 'credit_card':
@@ -141,8 +150,11 @@ def import_credit_card_statement(account_id: str):
         # Importa serviço de detecção de categorias
         from services.category_detector import detect_category_from_description, get_or_create_category
         
-        # Busca categorias do usuário
-        user_categories = {cat['name']: (cat.get('id') or cat.get('_id')) for cat in categories_repo.find_all({'user_id': request.user_id})}
+        # Busca categorias do usuário no tenant atual
+        user_categories = {
+            cat['name']: (cat.get('id') or cat.get('_id'))
+            for cat in categories_repo.find_all({'user_id': request.user_id, 'tenant_id': request.tenant_id})
+        }
         
         imported_transactions = []
         errors = []
@@ -166,7 +178,8 @@ def import_credit_card_statement(account_id: str):
                                 category_service,
                                 request.user_id,
                                 tx['category_name'],
-                                'expense'
+                                'expense',
+                                tenant_id=request.tenant_id,
                             )
                             # Atualiza o dicionário de categorias
                             user_categories[tx['category_name']] = category_id
@@ -187,7 +200,8 @@ def import_credit_card_statement(account_id: str):
                                 category_name,
                                 'expense',
                                 color,
-                                icon
+                                icon,
+                                tenant_id=request.tenant_id,
                             )
                             # Atualiza o dicionário de categorias
                             if category_name not in user_categories:
@@ -261,5 +275,3 @@ def import_credit_card_statement(account_id: str):
         return jsonify(result), 201 if imported_transactions else 400
     except Exception as e:
         return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
-
-
