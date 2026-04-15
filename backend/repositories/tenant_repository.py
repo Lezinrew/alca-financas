@@ -129,6 +129,21 @@ class TenantRepository(BaseRepository):
             return tenants[0].get("tenant_id")
 
         supabase = get_supabase()
+
+        # tenant_members.user_id → FK public.users(id). Sem linha em users, só gera tenant órfão e 23503.
+        try:
+            urow = supabase.table("users").select("id").eq("id", user_id).limit(1).execute()
+            if not urow.data:
+                logger.error(
+                    "ensure_default_tenant: public.users sem registro para user_id=%s; "
+                    "rode POST /api/auth/bootstrap antes de criar workspace.",
+                    user_id,
+                )
+                return None
+        except Exception as ex:
+            logger.warning("ensure_default_tenant: não foi possível verificar public.users para %s: %s", user_id, ex)
+            return None
+
         slug = f"personal-{user_id}"
         name = "Meu espaço"
 
@@ -158,7 +173,11 @@ class TenantRepository(BaseRepository):
 
         try:
             logger.info(f"ensure_default_tenant: Criando tenant para usuário {user_id} com slug {slug}")
-            ins = supabase.table("tenants").insert({"name": name, "slug": slug}).execute()
+            ins = (
+                supabase.table("tenants")
+                .insert({"name": name, "slug": slug})
+                .execute()
+            )
             tenant_id = None
             if ins.data and len(ins.data) > 0:
                 tenant_id = str(ins.data[0]["id"])

@@ -1,8 +1,9 @@
 """
 Validação de JWT do Supabase Auth.
 
-Suporta dois modos:
-1) HS256 (simétrico) via env `SUPABASE_JWT_SECRET` (recomendado quando JWKS não expõe keys).
+O modo de validação segue o `alg` do header (não verificado), não a presença isolada de
+`SUPABASE_JWT_SECRET`:
+1) HS256 (simétrico) via env `SUPABASE_JWT_SECRET`.
 2) RS256/ES256 (assimétrico) via JWKS em `/auth/v1/.well-known/jwks.json`.
 
 Este módulo é intencionalmente pequeno e sem dependências extras além de PyJWT + requests.
@@ -11,7 +12,7 @@ Este módulo é intencionalmente pequeno e sem dependências extras além de PyJ
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 import os
 import time
 import jwt
@@ -39,6 +40,8 @@ class SupabaseJwtConfig:
         if not supabase_url:
             raise RuntimeError("SUPABASE_URL não definido no backend.")
         jwt_secret = (os.getenv("SUPABASE_JWT_SECRET") or "").strip() or None
+        # Compatibilidade: JWT_SECRET/CHATBOT_JWT_SECRET são legados e ignorados
+        # para evitar drift entre serviços. A fonte única é SUPABASE_JWT_SECRET.
         audience = (os.getenv("SUPABASE_JWT_AUD") or "").strip() or None
         return SupabaseJwtConfig(supabase_url=supabase_url, jwt_secret=jwt_secret, audience=audience)
 
@@ -58,6 +61,45 @@ def _get_jwks(jwks_url: str, ttl_seconds: int = 600) -> Dict[str, Any]:
     return jwks
 
 
+_DECODE_OPTIONS = {
+    "verify_signature": True,
+    "verify_exp": True,
+    "verify_nbf": True,
+    "verify_iat": True,
+    "verify_aud": False,
+    "verify_iss": False,
+}
+
+
+def _decode_via_jwks(token: str, config: SupabaseJwtConfig, header: Mapping[str, Any]) -> Dict[str, Any]:
+    kid = header.get("kid")
+    if not kid:
+        raise jwt.InvalidTokenError("JWT assimétrico sem 'kid'; não é possível resolver chave via JWKS.")
+
+    jwks = _get_jwks(config.jwks_url)
+    keys = jwks.get("keys") or []
+    if not keys:
+        raise RuntimeError(
+            "JWKS do Supabase não expõe chaves públicas. "
+            "Para tokens HS256 defina SUPABASE_JWT_SECRET; para RS256/ES256 habilite chaves no Supabase."
+        )
+
+    jwk = next((k for k in keys if k.get("kid") == kid), None)
+    if not jwk:
+        raise jwt.InvalidTokenError("Chave pública (kid) não encontrada no JWKS.")
+
+    kty = jwk.get("kty")
+    if kty == "RSA":
+        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(jwk)
+    elif kty == "EC":
+        public_key = jwt.algorithms.ECAlgorithm.from_jwk(jwk)
+    else:
+        raise jwt.InvalidTokenError(f"JWKS com kty não suportado: {kty!r}")
+
+    alg = (header.get("alg") or "RS256").strip()
+    return jwt.decode(token, public_key, algorithms=[alg], options=_DECODE_OPTIONS)
+
+
 def verify_supabase_jwt(token: str, config: Optional[SupabaseJwtConfig] = None) -> Dict[str, Any]:
     """
     Verifica e decodifica um JWT emitido pelo Supabase.
@@ -65,58 +107,24 @@ def verify_supabase_jwt(token: str, config: Optional[SupabaseJwtConfig] = None) 
 
     IMPORTANTE: Validação de issuer/audience removida - apenas assinatura é validada.
     Supabase pode emitir tokens com iss="supabase" (legacy) ou iss="${URL}/auth/v1" (v2+).
-    A validação da assinatura (HS256/RS256) já garante autenticidade do token.
+    A escolha HS256 (secret) vs JWKS segue o campo `alg` do header, não só a presença do secret.
     """
     config = config or SupabaseJwtConfig.from_env()
 
-    # Modo HS256: valida localmente com secret.
-    if config.jwt_secret:
+    header = jwt.get_unverified_header(token)
+    alg = (header.get("alg") or "HS256").strip()
+
+    if alg == "HS256":
+        if not config.jwt_secret:
+            raise RuntimeError(
+                "JWT com algoritmo HS256 exige SUPABASE_JWT_SECRET no backend (mesmo projeto que SUPABASE_URL)."
+            )
         return jwt.decode(
             token,
             config.jwt_secret,
             algorithms=["HS256"],
-            options={
-                "verify_signature": True,
-                "verify_exp": True,
-                "verify_nbf": True,
-                "verify_iat": True,
-                "verify_aud": False,  # Não validar audience (desnecessário com assinatura válida)
-                "verify_iss": False,  # Não validar issuer (Supabase usa formatos diferentes)
-            },
+            options=_DECODE_OPTIONS,
         )
 
-    # Modo JWKS (RS256/ES256): buscar chaves públicas.
-    header = jwt.get_unverified_header(token)
-    kid = header.get("kid")
-    if not kid:
-        raise jwt.InvalidTokenError("JWT sem 'kid' e SUPABASE_JWT_SECRET não configurado.")
-
-    jwks = _get_jwks(config.jwks_url)
-    keys = jwks.get("keys") or []
-    if not keys:
-        raise RuntimeError(
-            "JWKS do Supabase não expõe chaves públicas. "
-            "Configure SUPABASE_JWT_SECRET no backend (modo HS256) ou habilite chaves assimétricas no Supabase."
-        )
-
-    jwk = next((k for k in keys if k.get("kid") == kid), None)
-    if not jwk:
-        raise jwt.InvalidTokenError("Chave pública (kid) não encontrada no JWKS.")
-
-    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(jwk) if jwk.get("kty") == "RSA" else jwt.algorithms.ECAlgorithm.from_jwk(jwk)
-    alg = header.get("alg") or "RS256"
-
-    return jwt.decode(
-        token,
-        public_key,
-        algorithms=[alg],
-        options={
-            "verify_signature": True,
-            "verify_exp": True,
-            "verify_nbf": True,
-            "verify_iat": True,
-            "verify_aud": False,
-            "verify_iss": False,
-        },
-    )
+    return _decode_via_jwks(token, config, header)
 
