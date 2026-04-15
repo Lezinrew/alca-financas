@@ -266,6 +266,14 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **Ajuste mínimo de resposta de autenticação:** cenário `Email not confirmed` mapeado para **401** com mensagem adequada de autenticação.
 - **Status da frente login/register 500:** concluída para o escopo definido.
 
+### Atualização de execução — microfrente register rate limit (concluída)
+
+- **Causa:** `email rate limit exceeded` retornado pelo Supabase Auth no fluxo de `POST /api/auth/register`.
+- **Antes:** a rota de register não tratava explicitamente esse caso e devolvia **500**.
+- **Agora:** o caso de rate limit foi mapeado para resposta controlada, retornando **429** com mensagem amigável.
+- **Mensagem final:** `Muitas tentativas de cadastro no momento. Tente novamente em instantes.`
+- **Validação confirmada:** `POST /api/auth/register` respondendo **429** com payload de erro amigável no cenário de rate limit.
+
 ## 12) Matriz operacional simplificada
 
 | Bloco | Arquivos afetados (principal) | Risco dominante | Teste de validação |
