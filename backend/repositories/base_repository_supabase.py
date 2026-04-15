@@ -119,10 +119,22 @@ class BaseRepository:
             if 'updated_at' not in data:
                 data['updated_at'] = datetime.utcnow().isoformat()
             
+            # Compatível com clientes supabase-py que não suportam encadear .select()
+            # após .insert() no mesmo builder.
             response = self.supabase.table(self.table_name).insert(data).execute()
-            
+
             if response.data and len(response.data) > 0:
-                return response.data[0]['id']
+                row = response.data[0]
+                rid = row.get("id") or data.get("id")
+                if rid is not None:
+                    return str(rid)
+
+            insert_id = data.get("id")
+            if insert_id is not None:
+                row = self.find_by_id(str(insert_id))
+                if row:
+                    return str(insert_id)
+
             raise ValueError("Nenhum registro foi criado")
         except Exception as e:
             logger.error(f"Erro ao criar registro em {self.table_name}: {e}")
