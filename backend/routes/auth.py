@@ -87,6 +87,8 @@ def register():
         error_msg = str(e)
         if 'already registered' in error_msg.lower() or 'user already exists' in error_msg.lower():
             return jsonify({'error': 'Email já cadastrado'}), 400
+        if 'email rate limit exceeded' in error_msg.lower() or 'rate limit' in error_msg.lower():
+            return jsonify({'error': 'Muitas tentativas de cadastro no momento. Tente novamente em instantes.'}), 429
         current_app.logger.error(f"Erro ao registrar usuário (Supabase): {e}")
         return jsonify({'error': f'Erro ao criar usuário: {error_msg}'}), 500
 
