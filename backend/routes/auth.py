@@ -131,6 +131,8 @@ def login():
         error_msg = str(e)
         if 'invalid' in error_msg.lower() or 'credentials' in error_msg.lower():
             return jsonify({'error': 'Email ou senha incorretos'}), 401
+        if 'email not confirmed' in error_msg.lower():
+            return jsonify({'error': 'Email não confirmado. Verifique sua caixa de entrada.'}), 401
         current_app.logger.error(f"Erro no login (Supabase): {e}")
         return jsonify({'error': f'Erro no login: {error_msg}'}), 500
 
@@ -211,6 +213,7 @@ def bootstrap_user():
             user_id=user_id,
             users_repo=users_repo,
             access_token=access_token,
+            jwt_claims=getattr(request, "jwt_payload", None),
         )
         tenant_id = bootstrap_result.tenant_id
     except TenantBootstrapError as exc:
