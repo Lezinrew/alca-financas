@@ -92,13 +92,15 @@ def test_resolve_tenant_ids_conta_sem_tenant_id_usa_request_tenant():
 
 def test_create_transaction_preenche_tenant_ids_no_payload():
     created_ids = []
-    def mock_create(data):
+
+    def mock_create(_self, data):
         if data.get("category_id") and not data.get("category_tenant_id"):
             raise ValueError("category_tenant_id obrigatório")
         if data.get("account_id") and not data.get("account_tenant_id"):
             raise ValueError("account_tenant_id obrigatório")
         created_ids.append(data)
         return data.get("id")
+
     account = {"user_id": USER_ID, "tenant_id": TENANT_ID}
     category = {"tenant_id": TENANT_ID}
     transaction_repo = type("TxRepo", (), {"create": mock_create})()

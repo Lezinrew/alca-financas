@@ -33,6 +33,11 @@ class FakeTenantRepo:
     def __init__(self):
         self.members = {}
         self.calls = []
+        # user_id -> lista de memberships (vazio = sem workspace; usado por _remove_stale_user_same_email)
+        self.user_tenants_by_user = {}
+
+    def get_user_tenants(self, user_id):
+        return list(self.user_tenants_by_user.get(user_id, []))
 
     def get_default_tenant_id(self, user_id):
         self.calls.append(("get_default_tenant_id", user_id))
@@ -60,7 +65,7 @@ def test_bootstrap_creates_user_before_tenant_membership(app_ctx, monkeypatch):
     monkeypatch.setattr(
         service,
         "_extract_profile_from_auth",
-        lambda _: ("Novo Usuário", "novo@example.com"),
+        lambda *_a, **_kw: ("Novo Usuário", "novo@example.com"),
     )
 
     create_calls = []
@@ -99,7 +104,7 @@ def test_bootstrap_returns_existing_tenant_without_recreating(app_ctx, monkeypat
     monkeypatch.setattr(
         service,
         "_extract_profile_from_auth",
-        lambda _: called.update(extract=True),
+        lambda *_a, **_kw: (called.update(extract=True) or ("unused", "unused@example.com")),
     )
 
     result = service.ensure_user_and_tenant(user_id="u1", users_repo=users_repo, access_token="token")
@@ -212,7 +217,7 @@ def test_bootstrap_blocks_conflicting_email_when_legacy_has_membership(app_ctx, 
     )
 
     tenant_repo = FakeTenantRepo()
-    tenant_repo.members["legacy-id"] = "tenant-legacy"
+    tenant_repo.user_tenants_by_user["legacy-id"] = [{"tenant_id": "tenant-legacy", "role": "owner"}]
     service = AuthBootstrapService(tenant_repo=tenant_repo)
 
     monkeypatch.setattr(
