@@ -7,6 +7,18 @@ from utils.money_utils import parse_money_value
 
 logger = logging.getLogger(__name__)
 
+_ACCOUNT_TYPE_LABEL_PT = {
+    "wallet": "carteira",
+    "checking": "conta corrente",
+    "savings": "poupança",
+    "credit_card": "cartão de crédito",
+    "investment": "investimento",
+}
+
+
+def _account_type_label_pt(account_type: str) -> str:
+    return _ACCOUNT_TYPE_LABEL_PT.get(account_type, account_type or "conta")
+
 
 def _parse_date(d):
     """Parse date from record (string or datetime)."""
@@ -54,9 +66,18 @@ class AccountService:
         if account_type not in ['wallet', 'checking', 'savings', 'credit_card', 'investment']:
             raise ValidationException('Tipo de conta inválido. Tipos válidos: wallet, checking, savings, credit_card, investment')
 
-        existing = self.account_repo.find_by_name(user_id, name, tenant_id=tenant_id)
+        if hasattr(self.account_repo, "find_by_name_and_type"):
+            existing = self.account_repo.find_by_name_and_type(
+                user_id, name, account_type, tenant_id=tenant_id
+            )
+        else:
+            existing = self.account_repo.find_by_name(user_id, name)
+            if existing and existing.get("type") != account_type:
+                existing = None
         if existing:
-            raise ValidationException(f'Conta "{name}" já existe')
+            raise ValidationException(
+                f'Já existe um {_account_type_label_pt(account_type)} com o nome "{name}".'
+            )
 
         # Trata initial_balance de diferentes formas (aceita string pt-BR ou número)
         # Para cartões de crédito, também aceita 'limit' como sinônimo de initial_balance
@@ -130,11 +151,21 @@ class AccountService:
             if not new_name:
                 raise ValidationException('Nome da conta não pode ser vazio')
             if new_name != account.get('name'):
-                # Verifica se já existe outra conta com mesmo nome
                 tenant_id = account.get('tenant_id')
-                existing = self.account_repo.find_by_name(user_id, new_name, tenant_id=tenant_id)
-                if existing and (existing.get('id') or existing.get('_id')) != account_id:
-                    raise ValidationException(f'Conta "{new_name}" já existe')
+                acc_type = account.get('type') or ''
+                if hasattr(self.account_repo, "find_by_name_and_type"):
+                    existing = self.account_repo.find_by_name_and_type(
+                        user_id, new_name, acc_type, tenant_id=tenant_id
+                    )
+                else:
+                    existing = self.account_repo.find_by_name(user_id, new_name)
+                    if existing and existing.get("type") != acc_type:
+                        existing = None
+                other_id = existing.get("id") or existing.get("_id") if existing else None
+                if existing and str(other_id) != str(account_id):
+                    raise ValidationException(
+                        f'Já existe um {_account_type_label_pt(acc_type)} com o nome "{new_name}".'
+                    )
             update_data['name'] = new_name
 
         # NÃO permite alterar tipo (evita inconsistência - ex: credit_card para checking)

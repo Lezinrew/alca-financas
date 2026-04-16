@@ -13,14 +13,22 @@ if [ -z "$PROD_USER" ]; then
     read -p "Digite o usuário SSH (ex: lezinrew): " PROD_USER
 fi
 
+if [ -z "$VITE_SUPABASE_URL" ]; then
+    echo "❌ Erro: variável obrigatória ausente: VITE_SUPABASE_URL"
+    echo "   Exemplo: export VITE_SUPABASE_URL='https://<project-ref>.supabase.co'"
+    exit 1
+fi
+
+if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+    echo "❌ Erro: variável obrigatória ausente: VITE_SUPABASE_ANON_KEY"
+    echo "   Exemplo: export VITE_SUPABASE_ANON_KEY='<SUPABASE_ANON_KEY>'"
+    exit 1
+fi
+
 echo "🔧 Hotfix: Rebuild frontend com Supabase"
 echo "Host: $PROD_USER@$PROD_HOST"
 echo "=========================================="
 echo ""
-
-# Credenciais do Supabase (do frontend/.env local)
-SUPABASE_URL="https://blutjlzyvhdvnkvrzdcm.supabase.co"
-SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsdXRqbHp5dmhkdm5rdnJ6ZGNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNTEyNzAsImV4cCI6MjA3OTkyNzI3MH0.38YCSHtl6oeScAxgvK8b4O-ahWCPP63vl3uVOe7WXhg"
 
 ssh $PROD_USER@$PROD_HOST << EOF
     set -e
@@ -32,8 +40,8 @@ ssh $PROD_USER@$PROD_HOST << EOF
 
     echo "📦 Rebuilding frontend com Supabase config..."
     docker run --rm \
-      -e VITE_SUPABASE_URL="$SUPABASE_URL" \
-      -e VITE_SUPABASE_ANON_KEY="$SUPABASE_KEY" \
+      -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
+      -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
       -e VITE_API_URL="http://localhost:8001" \
       -v /var/www/alca-financas/frontend:/app \
       -w /app \

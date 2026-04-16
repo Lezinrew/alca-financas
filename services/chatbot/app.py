@@ -1,3 +1,9 @@
+"""
+LEGADO INATIVO (P0-B):
+- Runtime oficial do chatbot nesta fase: Flask em /api/chatbot/* (backend/routes/chatbot.py)
+- Este serviço FastAPI (/api/chat, /api/chat/ws) permanece apenas para referência histórica.
+- Não deve ser consumido pela UI principal.
+"""
 from __future__ import annotations
 
 import os
@@ -20,11 +26,18 @@ DEFAULT_GREETING = (
 )
 
 # Configuração
-JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY", "dev-secret-key"))
+# Fonte única de validação JWT: SUPABASE_JWT_SECRET.
+SUPABASE_JWT_SECRET = (os.getenv("SUPABASE_JWT_SECRET") or "").strip()
 # API_BASE_URL deve apontar para o backend (em dev usamos localhost; em produção, variável de ambiente).
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8001")
 
 security = HTTPBearer()
+
+
+def _require_jwt_secret() -> str:
+    if not SUPABASE_JWT_SECRET:
+        raise HTTPException(status_code=500, detail="SUPABASE_JWT_SECRET não configurado")
+    return SUPABASE_JWT_SECRET
 
 
 class ChatRequest(BaseModel):
@@ -66,7 +79,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
         token = credentials.credentials
         # Armazena token para uso nas requisições
         verify_token._current_token = token
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, _require_jwt_secret(), algorithms=["HS256"])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Token inválido")
         return payload["user_id"]
@@ -292,7 +305,7 @@ def chat(
     # Verifica token e obtém user_id
     try:
         token = credentials.credentials
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, _require_jwt_secret(), algorithms=["HS256"])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Token inválido")
         user_id = payload["user_id"]
@@ -359,7 +372,7 @@ manager = ConnectionManager()
 def verify_ws_token(token: str) -> Optional[str]:
     """Verifica token JWT para WebSocket."""
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, _require_jwt_secret(), algorithms=["HS256"])
         if payload.get("type") != "access":
             return None
         return payload["user_id"]
@@ -437,12 +450,7 @@ CHATBOT_PORT = int(os.getenv("CHATBOT_PORT", "8100"))
 
 
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "services.chatbot.app:app",
-        host="127.0.0.1",
-        port=CHATBOT_PORT,
-        reload=True,
+    raise SystemExit(
+        "Serviço legado inativo nesta fase. Use o runtime oficial Flask em /api/chatbot/*."
     )
 

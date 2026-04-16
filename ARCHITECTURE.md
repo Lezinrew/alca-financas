@@ -1,7 +1,7 @@
 # ARCHITECTURE.md - Alça Finanças
 
-**Última atualização:** 2026-04-09  
-**Status:** Em validação (P0 críticos identificados)
+**Última atualização:** 2026-04-13  
+**Status:** P0 #1 em validação — Frontend migrado para Flask
 
 ---
 
@@ -13,10 +13,30 @@
 |------------|------------|-------|--------|
 | Frontend | React + Vite | 3000 | ✅ Estável |
 | Backend API | Flask + Supabase | 8001 | ✅ Estável |
-| Chatbot | FastAPI + WebSocket | 8100 | ⚠️ P0 (duplicado) |
+| Chatbot | Flask (backend) | 8001 | 🟡 Migrando (P0 #1) |
+| Chatbot (FastAPI) | FastAPI | 8100 | ⚠️ Arquivar após validação |
 | Mobile | React Native + Expo | 1900/8081 | 📋 Secundário |
 | Nginx | Reverse Proxy + SSL | 80/443 | ✅ Produção |
 | Supabase | PostgreSQL (cloud) | — | ✅ Produção |
+
+---
+
+### ⚠️ P0 #1 — Migração do Chatbot (2026-04-13)
+
+**Status:** Frontend migrado para backend Flask, aguardando validação.
+
+**Mudanças:**
+- Frontend agora usa `/api/chatbot/chat` (Flask) em vez de `/api/chat` (FastAPI)
+- WebSocket desativado temporariamente (Flask ainda não implementou)
+- `services/chatbot/` será arquivado após testes
+
+**Próximos passos:**
+1. Testar health: `curl http://localhost:8001/api/chatbot/health`
+2. Testar login + chat no frontend
+3. Validar logs do backend
+4. Arquivar `services/chatbot/`
+
+**Rollback:** `git checkout frontend/src/components/chat/ChatWidget.tsx frontend/src/utils/api.ts .env.example`
 
 ---
 

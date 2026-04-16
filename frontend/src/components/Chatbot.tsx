@@ -7,7 +7,12 @@ import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { cn } from '../lib/utils';
-import { chatbotAPI } from '../utils/api';
+import api from '../utils/api';
+
+const chatbotAPI = {
+  chat: (message: string, conversationId?: string) =>
+    api.post('/chatbot/chat', { message, conversation_id: conversationId }),
+};
 
 interface Message {
   id: string;

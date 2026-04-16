@@ -35,6 +35,8 @@ const api = axios.create({
 // Interceptor para adicionar token de autenticação (localStorage ou sessionStorage conforme Lembrar-me)
 api.interceptors.request.use(
   async (config) => {
+    // Frontend não valida com secret; apenas repassa access_token do Supabase.
+    // A validação da assinatura ocorre no backend via SUPABASE_JWT_SECRET.
     // Fonte de verdade: sessão do Supabase (Supabase-only).
     // Fallback: tokenStorage legado (se existir por algum motivo).
     const { data } = await supabase.auth.getSession();
@@ -419,6 +421,25 @@ export const adminAPI = {
   createUser: (userData: any) => api.post('/admin/users', userData),
   updateUserStatus: (id: string, data: { is_blocked?: boolean; is_admin?: boolean }) => api.put(`/admin/users/${id}`, data),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
+};
+
+// Chatbot (Backend Flask) - caminho oficial nesta fase.
+// Legado inativo: NÃO consumir /api/chat e /api/chat/ws.
+export const chatbotAPI = {
+  chat: (message: string, conversationId?: string) =>
+    api.post('/chatbot/chat', { message, conversation_id: conversationId }),
+  
+  getConversation: (conversationId: string) =>
+    api.get(`/chatbot/conversations/${conversationId}`),
+  
+  listConversations: () =>
+    api.get('/chatbot/conversations'),
+  
+  deleteConversation: (conversationId: string) =>
+    api.delete(`/chatbot/conversations/${conversationId}`),
+  
+  health: () =>
+    api.get('/chatbot/health'),
 };
 
 // Utilitários

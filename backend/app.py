@@ -67,25 +67,17 @@ if not SECRET_KEY or SECRET_KEY == 'dev-secret-key' or len(SECRET_KEY) < 32:
     )
 app.secret_key = SECRET_KEY
 
-# Supabase Auth: tokens HS256 exigem o mesmo JWT Secret do projeto (Settings → API).
-# Sem isto o login no browser funciona mas /api/* devolve 401 (assinatura inválida).
+# Supabase Auth: verify_supabase_jwt usa o `alg` do JWT — HS256 precisa de SUPABASE_JWT_SECRET;
+# RS256/ES256 usam JWKS em SUPABASE_URL. Produção pode rodar só com JWKS (secret vazio).
 if (
     os.getenv("FLASK_ENV", "").strip().lower() == "production"
     and not SKIP_DB_INIT
     and (os.getenv("SUPABASE_URL") or "").strip()
     and not (os.getenv("SUPABASE_JWT_SECRET") or "").strip()
 ):
-    raise RuntimeError(
-        "\n" + "=" * 60 + "\n"
-        "❌ ERRO: SUPABASE_JWT_SECRET não definido em produção.\n"
-        + "=" * 60 + "\n"
-        "O frontend envia access tokens assinados pelo Supabase; o backend precisa do\n"
-        "JWT Secret do MESMO projeto que SUPABASE_URL (Dashboard → Settings → API).\n"
-        "Sem isso, todas as rotas com @require_auth respondem 401.\n"
-        "\n"
-        "Adicione ao .env do servidor, reinicie o backend:\n"
-        "  SUPABASE_JWT_SECRET=<valor do dashboard>\n"
-        + "=" * 60
+    logger.warning(
+        "SUPABASE_JWT_SECRET vazio em produção: tokens HS256 falharão em @require_auth; "
+        "tokens RS256/ES256 usam JWKS. Defina o secret se o projeto ainda emitir HS256."
     )
 
 # Configuração de sessão para OAuth
@@ -103,7 +95,10 @@ limiter.init_app(app)
 cors_origins = os.getenv('CORS_ORIGINS', '*').strip()
 if cors_origins == '*':
     # Se não especificado, permite apenas localhost (produção DEVE definir CORS_ORIGINS)
-    cors_origins = 'http://localhost:3000,http://localhost:5173,http://localhost:3001,http://127.0.0.1:3000'
+    cors_origins = (
+        'http://localhost:3000,http://localhost:5173,http://localhost:3001,'
+        'http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:3001'
+    )
 origins_list = [o.strip() for o in cors_origins.split(',') if o.strip()]
 
 CORS(app,

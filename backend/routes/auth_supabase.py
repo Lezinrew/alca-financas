@@ -1,5 +1,7 @@
 """
-Rotas de autenticação usando Supabase Auth
+Rotas de autenticação usando Supabase Auth.
+
+Fonte única de validação JWT no backend: SUPABASE_JWT_SECRET.
 """
 from flask import Blueprint, request, jsonify, current_app
 from services.supabase_auth_service import SupabaseAuthService

@@ -9,8 +9,15 @@ import os
 from utils.supabase_jwt import verify_supabase_jwt
 
 
-JWT_SECRET = os.getenv("JWT_SECRET", "").strip()  # legado (não usado no Supabase-only)
 JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", 24))
+
+
+def _app_jwt_signing_secret() -> str:
+    """
+    Segredo HS256 apenas para JWTs legados da app (generate_jwt / reset), não para Supabase.
+    Ordem: JWT_SECRET (legado, evitar) → SECRET_KEY (Flask). Fluxo principal da API: verify_supabase_jwt.
+    """
+    return (os.getenv("JWT_SECRET", "").strip() or os.getenv("SECRET_KEY", "").strip())
 
 
 def hash_password(password: str) -> str:
@@ -89,15 +96,16 @@ def generate_jwt(user_id: str, tenant_id: Optional[str] = None) -> dict:
         'jti': str(uuid.uuid4())
     }
     
+    secret = _app_jwt_signing_secret()
     return {
-        'access_token': jwt.encode(access_payload, JWT_SECRET, algorithm='HS256'),
-        'refresh_token': jwt.encode(refresh_payload, JWT_SECRET, algorithm='HS256')
+        'access_token': jwt.encode(access_payload, secret, algorithm='HS256'),
+        'refresh_token': jwt.encode(refresh_payload, secret, algorithm='HS256')
     }
 
 
 def decode_token(token: str, type_required: str = 'access'):
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        payload = jwt.decode(token, _app_jwt_signing_secret(), algorithms=['HS256'])
         if payload.get('type') != type_required:
             return None
         return payload['user_id']
@@ -115,7 +123,7 @@ def generate_reset_token(user_id: str) -> str:
         'exp': datetime.utcnow() + timedelta(hours=RESET_TOKEN_EXPIRES_HOURS),
         'jti': str(uuid.uuid4()),
     }
-    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+    token = jwt.encode(payload, _app_jwt_signing_secret(), algorithm='HS256')
     return token.decode('utf-8') if isinstance(token, bytes) else token
 
 

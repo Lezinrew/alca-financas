@@ -115,7 +115,9 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
         monthly_income: monthlyIncomeValue,
       });
     } catch (err: any) {
-      setError(err.message || 'Erro ao salvar planejamento');
+      const apiError = err?.response?.data?.error;
+      const apiDetail = err?.response?.data?.detail;
+      setError(apiDetail || apiError || err.message || 'Erro ao salvar planejamento');
     } finally {
       setLoading(false);
     }
