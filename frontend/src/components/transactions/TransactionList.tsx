@@ -187,7 +187,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          console.log('TransactionList: Botão menu clicado, openMenuId atual:', openMenuId, 'transaction.id:', transaction.id);
                           setOpenMenuId(openMenuId === transaction.id ? null : transaction.id);
                         }}
                         className="p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -203,7 +202,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              console.log('TransactionList: Botão editar clicado para transação:', transaction.id);
                               setOpenMenuId(null);
                               // Usa setTimeout para garantir que o menu seja fechado antes de chamar onEdit
                               setTimeout(() => {
@@ -220,7 +218,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              console.log('TransactionList: Botão excluir clicado para transação:', transaction.id);
                               setOpenMenuId(null);
                               // Usa setTimeout para garantir que o menu seja fechado antes de chamar onDelete
                               setTimeout(() => {

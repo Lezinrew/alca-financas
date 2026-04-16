@@ -63,7 +63,6 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
   // Preenche o formulário se estiver editando
   useEffect(() => {
     if (category && show) {
-      console.log('CategoryForm: Preenchendo formulário com categoria:', category);
       setFormData({
         name: category.name || '',
         type: category.type || 'expense',
@@ -73,7 +72,6 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
       });
     } else if (!category && show) {
       // Reset form for new category
-      console.log('CategoryForm: Resetando formulário para nova categoria');
       setFormData({
         name: '',
         type: 'expense',
@@ -87,15 +85,11 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
   const handleChange = (e: InputChangeEvent) => {
     const { name, value } = e.target;
 
-    console.log('CategoryForm: handleChange - name:', name, 'value:', value);
-
     setFormData(prev => {
-      const newData = {
+      return {
         ...prev,
         [name]: value
       };
-      console.log('CategoryForm: Novo formData:', newData);
-      return newData;
     });
 
     setError('');
@@ -104,9 +98,6 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
-    console.log('CategoryForm: handleSubmit chamado');
-    console.log('CategoryForm: formData atual:', formData);
 
     setLoading(true);
     setError('');
@@ -135,15 +126,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
         description: formData.description?.trim() || ''
       };
 
-      console.log('CategoryForm: Enviando dados para API:', submitData);
       await onSubmit(submitData);
-      console.log('CategoryForm: Categoria criada com sucesso');
     } catch (err: any) {
-      console.error('CategoryForm: Erro ao enviar:', err);
-      console.error('CategoryForm: Response:', err?.response);
-      console.error('CategoryForm: Response data:', err?.response?.data);
-      console.error('CategoryForm: Response status:', err?.response?.status);
-
       const apiError = err?.response?.data?.error || err?.response?.data?.message || err?.message;
       const errorMessage = apiError || 'Erro ao salvar categoria';
       setError(errorMessage);
