@@ -79,6 +79,49 @@
     @apply bg-[#0f172a] text-white;
   }
 
+  /* Bootstrap icon always follows current text color */
+  .bi {
+    color: currentColor;
+  }
+
+  /*
+   * One-shot dark mode fix for legacy Bootstrap classes/components.
+   * Prevents "light mode text colors" from leaking into dark screens.
+   */
+  .dark .text-muted,
+  .dark .text-body-secondary,
+  .dark .form-text,
+  .dark .form-label,
+  .dark .col-form-label,
+  .dark .form-check-label,
+  .dark .btn-link {
+    color: rgb(var(--text-muted)) !important;
+  }
+
+  .dark .text-dark,
+  .dark .text-body,
+  .dark .dropdown-item,
+  .dark .table,
+  .dark th,
+  .dark td {
+    color: rgb(var(--text-secondary)) !important;
+  }
+
+  .dark .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.85;
+  }
+
+  .dark .btn-close:hover {
+    opacity: 1;
+  }
+
+  .dark .table {
+    --bs-table-color: rgb(var(--text-secondary));
+    --bs-table-bg: transparent;
+    --bs-table-border-color: rgba(148, 163, 184, 0.2);
+  }
+
   /* Typography hierarchy - Consistent dark mode */
   h1 {
     @apply text-page-title text-slate-900 dark:text-white;

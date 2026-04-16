@@ -68,11 +68,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       const response = await accountsAPI.getAll();
       if (response.data) {
         const data = response.data;
-        console.log('TransactionForm: Dados brutos da API:', data);
 
         // Garante que data seja um array
         const accountsArray = Array.isArray(data) ? data : [];
-        console.log('TransactionForm: Total de contas recebidas:', accountsArray.length);
 
         // Filtra apenas contas ativas e exclui cartões de crédito
         // O backend já converte _id para id, mas vamos garantir
@@ -90,13 +88,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           }))
           .filter((acc: any) => acc.id); // Remove contas sem ID válido
 
-        console.log('TransactionForm: Contas filtradas e normalizadas:', activeAccounts);
-        console.log('TransactionForm: Número de contas disponíveis:', activeAccounts.length);
         setAccounts(activeAccounts);
       } else {
-        console.error('Erro ao carregar contas: resposta não OK', response.status);
-        const errorText = response.data || response.statusText || 'Erro desconhecido';
-        console.error('Erro detalhado:', errorText);
         setAccountsError('Erro ao carregar contas. Tente novamente.');
       }
     } catch (err: any) {
