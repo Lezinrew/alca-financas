@@ -11,36 +11,22 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  suggestions?: string[];
 }
 
 const isDevelopment = import.meta.env.DEV;
 
 // HTTP base:
-// - DEV: http://127.0.0.1:8100/api/chat (fallback)
-// - PROD: origem relativa /api/chat (a menos que VITE_CHAT_API_URL esteja definida)
+// - DEV: http://localhost:8001/api/chatbot (Flask backend)
+// - PROD: origem relativa /api/chatbot (via nginx)
+// - Override: VITE_CHAT_API_URL se definido
 const CHAT_HTTP_BASE =
   (import.meta.env.VITE_CHAT_API_URL as string | undefined) && import.meta.env.VITE_CHAT_API_URL.trim().length
     ? import.meta.env.VITE_CHAT_API_URL.trim().replace(/\/+$/, '')
     : isDevelopment
-      ? 'http://127.0.0.1:8100/api/chat'
-      : '/api/chat';
+      ? 'http://localhost:8001/api/chatbot'  // Flask backend local
+      : '/api/chatbot';                       // Produção (via nginx)
 
-const CHATBOT_API_URL = CHAT_HTTP_BASE;
-
-// WebSocket base:
-// - DEV: ws://127.0.0.1:8100/api/chat/ws
-// - PROD: ws(s)://{host}/api/chat/ws, preservando protocolo da página
-const buildWebSocketUrl = () => {
-  if (isDevelopment) {
-    return 'ws://127.0.0.1:8100/api/chat/ws';
-  }
-  const loc = window.location;
-  const wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${wsProtocol}//${loc.host}/api/chat/ws`;
-};
-
-const CHATBOT_WS_URL = buildWebSocketUrl();
+const CHATBOT_API_URL = `${CHAT_HTTP_BASE}/chat`;
 
 export const ChatWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -56,10 +42,7 @@ export const ChatWidget: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [useWebSocket, setUseWebSocket] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const { isAuthenticated } = useAuth();
 
   const getToken = () => {
@@ -73,107 +56,6 @@ export const ChatWidget: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Conectar WebSocket quando o chat for aberto
-  useEffect(() => {
-    if (isOpen && isAuthenticated && useWebSocket) {
-      connectWebSocket();
-    } else if (wsRef.current) {
-      disconnectWebSocket();
-    }
-
-    return () => {
-      if (wsRef.current) {
-        disconnectWebSocket();
-      }
-    };
-  }, [isOpen, isAuthenticated, useWebSocket]);
-
-  const connectWebSocket = () => {
-    const token = getToken();
-    if (!token) return;
-
-    try {
-      const ws = new WebSocket(`${CHATBOT_WS_URL}?token=${token}`);
-
-      ws.onopen = () => {
-        setIsConnected(true);
-        wsRef.current = ws;
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.type === 'message') {
-            const botMessage: Message = {
-              id: Date.now().toString(),
-              text: data.reply,
-              isUser: false,
-              timestamp: new Date(data.timestamp || Date.now()),
-              suggestions: data.suggestions,
-            };
-            setMessages((prev) => [...prev, botMessage]);
-            if (data.conversation_id) {
-              setConversationId(data.conversation_id);
-            }
-          } else if (data.type === 'system') {
-            const systemMessage: Message = {
-              id: Date.now().toString(),
-              text: data.message,
-              isUser: false,
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, systemMessage]);
-            if (data.conversation_id) {
-              setConversationId(data.conversation_id);
-            }
-          } else if (data.type === 'error') {
-            const errorMessage: Message = {
-              id: Date.now().toString(),
-              text: data.message,
-              isUser: false,
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, errorMessage]);
-          }
-        } catch (error) {
-          console.error('Erro ao processar mensagem WebSocket:', error);
-        }
-      };
-
-      ws.onerror = () => {
-        // Não loga erros de WebSocket repetidamente para não poluir o console
-        // Apenas marca como desconectado e usa fallback HTTP
-        setIsConnected(false);
-        setUseWebSocket(false); // Fallback para HTTP
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        wsRef.current = null;
-        // Tentar reconectar após 3 segundos se o chat ainda estiver aberto
-        if (isOpen && isAuthenticated) {
-          setTimeout(() => {
-            if (isOpen && !wsRef.current) {
-              connectWebSocket();
-            }
-          }, 3000);
-        }
-      };
-    } catch (error) {
-      console.error('Erro ao conectar WebSocket:', error);
-      setUseWebSocket(false); // Fallback para HTTP
-    }
-  };
-
-  const disconnectWebSocket = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setIsConnected(false);
-  };
 
   const sendMessage = async (text?: string) => {
     const messageText = text || input.trim();
@@ -190,22 +72,7 @@ export const ChatWidget: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
-    // Usar WebSocket se disponível
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      try {
-        wsRef.current.send(JSON.stringify({
-          message: messageText,
-          conversation_id: conversationId,
-        }));
-        setIsLoading(false);
-        return;
-      } catch (error) {
-        console.error('Erro ao enviar via WebSocket:', error);
-        // Fallback para HTTP
-      }
-    }
-
-    // Fallback para HTTP
+    // Runtime oficial nesta fase: HTTP via Flask em /api/chatbot/*
     try {
       const token = getToken();
       if (!token) {
@@ -227,10 +94,9 @@ export const ChatWidget: React.FC = () => {
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response.data.reply,
+        text: response.data.message,
         isUser: false,
         timestamp: new Date(),
-        suggestions: response.data.suggestions,
       };
 
       if (response.data.conversation_id) {
@@ -239,9 +105,13 @@ export const ChatWidget: React.FC = () => {
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (error: any) {
+      const backendMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message;
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: error.response?.data?.detail || 'Desculpe, ocorreu um erro. Tente novamente.',
+        text: backendMessage || 'Desculpe, ocorreu um erro. Tente novamente.',
         isUser: false,
         timestamp: new Date(),
       };
@@ -256,10 +126,6 @@ export const ChatWidget: React.FC = () => {
       e.preventDefault();
       sendMessage();
     }
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion);
   };
 
   // Só mostra o widget se estiver autenticado
@@ -287,9 +153,6 @@ export const ChatWidget: React.FC = () => {
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5" />
           <h3 className="font-semibold">Assistente Virtual</h3>
-          {isConnected && (
-            <span className="ml-2 w-2 h-2 bg-green-300 rounded-full animate-pulse" title="Conectado em tempo real"></span>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -327,19 +190,6 @@ export const ChatWidget: React.FC = () => {
                     }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                  {message.suggestions && message.suggestions.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {message.suggestions.map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

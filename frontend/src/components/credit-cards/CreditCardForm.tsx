@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import CurrencyInput from '../ui/CurrencyInput';
 import { parseCurrencyString, formatNumberToBR } from '../../lib/utils';
 import { CreditCard, CreditCardPayload } from '../../types/credit-card';
@@ -193,8 +194,19 @@ const CreditCardForm: React.FC<CreditCardFormProps> = ({ show, onHide, onSubmit,
         setError('');
         setSaveAndCreateNew(false);
       }
-    } catch (err) {
-      setError((err as Error).message || 'Erro ao salvar cartão');
+    } catch (err: unknown) {
+      let message = 'Erro ao salvar cartão';
+      if (axios.isAxiosError(err)) {
+        const body = err.response?.data;
+        if (body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string') {
+          message = (body as { error: string }).error;
+        } else if (err.message) {
+          message = err.message;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }

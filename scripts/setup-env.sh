@@ -39,36 +39,39 @@ fi
 if [ "$1" = "--editor-only" ]; then
     echo -e "\n${BLUE}Abrindo .env no editor...${NC}"
     "${EDITOR:-nano}" .env
-    echo -e "${GREEN}Pronto. Verifique as variáveis obrigatórias (SUPABASE_*, SECRET_KEY, JWT_SECRET).${NC}"
+    echo -e "${GREEN}Pronto. Verifique as variáveis obrigatórias (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, SECRET_KEY).${NC}"
     exit 0
 fi
 
-# 2. Gerar SECRET_KEY e JWT_SECRET se ainda forem placeholders
-need_secrets=false
-if grep -q "your-secret-key-min-32-chars" .env 2>/dev/null || grep -q "your-jwt-secret-min-32-chars" .env 2>/dev/null; then
-    need_secrets=true
+# 2. Gerar SECRET_KEY se ainda for placeholder (SUPABASE_JWT_SECRET vem do dashboard, não se gera aqui)
+need_secret_key=false
+if grep -q "your-flask-secret-key-min-32-chars" .env 2>/dev/null; then
+    need_secret_key=true
 fi
 
-if [ "$need_secrets" = true ]; then
+if [ "$need_secret_key" = true ]; then
     echo ""
-    echo -e "${YELLOW}🔐 SECRET_KEY e JWT_SECRET ainda estão com valor de exemplo.${NC}"
-    read -p "Gerar valores seguros agora com openssl? (s/n): " gen
+    echo -e "${YELLOW}🔐 SECRET_KEY ainda está com valor de exemplo (Flask / cookies / JWT legado da app).${NC}"
+    read -p "Gerar SECRET_KEY segura agora com openssl? (s/n): " gen
     if [ "$gen" = "s" ] || [ "$gen" = "S" ]; then
         SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || echo "")
-        JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "")
-        if [ -n "$SECRET_KEY" ] && [ -n "$JWT_SECRET" ]; then
+        if [ -n "$SECRET_KEY" ]; then
             if [[ "$OSTYPE" == "darwin"* ]]; then
                 sed -i '' "s|SECRET_KEY=.*|SECRET_KEY=$SECRET_KEY|" .env
-                sed -i '' "s|JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
             else
                 sed -i "s|SECRET_KEY=.*|SECRET_KEY=$SECRET_KEY|" .env
-                sed -i "s|JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
             fi
-            echo -e "${GREEN}✅ SECRET_KEY e JWT_SECRET gerados e gravados no .env${NC}"
+            echo -e "${GREEN}✅ SECRET_KEY gerado e gravado no .env${NC}"
         else
-            echo -e "${YELLOW}⚠️  openssl não disponível. Preencha manualmente no .env.${NC}"
+            echo -e "${YELLOW}⚠️  openssl não disponível. Preencha SECRET_KEY manualmente no .env.${NC}"
         fi
     fi
+fi
+
+if grep -q "your-supabase-jwt-secret-min-32-chars" .env 2>/dev/null; then
+    echo ""
+    echo -e "${YELLOW}⚠️  SUPABASE_JWT_SECRET ainda está com placeholder.${NC}"
+    echo -e "${BLUE}   Copie o JWT Secret em: Supabase → Project Settings → API (não use openssl para este valor).${NC}"
 fi
 
 # 3. Oferecer script de credenciais Supabase
@@ -95,7 +98,7 @@ case "$choice" in
         echo -e "${GREEN}Pronto.${NC}"
         ;;
     3)
-        echo -e "${GREEN}Lembre de preencher pelo menos: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SECRET_KEY, JWT_SECRET, CORS_ORIGINS.${NC}"
+        echo -e "${GREEN}Lembre de preencher pelo menos: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, SECRET_KEY, CORS_ORIGINS.${NC}"
         exit 0
         ;;
     *)
@@ -106,6 +109,6 @@ esac
 
 echo ""
 echo -e "${GREEN}✅ Configuração do .env concluída.${NC}"
-echo -e "${BLUE}Variáveis obrigatórias: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SECRET_KEY, JWT_SECRET.${NC}"
+echo -e "${BLUE}Variáveis obrigatórias: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, SECRET_KEY.${NC}"
 echo -e "${YELLOW}Nunca commite o arquivo .env no Git.${NC}"
 echo ""

@@ -63,9 +63,20 @@ else
     exit 1
 fi
 
+# Validação: fluxo ativo exige Supabase JWT + SECRET_KEY (sem default silencioso de JWT_SECRET legado)
+if [ -z "${SUPABASE_JWT_SECRET:-}" ] || [ "$SUPABASE_JWT_SECRET" = "your-supabase-jwt-secret-min-32-chars" ]; then
+    echo -e "${RED}❌ SUPABASE_JWT_SECRET ausente ou ainda com placeholder do .env.example.${NC}"
+    echo -e "${YELLOW}   Defina SUPABASE_JWT_SECRET no .env (Supabase → Project Settings → API → JWT Secret).${NC}"
+    exit 1
+fi
+
+if [ -z "${SECRET_KEY:-}" ] || [ "$SECRET_KEY" = "your-flask-secret-key-min-32-chars" ]; then
+    echo -e "${RED}❌ SECRET_KEY ausente ou ainda com placeholder do .env.example.${NC}"
+    echo -e "${YELLOW}   Gere com: openssl rand -hex 32 e defina SECRET_KEY no .env${NC}"
+    exit 1
+fi
+
 # Set defaults
-export SECRET_KEY="${SECRET_KEY:-dev-secret-key}"
-export JWT_SECRET="${JWT_SECRET:-dev-jwt-secret}"
 export BACKEND_PORT="${BACKEND_PORT:-8001}"
 export FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 export HOST="${HOST:-0.0.0.0}"

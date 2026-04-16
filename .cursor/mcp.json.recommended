@@ -8,7 +8,7 @@
       "command": "npx",
       "args": ["hostinger-api-mcp@latest"],
       "env": {
-        "API_TOKEN": "***REMOVED_HOSTINGER_TOKEN***"
+        "API_TOKEN": "<HOSTINGER_API_TOKEN>"
       },
       "_comment": "Gerenciamento do VPS Hostinger (deploy, status, logs)"
     },

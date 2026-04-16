@@ -1,7 +1,11 @@
 """
 Serviço de integração com Supabase Auth
 """
+import os
 from typing import Dict, Any, Optional
+
+from supabase import create_client
+
 from database.connection import get_supabase
 from repositories.user_repository_supabase import UserRepository
 import logging
@@ -145,10 +149,9 @@ class SupabaseAuthService:
             Dados do usuário ou None
         """
         try:
-            # Definir sessão no cliente Supabase
-            self.supabase.auth.set_session(access_token=access_token, refresh_token='')
-            
-            # Obter usuário atual
+            # Nunca chamar set_session no cliente singleton (get_supabase): isso faz o PostgREST
+            # passar a enviar o JWT do utilizador e aplicar RLS nas tabelas (ex.: accounts) sem
+            # request.jwt.claim.tenant_id → erro 42501 em inserts seguintes.
             auth_user = self.supabase.auth.get_user(access_token)
             
             if not auth_user.user:
@@ -199,8 +202,17 @@ class SupabaseAuthService:
     def sign_out(self, access_token: str):
         """Faz logout do usuário"""
         try:
-            self.supabase.auth.set_session(access_token=access_token, refresh_token='')
-            self.supabase.auth.sign_out()
+            # Cliente efémero: evita poluir o singleton usado por repositórios (RLS / service_role).
+            url = (os.getenv("SUPABASE_URL") or "").strip()
+            key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip() or (
+                os.getenv("SUPABASE_ANON_KEY") or ""
+            ).strip()
+            if not url or not key:
+                logger.warning("sign_out: SUPABASE_URL ou chave ausente")
+                return
+            ephemeral = create_client(url, key)
+            ephemeral.auth.set_session(access_token=access_token, refresh_token="")
+            ephemeral.auth.sign_out()
         except Exception as e:
             logger.error(f"Erro ao fazer logout: {e}")
 

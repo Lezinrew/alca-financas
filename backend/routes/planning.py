@@ -73,29 +73,37 @@ def planning_month_put():
     Salva planejamento completo.
     Body: month, year, planned_income, savings_percentage, category_plans: [{ category_id, planned_amount }].
     """
-    data = request.get_json() or {}
-    month = data.get("month") or datetime.now().month
-    year = data.get("year") or datetime.now().year
-    _validate_month_year(month, year)
-    planned_income = float(data.get("planned_income", 0))
-    savings_percentage = float(data.get("savings_percentage", 0))
-    if savings_percentage < 0 or savings_percentage > 100:
-        raise ValidationException("savings_percentage deve ser entre 0 e 100")
-    category_plans = data.get("category_plans") or []
-    if not isinstance(category_plans, list):
-        raise ValidationException("category_plans deve ser uma lista")
-
-    tenant_id = getattr(request, "tenant_id", None)
-    if not tenant_id:
-        return jsonify({"error": "Workspace não identificado"}), 403
-    user_id = request.user_id
-    budget_repo = current_app.config.get("BUDGET_REPO")
-    if not budget_repo:
-        return jsonify({"error": "Planejamento não disponível para este ambiente"}), 503
-
-    from services.planning_service import save_planning_month
-
     try:
+        data = request.get_json() or {}
+        month = int(data.get("month") or datetime.now().month)
+        year = int(data.get("year") or datetime.now().year)
+        _validate_month_year(month, year)
+
+        planned_income_raw = data.get("planned_income", 0)
+        savings_percentage_raw = data.get("savings_percentage", 0)
+        try:
+            planned_income = float(planned_income_raw or 0)
+            savings_percentage = float(savings_percentage_raw or 0)
+        except (TypeError, ValueError):
+            raise ValidationException("planned_income e savings_percentage devem ser números válidos")
+
+        if savings_percentage < 0 or savings_percentage > 100:
+            raise ValidationException("savings_percentage deve ser entre 0 e 100")
+
+        category_plans = data.get("category_plans") or []
+        if not isinstance(category_plans, list):
+            raise ValidationException("category_plans deve ser uma lista")
+
+        tenant_id = getattr(request, "tenant_id", None)
+        if not tenant_id:
+            return jsonify({"error": "Workspace não identificado"}), 403
+        user_id = request.user_id
+        budget_repo = current_app.config.get("BUDGET_REPO")
+        if not budget_repo:
+            return jsonify({"error": "Planejamento não disponível para este ambiente"}), 503
+
+        from services.planning_service import save_planning_month
+
         result = save_planning_month(
             tenant_id=tenant_id,
             user_id=user_id,
@@ -107,9 +115,14 @@ def planning_month_put():
             budget_repo=budget_repo,
         )
         return jsonify(result)
+    except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.exception("planning_month_put error: %s", e)
-        return jsonify({"error": "Erro ao salvar planejamento"}), 500
+        return jsonify({
+            "error": "Erro ao salvar planejamento",
+            "detail": str(e),
+        }), 500
 
 
 @bp.route("/month", methods=["POST"])

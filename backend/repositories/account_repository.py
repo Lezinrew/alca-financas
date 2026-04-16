@@ -12,3 +12,10 @@ class AccountRepository(BaseRepository):
     
     def find_by_name(self, user_id: str, name: str) -> Optional[Dict[str, Any]]:
         return self.collection.find_one({'user_id': user_id, 'name': name})
+
+    def find_by_name_and_type(
+        self, user_id: str, name: str, account_type: str
+    ) -> Optional[Dict[str, Any]]:
+        return self.collection.find_one(
+            {'user_id': user_id, 'name': name, 'type': account_type}
+        )

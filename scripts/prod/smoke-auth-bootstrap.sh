@@ -115,17 +115,32 @@ accounts_status="$(run_check "GET" "$API_URL/accounts" "$TMP_DIR/accounts.json" 
 echo "HTTP $accounts_status"
 cat "$TMP_DIR/accounts.json" || true
 
+print_step "Categories: $API_URL/categories"
+categories_status="$(run_check "GET" "$API_URL/categories" "$TMP_DIR/categories.json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN")"
+echo "HTTP $categories_status"
+cat "$TMP_DIR/categories.json" || true
+
+print_step "Transactions: $API_URL/transactions"
+transactions_status="$(run_check "GET" "$API_URL/transactions?page=1&limit=5" "$TMP_DIR/transactions.json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN")"
+echo "HTTP $transactions_status"
+cat "$TMP_DIR/transactions.json" || true
+
 echo ""
 echo "==> Resumo"
-echo "health:    $health_status"
-echo "bootstrap: $bootstrap_status"
-echo "auth/me:   $me_status"
-echo "accounts:  $accounts_status"
+echo "health:        $health_status"
+echo "bootstrap:     $bootstrap_status"
+echo "auth/me:       $me_status"
+echo "accounts:      $accounts_status"
+echo "categories:    $categories_status"
+echo "transactions:  $transactions_status"
 
-if [[ "$bootstrap_status" != "200" || "$me_status" != "200" || "$accounts_status" != "200" ]]; then
+if [[ "$bootstrap_status" != "200" || "$me_status" != "200" || "$accounts_status" != "200" \
+  || "$categories_status" != "200" || "$transactions_status" != "200" ]]; then
   echo ""
   echo "SMOKE FALHOU"
-  echo "Esperado: bootstrap=200, auth/me=200, accounts=200"
+  echo "Esperado: bootstrap=200, auth/me=200, accounts=200, categories=200, transactions=200"
   exit 2
 fi
 

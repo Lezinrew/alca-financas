@@ -1,9 +1,11 @@
 """
 Conexão com Banco de Dados (Supabase/PostgreSQL apenas)
 """
+import base64
+import json
 import os
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 try:
     from supabase import create_client, Client
@@ -15,6 +17,38 @@ logger = logging.getLogger(__name__)
 
 _supabase_client: Optional[Any] = None
 _db_pool: Optional[Any] = None
+
+
+def _jwt_payload_unverified(token: str) -> Dict[str, Any]:
+    """Decodifica payload de JWT (sem validar assinatura) para diagnóstico de role."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        return {}
+    body = parts[1] + "=" * (-len(parts[1]) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(body.encode("ascii"))
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
+def _log_supabase_jwt_key_role(api_key: str) -> None:
+    """
+    Avisa se a chave JWT não é service_role. PostgREST aplica RLS para anon/authenticated;
+    inserts em tabelas protegidas falham com 42501 se policies não baterem com o contexto.
+    """
+    if not api_key.startswith("eyJ"):
+        return
+    payload = _jwt_payload_unverified(api_key)
+    role = payload.get("role")
+    if role == "service_role":
+        return
+    logger.warning(
+        "Chave Supabase em formato JWT com role=%r. O backend em produção deve usar "
+        "SUPABASE_SERVICE_ROLE_KEY (role service_role) para bypass de RLS no PostgREST; "
+        "com anon/authenticated, erros 42501 em INSERT/UPDATE são comuns.",
+        role,
+    )
 
 
 def _resolve_supabase_key() -> str:
@@ -120,6 +154,7 @@ def _init_supabase(url: str, key: str):
     else:
         # JWT format (eyJ*): formato nativo
         try:
+            _log_supabase_jwt_key_role(key)
             _supabase_client = create_client(url, key)
             logger.info("✅ Cliente Supabase inicializado com sucesso (JWT key)")
         except Exception as e:
