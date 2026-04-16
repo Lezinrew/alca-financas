@@ -1,7 +1,7 @@
 # TODO.md - Alça Finanças
 
-**Última atualização:** 2026-04-09  
-**Status:** 🔴 Crítico - Docker fora do ar
+**Última atualização:** 2026-04-13  
+**Status:** 🟡 Em progresso — P0 #1 (Chatbot) em validação
 
 ---
 
@@ -51,27 +51,25 @@
 
 ## 🎯 PRIORIDADE 2 - FLUXO PRINCIPAL
 
-### 2.1 Consolidar chatbot (backend vs services)
+### 2.1 Consolidar chatbot (backend vs services) ✅ EM VALIDAÇÃO
+- **Status:** 🟡 Frontend migrado para backend Flask (2026-04-13)
 - **Hipótese:** Chatbot tem implementação duplicada
 - **Arquivos:** `backend/routes/chatbot.py`, `backend/chatbot/`, `services/chatbot/app.py`
 - **Impacto:** WebSocket pode estar em serviço errado, autenticação falha
-- **Ferramenta:** Cursor
-- **Prompt:**
-  ```
-  O Alça tem chatbot em 2 lugares:
-  1. backend/chatbot/ + backend/routes/chatbot.py
-  2. services/chatbot/app.py (FastAPI separado)
-  
-  MEMORY.md diz: "websocket para chat realtime"
-  
-  Analise:
-  1. Qual está em produção hoje?
-  2. Qual tem websocket real vs HTTP polling?
-  3. Qual tem autenticação Supabase integrada?
-  4. Sugira consolidação em um único serviço
-  
-  Gere plano de migração se necessário.
-  ```
+- **Mudanças aplicadas:**
+  - ✅ `frontend/src/components/chat/ChatWidget.tsx` — URLs para `/api/chatbot`
+  - ✅ `frontend/src/utils/api.ts` — chatbotAPI adicionado
+  - ✅ `.env.example` — VITE_CHAT_API_URL apontando para Flask
+  - ✅ `frontend/src/components/Chatbot.tsx` — alinhado a `chatbotAPI` (mesmo contrato Flask; não montado no `App.tsx`)
+  - ✅ `backend/routes/chatbot.py` — `ChatbotRepository` lazy (import sem `get_db`)
+  - ✅ `services/chatbot/README.md` — legado FastAPI documentado como não oficial
+  - ✅ `EXECUTION_RUNBOOK.md` — secção P0-B (auditoria consumo UI / compose)
+- **Próximos passos:**
+  - [ ] Testar health: `curl http://localhost:8001/api/chatbot/health`
+  - [ ] Testar login + chat no frontend (fluxo real autenticado)
+  - [ ] Validar logs backend após uso de chat
+  - [ ] Arquivar `services/chatbot/` após validação
+- **Rollback:** `git checkout frontend/src/components/chat/ChatWidget.tsx frontend/src/utils/api.ts .env.example`
 
 ### 2.2 Validar autenticação Supabase JWT
 - **Hipótese:** JWT expirando ou RLs policies bloqueando
