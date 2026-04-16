@@ -237,10 +237,10 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 ## 11) Registro rápido de execução (preencher durante a fase)
 
 - **Data início:** 2026-04-14
-- **Última atualização runbook:** 2026-04-16 (CI/E2E/VPS + P0-B auditoria UI + lazy chatbot)
+- **Última atualização runbook:** 2026-04-16 (sincronizado com `main` até `a103b77`: RLS accounts/categories/transactions, CI pytest, smoke estendido, P0-B UI/chatbot)
 - **Bloco atual:** P0-D (documentação mínima crítica) e, em paralelo, **P0-B** (runtime único do chatbot) conforme capacidade do time
 - **Responsável:** Backend owner + Infra/Docs owner (conforme trilha)
-- **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` / `20260416000002` / `20260416000003` aplicáveis em Supabase; smoke **health → bootstrap → me → accounts** validado em produção após deploy; regressão coberta por testes unitários em CI (ver secção CI acima).
+- **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` … `20260416000004` aplicáveis em Supabase (reconcile + RLS users/tenants/members + **accounts** + **categories/transactions** via `tenant_members`); smoke **`/api/health` → bootstrap → me → accounts → categories → transactions`** (`scripts/prod/smoke-auth-bootstrap.sh`); regressão de conflito email legado coberta em CI por `backend/tests/unit/test_auth_bootstrap_service.py` (ex.: `test_bootstrap_reconciles_stale_email_without_memberships`, `test_bootstrap_blocks_conflicting_email_when_legacy_has_membership`) e `test_tenant_context.py` (fallback bootstrap); ver secção CI acima.
 - **Histórico P0-C (contexto):** `JWT_SECRET` deixou de ser caminho principal do runtime ativo; `scripts/dev/up.sh` valida `SUPABASE_JWT_SECRET` e `SECRET_KEY`; fluxo principal é token Supabase nos helpers Supabase.
 - **Próximo passo imediato:** fechar **P0-D** (docs mínimas + este runbook alinhado), avançar **P0-B** (chatbot único / sem consumo legado na UI) e, quando existir ambiente de teste dedicado, correr **E2E (Playwright)** manualmente ou reintegrar no CI com `if` condicionado a secrets.
 
@@ -291,6 +291,8 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **Accounts RLS (`20260416000003_accounts_rls_tenant_membership.sql`):**
   - Problema: policies antigas podiam depender de `current_tenant_id()` / claim `tenant_id` no JWT; o access token Supabase padrão **não** inclui `tenant_id` → `42501` em `accounts` mesmo com membership válido.
   - Solução: `SELECT`/`INSERT`/`UPDATE`/`DELETE` em `public.accounts` exigem `auth.uid() = user_id`, `tenant_id` preenchido e **EXISTS** em `tenant_members` para `(tenant_id, user_id)`, alinhado ao bootstrap.
+- **Categories + transactions RLS (`20260416000004_categories_transactions_rls_tenant_membership.sql`):**
+  - Mesmo racional que `00003`: evitar `42501` em leitura/escrita PostgREST quando o JWT não traz `tenant_id`; policies recriadas com `auth.uid() = user_id` e **EXISTS** em `tenant_members` para o par `(tenant_id, user_id)`.
 - **Validação pós-migration:**
   - Script de verificação: `scripts/sql/verify_bootstrap_rls_and_data.sql`
   - Policies confirmadas:
@@ -298,25 +300,27 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
     - `tenant_members_select_own`
     - `tenants_select_member`
     - `accounts_tenant_policy_select`, `accounts_tenant_policy_insert`, `accounts_tenant_policy_update`, `accounts_tenant_policy_delete` (após `00003`)
+    - `categories_tenant_policy_*` e `transactions_tenant_policy_*` (após `00004`; inspeção via query no fim de `verify_bootstrap_rls_and_data.sql`)
 - **Smoke runtime final (local):**
   - `GET /api/health` -> **200**
   - `POST /api/auth/bootstrap` -> **200**
   - `GET /api/auth/me` -> **200**
   - `GET /api/accounts` -> **200**
+  - `GET /api/categories` e `GET /api/transactions` incluídos no script de smoke (mesma ordem de dependência: bootstrap antes de dados tenant-aware).
   - Sweep de endpoints de páginas (dashboard/accounts/categories/transactions/planning/goals/reports/tenants) -> **200** no estado validado.
 - **Status:** frente de bootstrap/workspace resolvida no runtime local validado.
 
 ### Atualização de execução — CI, E2E e operações VPS (2026-04-16)
 
 - **GitHub Actions — CI principal (`.github/workflows/ci.yml`):**
-  - Job **Backend Tests**: corre subconjunto de unitários (bootstrap/tenant/transações + `test_auth_utils` sem testes JWT que exigem Mongo), com `pymongo` instalado para import do `conftest`, `SECRET_KEY` com **≥ 32 caracteres** (exigência do `app.py`), `SKIP_DB_INIT=true` e chave Supabase em formato `eyJ…` ou `sb_secret_` (validação em `database/connection.py`).
+  - Job **Backend Tests**: corre subconjunto de unitários (bootstrap/tenant/transações + `test_auth_utils` sem testes JWT que exigem Mongo), incluindo regressão de bootstrap (`test_auth_bootstrap_service.py`: reconciliação de email legado sem membership vs bloqueio quando legado tem workspace; `test_tenant_context.py`: fallback), com `pymongo` instalado para import do `conftest`, `SECRET_KEY` com **≥ 32 caracteres** (exigência do `app.py`), `SKIP_DB_INIT=true` e chave Supabase em formato `eyJ…` ou `sb_secret_` (validação em `database/connection.py`).
   - **Cobertura:** o `backend/pytest.ini` fixa `--cov-fail-under=70` sobre `--cov=.`; no CI o job usa `-o addopts=…` e **`--cov-fail-under=0`** para não falhar só porque a suite parcial não cobre o monólito inteiro — o gate deste job é **falha de teste**, não percentagem global.
   - **Frontend — typecheck (`npx tsc --noEmit`):** o job compila todo o `src/`. O componente **`Chatbot.tsx`** (não montado no `App` por defeito) deve importar a instância axios **`default`** de `utils/api.ts` e usar um wrapper local para `POST /chatbot/chat`, em vez de depender só do export nomeado `chatbotAPI` — evita **`TS2614`** se o ficheiro de API divergir entre branches ou o export não existir no tipo visto pelo compilador.
   - **E2E Playwright:** removido do pipeline em cada push (evitava card **skipped** com `if: false`). Passa a existir workflow manual **`.github/workflows/e2e-playwright.yml`** — em GitHub: **Actions → E2E (Playwright) → Run workflow**. Quando houver stack E2E estável (API + Supabase de teste), reintegrar ou enriquecer esse ficheiro com secrets e `on: push` seletivo.
 - **Backend — import do chatbot:** `backend/routes/chatbot.py` usa **`ChatbotRepository` lazy** (`_get_chatbot_repo()`): o import do módulo **não** chama `get_db()`; a ligação ao Supabase ocorre só na primeira rota que persiste ou valida conversas. Isto alinha o carregamento do `app` com `SKIP_DB_INIT=true` (CI / smoke sem registar blueprints de dados).
 - **VPS / disco:** `No space left on device` em `git pull` costuma vir de **`/var/lib/containerd`** (snapshots + blobs). Liberar com `docker builder prune -af`, `docker image prune -a -f` e, se necessário, `docker compose down` + prune antes de voltar a fazer pull/build. Monitorizar `df -h /`.
 - **Incidente tenant/bootstrap (enxuto):** `backend/EXECUTION_TENANT_BOOTSTRAP_CHECKLIST.md`
-- **Smoke pós-deploy (auth + bootstrap + contas):** `scripts/prod/smoke-auth-bootstrap.sh` (variável `API_URL` conforme script; token Supabase no stdin).
+- **Smoke pós-deploy:** `scripts/prod/smoke-auth-bootstrap.sh` — inferir base com `SMOKE_BASE_URL` / `API_BASE_URL` / `VITE_API_URL` / `FRONTEND_URL` (URL **sem** sufixo `/api`; o script monta `$BASE_URL/api`); `ACCESS_TOKEN` por env ou stdin; valida **health, bootstrap, me, accounts, categories, transactions** (todos `200`).
 
 ### Atualização de execução — P0-B consumo oficial / UI (auditoria 2026-04-16)
 
