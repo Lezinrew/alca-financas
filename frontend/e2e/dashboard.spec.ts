@@ -11,6 +11,14 @@ test.describe('Dashboard', () => {
       await aiLoginButton.click()
       await page.waitForURL(/.*dashboard.*/, { timeout: 10_000 })
     }
+
+    // Em produção, o botão "Login com IA/Demo" pode não existir.
+    // Sem sessão autenticada, asserts de dashboard são inválidos e geram falso negativo no smoke.
+    const isOnDashboard = page.url().includes('dashboard')
+    test.skip(
+      !isOnDashboard,
+      'Dashboard smoke requer sessão autenticada; ambiente sem login demo disponível.'
+    )
   })
 
   test('should display dashboard KPIs', async ({ page }) => {
