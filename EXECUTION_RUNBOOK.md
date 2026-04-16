@@ -274,6 +274,33 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **Mensagem final:** `Muitas tentativas de cadastro no momento. Tente novamente em instantes.`
 - **Validação confirmada:** `POST /api/auth/register` respondendo **429** com payload de erro amigável no cenário de rate limit.
 
+### Atualização de execução — saneamento bootstrap/tenant + RLS (concluída)
+
+- **Contexto:** ambiente apresentava conflito de identidade por email entre `auth.users` e `public.users`, causando `POST /api/auth/bootstrap` -> **503** (`tenant_bootstrap_failed`) e cascata `tenant_required` em páginas de dados.
+- **Causa raiz:** email já vinculado a `public.users` legado com workspace/membership ativo para outro `id`, impedindo reconciliação do usuário autenticado atual.
+- **Correção de dados aplicada (SQL):**
+  - `supabase/migrations/20260416000001_reconcile_public_users_with_auth.sql`
+  - Reconciliação por email normalizado (`auth.users` x `public.users`), migração de `tenant_members`/`user_id` para o `auth.users.id` canônico e limpeza segura de legados sem referências.
+  - Hardenings de idempotência:
+    - fallback de email temporário interno para evitar `users_email_key` durante reconciliação;
+    - deleção dinâmica para tabelas opcionais (evita `42P01` quando tabela não existe).
+- **Correção de RLS aplicada (SQL):**
+  - `supabase/migrations/20260416000002_rls_bootstrap_hardening.sql`
+  - Policies críticas em `public.users`, `public.tenant_members` e `public.tenants` para `authenticated`, compatíveis com `auth.uid()` e `current_app_user_id()`.
+- **Validação pós-migration:**
+  - Script de verificação: `scripts/sql/verify_bootstrap_rls_and_data.sql`
+  - Policies confirmadas:
+    - `users_select_own`, `users_update_own`, `users_insert_own`
+    - `tenant_members_select_own`
+    - `tenants_select_member`
+- **Smoke runtime final (local):**
+  - `GET /api/health` -> **200**
+  - `POST /api/auth/bootstrap` -> **200**
+  - `GET /api/auth/me` -> **200**
+  - `GET /api/accounts` -> **200**
+  - Sweep de endpoints de páginas (dashboard/accounts/categories/transactions/planning/goals/reports/tenants) -> **200** no estado validado.
+- **Status:** frente de bootstrap/workspace resolvida no runtime local validado.
+
 ## 12) Matriz operacional simplificada
 
 | Bloco | Arquivos afetados (principal) | Risco dominante | Teste de validação |
