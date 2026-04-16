@@ -131,6 +131,7 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 
 ### Arquivos alvo
 
+- `EXECUTION_RUNBOOK.md` (este ficheiro — registro de execução e gates)
 - `ARCHITECTURE.md`
 - `TODO.md`
 - Documentos operacionais que ainda indiquem `:5000`, `/api/chat*` legado, `JWT_SECRET` como principal.
@@ -236,12 +237,12 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 ## 11) Registro rápido de execução (preencher durante a fase)
 
 - **Data início:** 2026-04-14
-- **Bloco atual:** P0-C (Auth sem ambiguidade — JWT legado vs Supabase)
-- **Responsável:** Backend owner (execução técnica em escopo estrito)
-- **Status:** concluído tecnicamente (validação ponta a ponta bloqueada fora do escopo do patch)
-- **Bloqueios / pendência externa ao escopo P0-C:** integração/auth em runtime — token Supabase válido obtido, porém `POST /api/auth/bootstrap`, `GET /api/dashboard`, `GET /api/accounts` e `POST /api/chatbot/chat` responderam **401**; `POST /api/auth/login` e `POST /api/auth/register` responderam **500** (ex.: repositório Supabase / resolução de utilizador). Tratar como correção fora do escopo P0-C até desbloquear o gate de validação E2E.
-- **Decisão tomada:** `JWT_SECRET` deixou de ser caminho principal do runtime ativo; `scripts/dev/up.sh` valida `SUPABASE_JWT_SECRET` e `SECRET_KEY` (com mensagens claras se ausentes/placeholder); helper Supabase (`auth_utils_supabase.py`) não usa mais o ramo legado de app JWT — fluxo principal é token Supabase; `auth_utils.py` / `setup-env.sh` / `.env.example` alinhados a `SUPABASE_JWT_SECRET` + `SECRET_KEY` sem exigir `JWT_SECRET` nos scripts como caminho principal.
-- **Próximo passo imediato:** P0-D (documentação operacional mínima), mantendo em paralelo o desbloqueio da pendência de integração/auth E2E e, quando aplicável, a pendência P0-B do bridge/LLM.
+- **Última atualização runbook:** 2026-04-16 (secção *CI, E2E e operações VPS*)
+- **Bloco atual:** P0-D (documentação mínima crítica) e, em paralelo, **P0-B** (runtime único do chatbot) conforme capacidade do time
+- **Responsável:** Backend owner + Infra/Docs owner (conforme trilha)
+- **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` / `20260416000002` aplicáveis em Supabase; smoke **health → bootstrap → me → accounts** validado em produção após deploy; regressão coberta por testes unitários em CI (ver secção CI acima).
+- **Histórico P0-C (contexto):** `JWT_SECRET` deixou de ser caminho principal do runtime ativo; `scripts/dev/up.sh` valida `SUPABASE_JWT_SECRET` e `SECRET_KEY`; fluxo principal é token Supabase nos helpers Supabase.
+- **Próximo passo imediato:** fechar **P0-D** (docs mínimas + este runbook alinhado), avançar **P0-B** (chatbot único / sem consumo legado na UI) e, quando existir ambiente de teste dedicado, correr **E2E (Playwright)** manualmente ou reintegrar no CI com `if` condicionado a secrets.
 
 ### Atualização de execução — bootstrap/tenant (resolvido para fluxo validado)
 
@@ -300,6 +301,16 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
   - `GET /api/accounts` -> **200**
   - Sweep de endpoints de páginas (dashboard/accounts/categories/transactions/planning/goals/reports/tenants) -> **200** no estado validado.
 - **Status:** frente de bootstrap/workspace resolvida no runtime local validado.
+
+### Atualização de execução — CI, E2E e operações VPS (2026-04-16)
+
+- **GitHub Actions — CI principal (`.github/workflows/ci.yml`):**
+  - Job **Backend Tests**: corre subconjunto de unitários (bootstrap/tenant/transações + `test_auth_utils` sem testes JWT que exigem Mongo), com `pymongo` instalado para import do `conftest`, `SECRET_KEY` com **≥ 32 caracteres** (exigência do `app.py`), `SKIP_DB_INIT=true` e chave Supabase em formato `eyJ…` ou `sb_secret_` (validação em `database/connection.py`).
+  - **Cobertura:** o `backend/pytest.ini` fixa `--cov-fail-under=70` sobre `--cov=.`; no CI o job usa `-o addopts=…` e **`--cov-fail-under=0`** para não falhar só porque a suite parcial não cobre o monólito inteiro — o gate deste job é **falha de teste**, não percentagem global.
+  - **E2E Playwright:** removido do pipeline em cada push (evitava card **skipped** com `if: false`). Passa a existir workflow manual **`.github/workflows/e2e-playwright.yml`** — em GitHub: **Actions → E2E (Playwright) → Run workflow**. Quando houver stack E2E estável (API + Supabase de teste), reintegrar ou enriquecer esse ficheiro com secrets e `on: push` seletivo.
+- **VPS / disco:** `No space left on device` em `git pull` costuma vir de **`/var/lib/containerd`** (snapshots + blobs). Liberar com `docker builder prune -af`, `docker image prune -a -f` e, se necessário, `docker compose down` + prune antes de voltar a fazer pull/build. Monitorizar `df -h /`.
+- **Incidente tenant/bootstrap (enxuto):** `backend/EXECUTION_TENANT_BOOTSTRAP_CHECKLIST.md`
+- **Smoke pós-deploy (auth + bootstrap + contas):** `scripts/prod/smoke-auth-bootstrap.sh` (variável `API_URL` conforme script; token Supabase no stdin).
 
 ## 12) Matriz operacional simplificada
 
