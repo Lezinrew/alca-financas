@@ -237,7 +237,7 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 ## 11) Registro rápido de execução (preencher durante a fase)
 
 - **Data início:** 2026-04-14
-- **Última atualização runbook:** 2026-04-16 (secção *CI, E2E e operações VPS*)
+- **Última atualização runbook:** 2026-04-16 (CI/E2E/VPS + P0-B auditoria UI + lazy chatbot)
 - **Bloco atual:** P0-D (documentação mínima crítica) e, em paralelo, **P0-B** (runtime único do chatbot) conforme capacidade do time
 - **Responsável:** Backend owner + Infra/Docs owner (conforme trilha)
 - **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` / `20260416000002` aplicáveis em Supabase; smoke **health → bootstrap → me → accounts** validado em produção após deploy; regressão coberta por testes unitários em CI (ver secção CI acima).
@@ -312,6 +312,15 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **VPS / disco:** `No space left on device` em `git pull` costuma vir de **`/var/lib/containerd`** (snapshots + blobs). Liberar com `docker builder prune -af`, `docker image prune -a -f` e, se necessário, `docker compose down` + prune antes de voltar a fazer pull/build. Monitorizar `df -h /`.
 - **Incidente tenant/bootstrap (enxuto):** `backend/EXECUTION_TENANT_BOOTSTRAP_CHECKLIST.md`
 - **Smoke pós-deploy (auth + bootstrap + contas):** `scripts/prod/smoke-auth-bootstrap.sh` (variável `API_URL` conforme script; token Supabase no stdin).
+
+### Atualização de execução — P0-B consumo oficial / UI (auditoria 2026-04-16)
+
+- **Frontend:** `App.tsx` monta apenas **`ChatWidget`** → HTTP para **`/api/chatbot/chat`** (base `VITE_CHAT_API_URL` ou `/api/chatbot` em prod).
+- **`Chatbot.tsx`:** não está referenciado no `App.tsx`; passou a usar o mesmo contrato **`chatbotAPI`** (`frontend/src/utils/api.ts`) que o resto do código deve preferir, evitando divergência de paths.
+- **`chatbotAPI`:** único módulo exportado para chat HTTP no cliente; comentário explícito contra `/api/chat` e `/api/chat/ws` legados.
+- **`mobile/`:** sem referências a endpoints de chat legados (grep na data acima).
+- **Compose:** `docker-compose.yml` / `docker-compose.prod.yml` não sobem `services/chatbot` por omissão; OpenClaw (gateway/bridge) é stack à parte.
+- **Legado no repo:** `services/chatbot/app.py` (FastAPI) — ver **`services/chatbot/README.md`**. Próximo passo formal de P0-B: arquivoção/remoção após checklist de validação em produção, sem reintroduzir consumo `/api/chat*` na UI.
 
 ## 12) Matriz operacional simplificada
 

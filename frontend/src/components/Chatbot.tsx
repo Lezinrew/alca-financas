@@ -1,9 +1,13 @@
+/**
+ * UI flutuante alternativa ao ChatWidget.
+ * O App atual monta apenas ChatWidget; este componente permanece alinhado ao mesmo contrato HTTP (Flask /api/chatbot/*).
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { cn } from '../lib/utils';
-import api from '../utils/api';
+import { chatbotAPI } from '../utils/api';
 
 interface Message {
   id: string;
@@ -50,10 +54,10 @@ export const Chatbot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/chatbot/chat', {
-        message: inputMessage,
-        conversation_id: conversationId
-      });
+      const response = await chatbotAPI.chat(
+        inputMessage,
+        conversationId ?? undefined,
+      );
 
       if (response.data.success) {
         const botMessage: Message = {
@@ -72,9 +76,13 @@ export const Chatbot: React.FC = () => {
         throw new Error(response.data.message || 'Erro ao enviar mensagem');
       }
     } catch (error: any) {
+      const backendMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message;
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: error.response?.data?.message || 'Desculpe, não consegui processar sua mensagem. Tente novamente.',
+        text: backendMessage || 'Desculpe, não consegui processar sua mensagem. Tente novamente.',
         sender: 'bot',
         timestamp: new Date()
       };
