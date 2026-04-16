@@ -5,6 +5,7 @@
 - `POST /api/auth/bootstrap` retorna `200` com `tenant_id` preenchido.
 - `GET /api/auth/me` retorna `200`.
 - `GET /api/accounts` (com mesmo token) retorna `200`.
+- `GET /api/categories` e `GET /api/transactions` (com mesmo token) retornam `200` após migrations RLS `00003`/`00004`.
 - Logs não mostram `tenant_bootstrap_failed` nem `tenant_required` para o usuário validado.
 
 ## 2) Diagnóstico rápido (copiar e executar)
@@ -51,6 +52,6 @@ where tm.user_id = :auth_user_id;
 
 ## 4) Primeira ação em caso quebrado
 
-- Rodar as migrations de reconciliação/hardening/accounts RLS já aprovadas (`00001`, `00002`, `00003`).
+- Rodar as migrations de reconciliação/hardening/RLS tenant-aware já aprovadas (`00001`, `00002`, `00003`, `00004`).
 - Executar `scripts/sql/verify_bootstrap_rls_and_data.sql`.
 - Repetir smoke (`health -> bootstrap -> me -> accounts`) antes de encerrar incidente.
