@@ -211,12 +211,23 @@ def bootstrap_user():
     access_token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
 
     try:
-        bootstrap_result = AuthBootstrapService().ensure_user_and_tenant(
-            user_id=user_id,
-            users_repo=users_repo,
-            access_token=access_token,
-            jwt_claims=getattr(request, "jwt_payload", None),
-        )
+        try:
+            bootstrap_result = AuthBootstrapService().ensure_user_and_tenant(
+                user_id=user_id,
+                users_repo=users_repo,
+                access_token=access_token,
+                jwt_claims=getattr(request, "jwt_payload", None),
+            )
+        except TypeError as exc:
+            # Compatibilidade: containers antigos podem ter ensure_user_and_tenant sem `jwt_claims`.
+            if "unexpected keyword argument" in str(exc) and "jwt_claims" in str(exc):
+                bootstrap_result = AuthBootstrapService().ensure_user_and_tenant(
+                    user_id=user_id,
+                    users_repo=users_repo,
+                    access_token=access_token,
+                )
+            else:
+                raise
         tenant_id = bootstrap_result.tenant_id
     except TenantBootstrapError as exc:
         return jsonify({"error": exc.message, "code": exc.code}), exc.status_code

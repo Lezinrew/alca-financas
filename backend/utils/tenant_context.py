@@ -63,7 +63,7 @@ def resolve_tenant_id(
                 403,
             )
 
-    # C) Default tenant (first membership); se não existir, cria um tenant padrão
+    # C) Default tenant (first membership); se não existir, tenta bootstrap completo (users + tenant)
     import logging
     logger = logging.getLogger(__name__)
     bootstrap_service = AuthBootstrapService(repo)
@@ -79,17 +79,29 @@ def resolve_tenant_id(
                 try:
                     # Fallback de segurança: cobre usuário que pulou /auth/bootstrap
                     # e evita FK failure ao tentar membership sem public.users.
-                    result = bootstrap_service.ensure_user_and_tenant(
-                        user_id=user_id,
-                        users_repo=users_repo,
-                        access_token=access_token,
-                    )
+                    try:
+                        result = bootstrap_service.ensure_user_and_tenant(
+                            user_id=user_id,
+                            users_repo=users_repo,
+                            access_token=access_token,
+                            jwt_claims=getattr(request, "jwt_payload", None),
+                        )
+                    except TypeError as exc:
+                        # Compatibilidade: containers antigos podem ter ensure_user_and_tenant sem `jwt_claims`.
+                        if "unexpected keyword argument" in str(exc) and "jwt_claims" in str(exc):
+                            result = bootstrap_service.ensure_user_and_tenant(
+                                user_id=user_id,
+                                users_repo=users_repo,
+                                access_token=access_token,
+                            )
+                        else:
+                            raise
                     default_tenant_id = result.tenant_id
                 except Exception as exc:
                     logger.warning(f"resolve_tenant_id: fallback user+tenant failed for user_id={user_id}: {exc}")
 
-        if default_tenant_id is None:
-            default_tenant_id = bootstrap_service.ensure_minimum_tenant(user_id)
+        # Nunca chamar ensure_minimum_tenant sozinho: cria tenants/tenant_members sem garantir
+        # public.users (FK tenant_members_user_id_fkey). O caminho certo é ensure_user_and_tenant /bootstrap.
         if default_tenant_id is None:
             logger.error(f"resolve_tenant_id: Falha ao criar tenant padrão para usuário {user_id}")
         else:
