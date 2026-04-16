@@ -114,7 +114,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-mock || true
+          pip install pytest pytest-cov pytest-mock pymongo || true
 
       - name: Run unit tests (mocked DB)
         working-directory: ./backend
@@ -122,12 +122,19 @@ jobs:
           # Supabase test config (these are fake values for unit tests with mocks)
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.fake
-          SECRET_KEY: test-secret-key
-          JWT_SECRET: test-jwt-secret
+          # app.py exige SECRET_KEY com >= 32 caracteres
+          SECRET_KEY: ci-test-secret-key-not-for-production-use-32chars
+          JWT_SECRET: test-jwt-secret-for-ci-only-not-prod-32ch
           SKIP_DB_INIT: "true"
         run: |
-          # Run only unit tests that don't require real DB connection
-          pytest tests/unit -v --cov=. --cov-report=xml --cov-report=term || echo "Unit tests completed"
+          # conftest ainda usa pymongo/Y app Flask; estes testes não usam o fixture `app` (sem Mongo no CI).
+          pytest \
+            tests/unit/test_auth_bootstrap_service.py \
+            tests/unit/test_tenant_context.py \
+            tests/unit/test_transaction_service_tenant.py \
+            -v --tb=short --cov=. --cov-report=xml --cov-report=term
+          # testes JWT em test_auth_utils exigem fixture `app`+Mongo — CI sem Mongo: só hashing
+          pytest tests/unit/test_auth_utils.py -v --tb=short -k "not jwt"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -163,7 +170,7 @@ jobs:
         env:
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.fake
-          SECRET_KEY: test-secret
+          SECRET_KEY: ci-test-secret-key-not-for-production-use-32chars
           SKIP_DB_INIT: "true"
         run: |
           # Try to start backend in background
