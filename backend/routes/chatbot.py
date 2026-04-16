@@ -1,8 +1,14 @@
 """
-Rotas para o Chatbot OpenClaw
+Rotas para o Chatbot OpenClaw.
+
+Autenticação via token_required (validação Supabase centralizada no backend).
+Runtime oficial nesta fase: Flask em /api/chatbot/*.
+
+ChatbotRepository é lazy: evita get_db()/init_db no import do módulo (alinhado a SKIP_DB_INIT e testes).
 """
 import time
 import logging
+from typing import Optional
 from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils_supabase import token_required
 from services.openclaw_service import OpenClawService
@@ -41,7 +47,14 @@ def _error_response(error_type: str, message: str, retryable: bool):
 bp = Blueprint('chatbot', __name__, url_prefix='/api/chatbot')
 
 openclaw_service = OpenClawService()
-chatbot_repo = ChatbotRepository()
+_chatbot_repo: Optional[ChatbotRepository] = None
+
+
+def _get_chatbot_repo() -> ChatbotRepository:
+    global _chatbot_repo
+    if _chatbot_repo is None:
+        _chatbot_repo = ChatbotRepository()
+    return _chatbot_repo
 
 
 @bp.route('/chat', methods=['POST'])
@@ -115,7 +128,7 @@ def chat(current_user):
 
         # Validar ownership se conversation_id for fornecido
         if conversation_id:
-            if not chatbot_repo.validate_ownership(conversation_id, user_id):
+            if not _get_chatbot_repo().validate_ownership(conversation_id, user_id):
                 logger.warning(
                     "chatbot_ownership_validation_failure user_id_trunc=%s conversation_id=%s",
                     user_id_trunc, conversation_id
@@ -147,7 +160,7 @@ def chat(current_user):
             new_conversation_id = result.get('conversation_id')
             if new_conversation_id:
                 try:
-                    chatbot_repo.create_conversation(
+                    _get_chatbot_repo().create_conversation(
                         user_id=user_id,
                         conversation_id=new_conversation_id,
                         metadata={'last_message': message[:100]}
@@ -192,7 +205,7 @@ def get_conversation(current_user, conversation_id):
         user_id = current_user['id']
 
         # Validar ownership
-        if not chatbot_repo.validate_ownership(conversation_id, user_id):
+        if not _get_chatbot_repo().validate_ownership(conversation_id, user_id):
             logger.warning(f"🚨 Unauthorized conversation access attempt - User: {user_id[:8]}... Conv: {conversation_id}")
             return jsonify({
                 'error': 'Conversa não encontrada ou não autorizada'
@@ -226,7 +239,7 @@ def list_conversations(current_user):
     """
     try:
         user_id = current_user['id']
-        conversations = chatbot_repo.get_user_conversations(user_id)
+        conversations = _get_chatbot_repo().get_user_conversations(user_id)
 
         return jsonify({
             'success': True,
@@ -255,7 +268,7 @@ def delete_conversation(current_user, conversation_id):
         user_id = current_user['id']
 
         # Validar ownership está dentro do método delete_conversation
-        success = chatbot_repo.delete_conversation(conversation_id, user_id)
+        success = _get_chatbot_repo().delete_conversation(conversation_id, user_id)
 
         if success:
             return jsonify({'success': True}), 200
