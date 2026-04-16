@@ -7,9 +7,23 @@ from services.bootstrap_service import AuthBootstrapService, TenantBootstrapErro
 class FakeUsersRepo:
     def __init__(self):
         self.rows = {}
+        self.deleted = []
 
     def find_by_id(self, user_id):
         return self.rows.get(user_id)
+
+    def find_by_email(self, email):
+        for row in self.rows.values():
+            if row.get("email") == email:
+                return row
+        return None
+
+    def delete(self, user_id):
+        if user_id in self.rows:
+            self.deleted.append(user_id)
+            del self.rows[user_id]
+            return True
+        return False
 
     def create(self, payload):
         self.rows[payload["id"]] = payload
@@ -161,3 +175,61 @@ def test_ensure_minimum_tenant_uses_repo_methods_only(monkeypatch):
     assert tenants[0]["tenant_id"] == "t1"
     assert ("tenant_members", "tenant_id, role") in captured_selects
     assert all("tenants!inner" not in cols for _table, cols in captured_selects)
+
+
+def test_bootstrap_reconciles_stale_email_without_memberships(app_ctx, monkeypatch):
+    users_repo = FakeUsersRepo()
+    users_repo.create(
+        {"id": "legacy-id", "name": "Legacy", "email": "same@example.com", "password": ""}
+    )
+    tenant_repo = FakeTenantRepo()
+    service = AuthBootstrapService(tenant_repo=tenant_repo)
+
+    monkeypatch.setattr(
+        service,
+        "_extract_profile_from_auth",
+        lambda *_: ("Novo Usuário", "same@example.com"),
+    )
+    monkeypatch.setattr("services.bootstrap_service.create_user", lambda repo, payload, **_: repo.create(payload))
+
+    result = service.ensure_user_and_tenant(
+        user_id="new-auth-id",
+        users_repo=users_repo,
+        access_token="token",
+        jwt_claims={"email": "same@example.com"},
+    )
+
+    assert result.tenant_id == "tenant-new-auth-id"
+    assert users_repo.find_by_id("legacy-id") is None
+    assert users_repo.find_by_id("new-auth-id") is not None
+    assert users_repo.deleted == ["legacy-id"]
+
+
+def test_bootstrap_blocks_conflicting_email_when_legacy_has_membership(app_ctx, monkeypatch):
+    users_repo = FakeUsersRepo()
+    users_repo.create(
+        {"id": "legacy-id", "name": "Legacy", "email": "same@example.com", "password": ""}
+    )
+
+    tenant_repo = FakeTenantRepo()
+    tenant_repo.members["legacy-id"] = "tenant-legacy"
+    service = AuthBootstrapService(tenant_repo=tenant_repo)
+
+    monkeypatch.setattr(
+        service,
+        "_extract_profile_from_auth",
+        lambda *_: ("Novo Usuário", "same@example.com"),
+    )
+    monkeypatch.setattr("services.bootstrap_service.create_user", lambda repo, payload, **_: repo.create(payload))
+
+    with pytest.raises(TenantBootstrapError) as exc:
+        service.ensure_user_and_tenant(
+            user_id="new-auth-id",
+            users_repo=users_repo,
+            access_token="token",
+            jwt_claims={"email": "same@example.com"},
+        )
+
+    assert exc.value.code == "tenant_bootstrap_failed"
+    assert exc.value.status_code == 503
+    assert "já está associado a outro perfil" in exc.value.message
