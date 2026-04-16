@@ -240,7 +240,7 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **Última atualização runbook:** 2026-04-16 (CI/E2E/VPS + P0-B auditoria UI + lazy chatbot)
 - **Bloco atual:** P0-D (documentação mínima crítica) e, em paralelo, **P0-B** (runtime único do chatbot) conforme capacidade do time
 - **Responsável:** Backend owner + Infra/Docs owner (conforme trilha)
-- **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` / `20260416000002` aplicáveis em Supabase; smoke **health → bootstrap → me → accounts** validado em produção após deploy; regressão coberta por testes unitários em CI (ver secção CI acima).
+- **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` / `20260416000002` / `20260416000003` aplicáveis em Supabase; smoke **health → bootstrap → me → accounts** validado em produção após deploy; regressão coberta por testes unitários em CI (ver secção CI acima).
 - **Histórico P0-C (contexto):** `JWT_SECRET` deixou de ser caminho principal do runtime ativo; `scripts/dev/up.sh` valida `SUPABASE_JWT_SECRET` e `SECRET_KEY`; fluxo principal é token Supabase nos helpers Supabase.
 - **Próximo passo imediato:** fechar **P0-D** (docs mínimas + este runbook alinhado), avançar **P0-B** (chatbot único / sem consumo legado na UI) e, quando existir ambiente de teste dedicado, correr **E2E (Playwright)** manualmente ou reintegrar no CI com `if` condicionado a secrets.
 
@@ -288,12 +288,16 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **Correção de RLS aplicada (SQL):**
   - `supabase/migrations/20260416000002_rls_bootstrap_hardening.sql`
   - Policies críticas em `public.users`, `public.tenant_members` e `public.tenants` para `authenticated`, compatíveis com `auth.uid()` e `current_app_user_id()`.
+- **Accounts RLS (`20260416000003_accounts_rls_tenant_membership.sql`):**
+  - Problema: policies antigas podiam depender de `current_tenant_id()` / claim `tenant_id` no JWT; o access token Supabase padrão **não** inclui `tenant_id` → `42501` em `accounts` mesmo com membership válido.
+  - Solução: `SELECT`/`INSERT`/`UPDATE`/`DELETE` em `public.accounts` exigem `auth.uid() = user_id`, `tenant_id` preenchido e **EXISTS** em `tenant_members` para `(tenant_id, user_id)`, alinhado ao bootstrap.
 - **Validação pós-migration:**
   - Script de verificação: `scripts/sql/verify_bootstrap_rls_and_data.sql`
   - Policies confirmadas:
     - `users_select_own`, `users_update_own`, `users_insert_own`
     - `tenant_members_select_own`
     - `tenants_select_member`
+    - `accounts_tenant_policy_select`, `accounts_tenant_policy_insert`, `accounts_tenant_policy_update`, `accounts_tenant_policy_delete` (após `00003`)
 - **Smoke runtime final (local):**
   - `GET /api/health` -> **200**
   - `POST /api/auth/bootstrap` -> **200**

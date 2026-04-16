@@ -46,10 +46,11 @@ where tm.user_id = :auth_user_id;
 - **Quebrado**
   - `POST /api/auth/bootstrap` retorna `503 tenant_bootstrap_failed`;
   - endpoints protegidos retornam `403 tenant_required` após bootstrap;
+  - `GET/POST /api/accounts` ou writes em `public.accounts` com **42501** (RLS) após membership válido — ver migration `20260416000003_accounts_rls_tenant_membership` (policies devem usar `tenant_members`, não só claim `tenant_id` no JWT);
   - conflito residual: email aponta para `public.users.id` diferente do `auth.users.id`.
 
 ## 4) Primeira ação em caso quebrado
 
-- Rodar as migrations de reconciliação/hardening já aprovadas.
+- Rodar as migrations de reconciliação/hardening/accounts RLS já aprovadas (`00001`, `00002`, `00003`).
 - Executar `scripts/sql/verify_bootstrap_rls_and_data.sql`.
 - Repetir smoke (`health -> bootstrap -> me -> accounts`) antes de encerrar incidente.

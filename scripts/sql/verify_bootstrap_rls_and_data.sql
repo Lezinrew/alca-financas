@@ -3,6 +3,7 @@
 -- Execute no Supabase SQL Editor após:
 --   1) 20260416000001_reconcile_public_users_with_auth.sql
 --   2) 20260416000002_rls_bootstrap_hardening.sql
+--   3) 20260416000003_accounts_rls_tenant_membership.sql
 -- =============================================================================
 
 -- 1) Duplicidades por email normalizado em public.users (esperado: 0 linhas)
@@ -41,9 +42,11 @@ ORDER BY u.created_at DESC
 LIMIT 100;
 
 -- 5) Policies RLS críticas existentes (inspeção)
+--    Esperado em accounts: accounts_tenant_policy_{select,insert,update,delete}
+--    (membership via tenant_members; sem depender de tenant_id no JWT)
 SELECT schemaname, tablename, policyname, roles, cmd
 FROM pg_policies
 WHERE schemaname = 'public'
-  AND tablename IN ('users', 'tenant_members', 'tenants')
+  AND tablename IN ('users', 'tenant_members', 'tenants', 'accounts')
 ORDER BY tablename, policyname;
 
