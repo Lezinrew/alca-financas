@@ -95,44 +95,36 @@ class SupabaseAuthService:
         """
         try:
             # Autenticar no Supabase Auth
-            auth_response = self.supabase.auth.sign_in_with_password({
-                'email': email,
-                'password': password
-            })
-            
+            auth_response = self.supabase.auth.sign_in_with_password(
+                {
+                    'email': email,
+                    'password': password,
+                }
+            )
+
             if not auth_response.user or not auth_response.session:
                 raise ValueError("Credenciais inválidas")
-            
+
             auth_user = auth_response.user
             auth_user_id = auth_user.id
-            
-            # Buscar dados customizados na tabela users
+
+            # Buscar dados customizados na tabela users (READ-ONLY no login)
             custom_user = self.user_repo.find_by_id(auth_user_id)
-            
-            # Se não existir na tabela customizada, criar (pode acontecer se usuário foi criado diretamente no Supabase)
-            if not custom_user:
-                user_data = {
-                    'id': auth_user_id,
-                    'email': email,
-                    'name': auth_user.user_metadata.get('name', email.split('@')[0]),
-                    'settings': {
-                        'currency': 'BRL',
-                        'theme': 'light',
-                        'language': 'pt'
-                    },
-                    'auth_providers': [{'provider': 'email', 'email_verified': auth_user.email_confirmed_at is not None}],
-                    'is_admin': False
-                }
-                self.user_repo.create(user_data)
-                custom_user = self.user_repo.find_by_id(auth_user_id)
-            
+
+            # Não cria mais public.users durante o login.
+            # Se public.users ainda não existe, o bootstrap (/api/auth/bootstrap)
+            # será o ponto único responsável por garantir o estado mínimo.
+
+            name_from_custom = (custom_user or {}).get('name') if custom_user else None
+            settings_from_custom = (custom_user or {}).get('settings', {}) if custom_user else {}
+
             return {
                 'user': {
                     'id': auth_user_id,
                     'email': email,
-                    'name': custom_user.get('name') if custom_user else auth_user.user_metadata.get('name', email.split('@')[0]),
+                    'name': name_from_custom or auth_user.user_metadata.get('name', email.split('@')[0]),
                     'email_verified': auth_user.email_confirmed_at is not None,
-                    'settings': custom_user.get('settings', {}) if custom_user else {}
+                    'settings': settings_from_custom,
                 },
                 'access_token': auth_response.session.access_token,
                 'refresh_token': auth_response.session.refresh_token,
