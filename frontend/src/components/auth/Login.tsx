@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -18,7 +19,16 @@ const Login: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [postRegisterInfo, setPostRegisterInfo] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const notice = (location.state as { registrationNotice?: string } | null)?.registrationNotice;
+    if (notice) {
+      setPostRegisterInfo(notice);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -27,12 +37,14 @@ const Login: React.FC = () => {
       [name]: type === 'checkbox' ? checked : value,
     }));
     setError('');
+    setPostRegisterInfo('');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setPostRegisterInfo('');
 
     if (!formData.email?.trim() || !formData.password) {
       setError('Preencha e-mail e senha.');
@@ -168,6 +180,15 @@ const Login: React.FC = () => {
                   Esqueci a senha
                 </Link>
               </div>
+
+              {postRegisterInfo && (
+                <div
+                  className="text-sm text-slate-700 dark:text-slate-200 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2.5"
+                  role="status"
+                >
+                  {postRegisterInfo}
+                </div>
+              )}
 
               {error && (
                 <div

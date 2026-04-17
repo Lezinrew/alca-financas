@@ -69,6 +69,12 @@ FRONTEND_PORT=3000          # Vite dev server port (default: 3000)
 VITE_API_URL=http://localhost:8001  # Backend API URL for frontend
 ```
 
+### Supabase Auth (cadastro e confirmação por e-mail)
+
+- **Rate limit de e-mail** (`email rate limit exceeded`): quota anti-abuso do Supabase. Em projeto de **dev**, desative **Confirm email** em *Authentication → Providers → Email*, ou configure **SMTP próprio**, ou aguarde a janela de quota.
+- **Redirect URLs:** em *Authentication → URL Configuration*, inclua a URL de retorno após clicar no link do e-mail (ex.: `http://localhost:3000/login` e a origem de produção).
+- **`VITE_AUTH_EMAIL_REDIRECT_TO`** (opcional): se definido, o `signUp` usa este URL em `emailRedirectTo`. Se omitido, o frontend usa `<origem atual do browser>/login`.
+
 ### CORS Configuration
 
 ```bash

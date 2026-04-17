@@ -46,16 +46,14 @@ const AppShell = () => {
   }
 
   const handleLogout = async () => {
-    if (window.confirm('Deseja sair?')) {
-      try {
-        logout();
-        // Usar window.location para garantir redirecionamento completo
-        window.location.href = '/login';
-      } catch (error) {
-        console.error('Erro ao fazer logout:', error);
-        // Fallback: tentar navegação normal
-        navigate('/login', { replace: true });
-      }
+    if (!window.confirm('Deseja sair?')) return;
+    try {
+      // Aguardar signOut do Supabase antes de navegar — evita reload com sessão ainda no storage.
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      window.location.href = '/login';
     }
   };
 

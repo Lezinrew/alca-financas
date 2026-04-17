@@ -59,7 +59,7 @@ const TestComponent = () => {
       </button>
       <button
         data-testid="logout-btn"
-        onClick={logout}
+        onClick={() => void logout()}
       >
         Logout
       </button>
