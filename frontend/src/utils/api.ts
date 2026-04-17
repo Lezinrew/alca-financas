@@ -6,8 +6,8 @@ import { supabase } from './supabaseClient';
 // Utilitário para remover barras duplicadas ao final
 const trimTrailingSlashes = (value?: string) => value?.replace(/\/+$/, '') ?? '';
 
-// Em desenvolvimento, usamos backend local; em produção, usamos origem relativa por padrão.
-const DEFAULT_API_HOST = import.meta.env.DEV ? 'http://localhost:8001' : '';
+// Em desenvolvimento, priorizamos mesma origem com proxy do Vite para reduzir preflight CORS.
+const DEFAULT_API_HOST = '';
 
 // Normaliza a URL base: se VITE_API_URL/REACT_APP_BACKEND_URL for uma URL absoluta (http/https),
 // ela tem prioridade; caso contrário, usamos o fallback (DEFAULT_API_HOST).
@@ -31,6 +31,26 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+type LookupCacheEntry<T> = {
+  ts: number;
+  data: T;
+  inFlight?: Promise<T>;
+};
+
+const LOOKUP_CACHE_TTL_MS = 60_000;
+const lookupCache: {
+  accounts?: LookupCacheEntry<any[]>;
+  categories?: LookupCacheEntry<any[]>;
+} = {};
+
+const isLookupCacheValid = <T>(entry?: LookupCacheEntry<T>) =>
+  !!entry && Date.now() - entry.ts < LOOKUP_CACHE_TTL_MS;
+
+const invalidateLookupCache = (kind?: 'accounts' | 'categories') => {
+  if (!kind || kind === 'accounts') lookupCache.accounts = undefined;
+  if (!kind || kind === 'categories') lookupCache.categories = undefined;
+};
 
 // Interceptor para adicionar token de autenticação (localStorage ou sessionStorage conforme Lembrar-me)
 api.interceptors.request.use(
@@ -111,10 +131,45 @@ export const authAPI = {
 
 // Funções de categorias
 export const categoriesAPI = {
-  getAll: () => api.get('/categories'),
-  create: (categoryData: any) => api.post('/categories', categoryData),
-  update: (id: string, categoryData: any) => api.put(`/categories/${id}`, categoryData),
-  delete: (id: string) => api.delete(`/categories/${id}`),
+  getAll: async (config?: { signal?: AbortSignal; skipCache?: boolean }) => {
+    const canUseCache = !config?.skipCache && !config?.signal;
+    if (canUseCache && isLookupCacheValid(lookupCache.categories)) {
+      return { data: lookupCache.categories!.data };
+    }
+    if (canUseCache && lookupCache.categories?.inFlight) {
+      const data = await lookupCache.categories.inFlight;
+      return { data };
+    }
+    const request = api.get('/categories', config).then((response) => {
+      const data = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      lookupCache.categories = { ts: Date.now(), data };
+      return data;
+    });
+    if (canUseCache) {
+      lookupCache.categories = { ts: Date.now(), data: lookupCache.categories?.data || [], inFlight: request };
+    }
+    const data = await request.finally(() => {
+      if (lookupCache.categories) {
+        delete lookupCache.categories.inFlight;
+      }
+    });
+    return { data };
+  },
+  create: async (categoryData: any) => {
+    const response = await api.post('/categories', categoryData);
+    invalidateLookupCache('categories');
+    return response;
+  },
+  update: async (id: string, categoryData: any) => {
+    const response = await api.put(`/categories/${id}`, categoryData);
+    invalidateLookupCache('categories');
+    return response;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/categories/${id}`);
+    invalidateLookupCache('categories');
+    return response;
+  },
   import: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -122,17 +177,52 @@ export const categoriesAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    }).finally(() => invalidateLookupCache('categories'));
   },
 };
 
 // Funções de contas
 export const accountsAPI = {
-  getAll: (config?: { signal?: AbortSignal }) => api.get('/accounts', config),
+  getAll: async (config?: { signal?: AbortSignal; skipCache?: boolean }) => {
+    const canUseCache = !config?.skipCache && !config?.signal;
+    if (canUseCache && isLookupCacheValid(lookupCache.accounts)) {
+      return { data: lookupCache.accounts!.data };
+    }
+    if (canUseCache && lookupCache.accounts?.inFlight) {
+      const data = await lookupCache.accounts.inFlight;
+      return { data };
+    }
+    const request = api.get('/accounts', config).then((response) => {
+      const data = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      lookupCache.accounts = { ts: Date.now(), data };
+      return data;
+    });
+    if (canUseCache) {
+      lookupCache.accounts = { ts: Date.now(), data: lookupCache.accounts?.data || [], inFlight: request };
+    }
+    const data = await request.finally(() => {
+      if (lookupCache.accounts) {
+        delete lookupCache.accounts.inFlight;
+      }
+    });
+    return { data };
+  },
   getById: (id: string) => api.get(`/accounts/${id}`),
-  create: (accountData: any) => api.post('/accounts', accountData),
-  update: (id: string, accountData: any) => api.put(`/accounts/${id}`, accountData),
-  delete: (id: string) => api.delete(`/accounts/${id}`),
+  create: async (accountData: any) => {
+    const response = await api.post('/accounts', accountData);
+    invalidateLookupCache('accounts');
+    return response;
+  },
+  update: async (id: string, accountData: any) => {
+    const response = await api.put(`/accounts/${id}`, accountData);
+    invalidateLookupCache('accounts');
+    return response;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/accounts/${id}`);
+    invalidateLookupCache('accounts');
+    return response;
+  },
   import: (cardId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -140,7 +230,7 @@ export const accountsAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    }).finally(() => invalidateLookupCache('accounts'));
   },
 };
 

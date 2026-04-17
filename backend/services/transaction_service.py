@@ -19,6 +19,25 @@ def _category_for(categories_repo, category_id):
     return None
 
 
+def _build_category_map(categories_repo, user_id, tenant_id=None):
+    query_kwargs = {"tenant_id": tenant_id} if tenant_id else {}
+    categories = []
+    if hasattr(categories_repo, "find_by_user"):
+        categories = categories_repo.find_by_user(user_id, **query_kwargs) or []
+    elif hasattr(categories_repo, "find_all"):
+        filters = {"user_id": user_id}
+        if tenant_id:
+            filters["tenant_id"] = tenant_id
+        categories = categories_repo.find_all(filters) or []
+
+    mapped = {}
+    for category in categories:
+        cid = category.get("id") or category.get("_id")
+        if cid:
+            mapped[str(cid)] = category
+    return mapped
+
+
 def _account_for(accounts_repo, account_id, user_id):
     if not account_id:
         return None
@@ -89,9 +108,10 @@ class TransactionService:
             tenant_id=tenant_id,
         )
         data = result.get('data') or []
+        categories_by_id = _build_category_map(self.categories_repo, user_id, tenant_id=tenant_id)
         for transaction in data:
             cat_id = transaction.get('category_id')
-            category = _category_for(self.categories_repo, cat_id)
+            category = categories_by_id.get(str(cat_id)) if cat_id else None
             if category:
                 transaction['category'] = {
                     'name': category.get('name', ''),

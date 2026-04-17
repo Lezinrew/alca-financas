@@ -262,16 +262,16 @@ const Settings = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-          <i className="bi bi-exclamation-triangle-fill text-red-600"></i>
-          <span className="text-red-800">{error}</span>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
+          <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
+          <span className="text-red-800 dark:text-red-200">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-2">
-          <i className="bi bi-check-circle-fill text-emerald-600"></i>
-          <span className="text-emerald-800">{success}</span>
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-center gap-2">
+          <i className="bi bi-check-circle-fill text-emerald-600 dark:text-emerald-400"></i>
+          <span className="text-emerald-800 dark:text-emerald-200">{success}</span>
         </div>
       )}
 

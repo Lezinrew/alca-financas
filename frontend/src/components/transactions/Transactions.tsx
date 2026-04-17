@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -37,45 +37,59 @@ const Transactions = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
   const [initialTransactionType, setInitialTransactionType] = useState<TransactionType | null>(null);
+  const requestSeqRef = useRef(0);
+  const lookupCacheRef = useRef<{ categories: TransactionCategory[]; accounts: any[] } | null>(null);
 
-  const loadData = async () => {
+  const buildFilterParams = () => ({
+    date_preset: filters.datePreset,
+    date_from: filters.dateFrom,
+    date_to: filters.dateTo,
+    types: filters.types.join(','),
+    type: filters.types.length === 1 ? filters.types[0] : undefined,
+    account_ids: filters.accountIds.join(','),
+    category_ids: filters.categoryIds.join(','),
+    min_amount: filters.minAmount,
+    max_amount: filters.maxAmount,
+    search: filters.search,
+    status: filters.status,
+    is_recurring: filters.isRecurring,
+  });
+
+  const loadData = async (includeFacets = true) => {
+    const requestId = ++requestSeqRef.current;
     try {
       setLoading(true);
       setError('');
+      const filterParams = buildFilterParams();
 
-      // Carrega transações e categorias primeiro (essenciais)
-      const [transactionsRes, categoriesRes] = await Promise.all([
+      const shouldFetchLookups = !lookupCacheRef.current;
+      const [transactionsRes, categoriesRes, accountsResponse, facetsData] = await Promise.all([
         transactionsAPI.getAll({
-          date_preset: filters.datePreset,
-          date_from: filters.dateFrom,
-          date_to: filters.dateTo,
-          types: filters.types.join(','),
-          type: filters.types.length === 1 ? filters.types[0] : undefined,
-          account_ids: filters.accountIds.join(','),
-          category_ids: filters.categoryIds.join(','),
-          min_amount: filters.minAmount,
-          max_amount: filters.maxAmount,
-          search: filters.search,
-          status: filters.status,
-          is_recurring: filters.isRecurring,
+          ...filterParams,
           page: filters.page,
           limit: filters.limit,
           sort: filters.sort,
         }),
-        categoriesAPI.getAll()
+        shouldFetchLookups ? categoriesAPI.getAll() : Promise.resolve({ data: lookupCacheRef.current?.categories ?? [] }),
+        shouldFetchLookups
+          ? accountsAPI.getAll().then(res => res.data).catch(() => [])
+          : Promise.resolve(lookupCacheRef.current?.accounts ?? []),
+        includeFacets
+          ? transactionsAPI.getFacets(filterParams).then((res) => res.data).catch(() => null)
+          : Promise.resolve(null),
       ]);
 
-      // Carrega contas separadamente (não crítico - se falhar, não quebra a página)
-      let accountsRes: any[] = [];
-      try {
-        const accountsResponse = await accountsAPI.getAll();
-        if (accountsResponse.data) {
-          accountsRes = Array.isArray(accountsResponse.data) ? accountsResponse.data : [];
-        }
-      } catch (accountsErr) {
-        console.warn('Erro ao carregar contas (não crítico):', accountsErr);
-        // Não quebra o fluxo se falhar ao carregar contas
+      // Ignora respostas antigas quando o usuário troca filtros rapidamente.
+      if (requestId !== requestSeqRef.current) return;
+
+      if (includeFacets) {
+        setFacets(facetsData);
       }
+
+      const facetsForCounts = includeFacets ? facetsData : facets;
+
+      // Carrega contas separadamente (não crítico - se falhar, não quebra a página)
+      const accountsRes: any[] = Array.isArray(accountsResponse) ? accountsResponse : [];
 
       // Garante que transactions seja sempre um array
       // O backend retorna {data: [...], pagination: {...}}
@@ -123,9 +137,9 @@ const Transactions = () => {
         }));
 
       // Enriquecer categorias com contagem (facets)
-      if (facets?.categories?.length) {
+      if (facetsForCounts?.categories?.length) {
         const withCounts = validCategories.map((cat: TransactionCategory) => {
-          const facet = facets.categories.find((f) => f.id === cat.id);
+          const facet = facetsForCounts.categories.find((f: any) => f.id === cat.id);
           return facet ? { ...cat, count: facet.count } : cat;
         });
         setCategories(withCounts as any);
@@ -158,20 +172,28 @@ const Transactions = () => {
           );
         
         // Enriquecer contas com contagem (facets)
-        if (facets?.accounts?.length) {
+        if (facetsForCounts?.accounts?.length) {
           const withCounts = activeAccounts.map((acc: any) => {
-            const facet = facets.accounts.find((f) => f.id === acc.id);
+            const facet = facetsForCounts.accounts.find((f: any) => f.id === acc.id);
             return facet ? { ...acc, count: facet.count } : acc;
           });
           setAccounts(withCounts);
         } else {
           setAccounts(activeAccounts);
         }
+
+        if (shouldFetchLookups) {
+          lookupCacheRef.current = {
+            categories: validCategories,
+            accounts: activeAccounts,
+          };
+        }
       } else {
         // Se não conseguiu carregar, mantém o array vazio
         setAccounts([]);
       }
     } catch (err) {
+      if (requestId !== requestSeqRef.current) return;
       setError('Erro ao carregar transações');
       console.error('Load transactions error:', err);
       // Garante que transactions seja um array vazio em caso de erro
@@ -179,38 +201,16 @@ const Transactions = () => {
       // Mantém contas vazias em caso de erro
       setAccounts([]);
     } finally {
-      setLoading(false);
+      if (requestId === requestSeqRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
     if (isAuthenticated && !authLoading) {
-      // Primeiro carrega facets para enriquecer filtros, depois dados
-      const fetchFacetsAndData = async () => {
-        try {
-          const facetsRes = await transactionsAPI.getFacets({
-            date_preset: filters.datePreset,
-            date_from: filters.dateFrom,
-            date_to: filters.dateTo,
-            types: filters.types.join(','),
-            type: filters.types.length === 1 ? filters.types[0] : undefined,
-            account_ids: filters.accountIds.join(','),
-            category_ids: filters.categoryIds.join(','),
-            min_amount: filters.minAmount,
-            max_amount: filters.maxAmount,
-            search: filters.search,
-            status: filters.status,
-            is_recurring: filters.isRecurring,
-          });
-          setFacets(facetsRes.data);
-        } catch (e) {
-          console.warn('Erro ao carregar facets de transações (não crítico):', e);
-          setFacets(null);
-        }
-        await loadData();
-      };
-      fetchFacetsAndData();
+      loadData(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, isAuthenticated, authLoading]);

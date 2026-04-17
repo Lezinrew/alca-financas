@@ -337,7 +337,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                       className={`block p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         formData.credit_card_visualization === 'purchase_date'
                           ? 'border-purple-600 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                          : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-purple-400 dark:hover:border-purple-600'
+                          : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 hover:border-purple-400 dark:hover:border-purple-500'
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -349,13 +349,21 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                               value="purchase_date"
                               checked={formData.credit_card_visualization === 'purchase_date'}
                               onChange={(e) => handleChange('credit_card_visualization', e.target.value)}
-                              className="w-5 h-5 text-purple-600 focus:ring-purple-500"
+                              className="w-5 h-5 border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 focus:ring-purple-500 dark:focus:ring-purple-400"
                             />
-                            <h4 className="font-semibold text-slate-900 dark:text-slate-100">
+                            <h4 className={`font-semibold ${
+                              formData.credit_card_visualization === 'purchase_date'
+                                ? 'text-slate-900 dark:text-slate-100'
+                                : 'text-slate-800 dark:text-slate-100'
+                            }`}>
                               Pela data da compra
                             </h4>
                           </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 ml-8">
+                          <p className={`text-sm ml-8 ${
+                            formData.credit_card_visualization === 'purchase_date'
+                              ? 'text-slate-600 dark:text-slate-400'
+                              : 'text-slate-600 dark:text-slate-400'
+                          }`}>
                             As despesas realizadas no cartão serão contabilizadas no planejamento no dia em que forem realizadas.
                           </p>
                         </div>
@@ -367,7 +375,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                       className={`block p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         formData.credit_card_visualization === 'invoice_date'
                           ? 'border-purple-600 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                          : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-purple-400 dark:hover:border-purple-600'
+                          : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 hover:border-purple-400 dark:hover:border-purple-500'
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -379,13 +387,21 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                               value="invoice_date"
                               checked={formData.credit_card_visualization === 'invoice_date'}
                               onChange={(e) => handleChange('credit_card_visualization', e.target.value)}
-                              className="w-5 h-5 text-purple-600 focus:ring-purple-500"
+                              className="w-5 h-5 border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 focus:ring-purple-500 dark:focus:ring-purple-400"
                             />
-                            <h4 className="font-semibold text-slate-900 dark:text-slate-100">
+                            <h4 className={`font-semibold ${
+                              formData.credit_card_visualization === 'invoice_date'
+                                ? 'text-slate-900 dark:text-slate-100'
+                                : 'text-slate-800 dark:text-slate-100'
+                            }`}>
                               Pela data da fatura
                             </h4>
                           </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 ml-8">
+                          <p className={`text-sm ml-8 ${
+                            formData.credit_card_visualization === 'invoice_date'
+                              ? 'text-slate-600 dark:text-slate-400'
+                              : 'text-slate-600 dark:text-slate-400'
+                          }`}>
                             As despesas realizadas no cartão serão contabilizadas no planejamento apenas na data do vencimento da fatura.
                           </p>
                         </div>

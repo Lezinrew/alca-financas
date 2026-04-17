@@ -4,6 +4,7 @@ import uuid
 import logging
 from utils.exceptions import ValidationException, NotFoundException
 from utils.money_utils import parse_money_value
+from database.connection import get_supabase
 
 logger = logging.getLogger(__name__)
 
@@ -274,6 +275,67 @@ class AccountService:
                 projected_adjustment -= amount
         
         return current_balance + projected_adjustment
+
+    def calculate_projected_balances(
+        self,
+        user_id: str,
+        accounts: List[Dict[str, Any]],
+    ) -> Dict[str, float]:
+        """
+        Calcula projected_balance para múltiplas contas em lote para evitar N+1.
+        """
+        if not accounts:
+            return {}
+
+        now = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        account_map: Dict[str, Dict[str, Any]] = {}
+        tenant_id = None
+        for acc in accounts:
+            acc_id = acc.get("id") or acc.get("_id")
+            if not acc_id:
+                continue
+            if acc.get("user_id") != user_id:
+                continue
+            account_map[str(acc_id)] = acc
+            tenant_id = tenant_id or acc.get("tenant_id")
+
+        if not account_map:
+            return {}
+
+        query = (
+            get_supabase()
+            .table("transactions")
+            .select("account_id, amount, type, status, date")
+            .eq("user_id", user_id)
+            .in_("account_id", list(account_map.keys()))
+        )
+        if tenant_id:
+            query = query.eq("tenant_id", tenant_id)
+        response = query.execute()
+        txs = response.data or []
+
+        adjustments: Dict[str, float] = {aid: 0.0 for aid in account_map.keys()}
+        for tx in txs or []:
+            aid = tx.get("account_id")
+            if not aid:
+                continue
+            aid = str(aid)
+            if aid not in adjustments:
+                continue
+            status = tx.get("status") or "paid"
+            dt = _parse_date(tx.get("date"))
+            is_pending = status == "pending" or (dt and dt.replace(tzinfo=None) > now and status != "paid")
+            if not is_pending:
+                continue
+            amount = float(tx.get("amount", 0) or 0)
+            tx_type = tx.get("type", "expense")
+            adjustments[aid] += amount if tx_type == "income" else -amount
+
+        result: Dict[str, float] = {}
+        for aid, acc in account_map.items():
+            current_balance = float(acc.get("current_balance", 0) or 0)
+            result[aid] = current_balance + adjustments.get(aid, 0.0)
+        return result
 
     def delete_account(self, user_id: str, account_id: str) -> bool:
         account = self.account_repo.find_by_id(account_id)

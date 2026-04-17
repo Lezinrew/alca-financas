@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { clearAuthStorage } from '../utils/tokenStorage';
 import { authAPI } from '../utils/api';
@@ -46,11 +46,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const bootstrapInFlightRef = useRef<Promise<void> | null>(null);
+  const bootstrapDoneForUserRef = useRef<string | null>(null);
+
   const ensureBackendBootstrap = useCallback(async () => {
     // Bootstrap precisa rodar também quando a sessão é restaurada (F5/reopen),
     // não apenas no login manual.
     try {
-      await authAPI.bootstrap();
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user?.id ?? null;
+      if (!userId) return;
+      if (bootstrapDoneForUserRef.current === userId) return;
+      if (!bootstrapInFlightRef.current) {
+        bootstrapInFlightRef.current = authAPI
+          .bootstrap()
+          .then(() => {
+            bootstrapDoneForUserRef.current = userId;
+          })
+          .finally(() => {
+            bootstrapInFlightRef.current = null;
+          });
+      }
+      await bootstrapInFlightRef.current;
     } catch {
       // Não bloqueia a sessão por falha transitória no bootstrap.
     }
@@ -258,6 +275,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const logout = () => {
     clearAuthStorage();
     Promise.resolve(supabase.auth.signOut()).catch(() => undefined);
+    bootstrapDoneForUserRef.current = null;
+    bootstrapInFlightRef.current = null;
     setUser(null);
     setIsAuthenticated(false);
   };

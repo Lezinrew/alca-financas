@@ -31,13 +31,11 @@ def accounts():
         # tenant_id é garantido pelo decorator @require_tenant
         accounts = service.list_accounts(request.user_id, tenant_id=request.tenant_id)
         filtered_accounts = [acc for acc in accounts if acc.get('user_id') == request.user_id]
+        projected_by_account = service.calculate_projected_balances(request.user_id, filtered_accounts)
         for acc in filtered_accounts:
             aid = _account_id(acc)
-            if aid:
-                projected = service.calculate_projected_balance(
-                    request.user_id, aid, transactions_repo
-                )
-                acc['projected_balance'] = projected
+            if aid and str(aid) in projected_by_account:
+                acc['projected_balance'] = projected_by_account[str(aid)]
             if acc.get('type') == 'credit_card':
                 acc['limit'] = acc.get('initial_balance', 0)
         return jsonify(filtered_accounts)
