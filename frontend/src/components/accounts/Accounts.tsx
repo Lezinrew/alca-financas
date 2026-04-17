@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, accountsAPI } from '../../utils/api';
@@ -13,6 +13,7 @@ const Accounts: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
@@ -22,6 +23,11 @@ const Accounts: React.FC = () => {
   }, [isAuthenticated, authLoading]);
 
   const loadAccounts = async () => {
+    if (loadInFlightRef.current) {
+      await loadInFlightRef.current;
+      return;
+    }
+    const task = (async () => {
     try {
       setLoading(true);
       setError('');
@@ -45,6 +51,11 @@ const Accounts: React.FC = () => {
     } finally {
       setLoading(false);
     }
+    })();
+    loadInFlightRef.current = task;
+    await task.finally(() => {
+      loadInFlightRef.current = null;
+    });
   };
 
   const handleAddAccount = () => {
