@@ -42,7 +42,7 @@ const AppShell = () => {
   ];
 
   if (user?.role === 'admin' || user?.is_admin) {
-    navItems.push({ path: '/admin/dashboard', icon: Settings, label: 'Administração' });
+    navItems.push({ path: '/admin/dashboard', icon: Shield, label: 'Administração' });
   }
 
   const handleLogout = async () => {

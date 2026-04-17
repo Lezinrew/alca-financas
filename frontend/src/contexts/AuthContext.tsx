@@ -202,6 +202,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe();
   }, [ensureBackendBootstrap]);
 
+  // Após promover admin via SQL ou outro separador, voltar ao app deve atualizar role/is_admin.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      void syncProfileFromBackend(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [isAuthenticated, syncProfileFromBackend]);
+
   const login = async (credentials: { email: string; password: string }, rememberMe = false) => {
     try {
       // Após apagar/recriar usuário no Supabase, tokens antigos no browser invalidam refresh e derrubam a sessão.
