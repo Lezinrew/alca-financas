@@ -35,6 +35,14 @@ supabase/migrations/
 
 **Ordem de execução:** SEMPRE `001 → 002 → 003 → 004`
 
+### Migrations posteriores (ordem por nome de ficheiro)
+
+O repositório inclui alterações datadas **após** o pacote inicial (reconcile auth/users, RLS por `tenant_members`, despesas, **admin**). Antes de qualquer deploy:
+
+1. Listar `supabase/migrations/*.sql` e ordenar pelo prefixo `YYYYMMDDHHMMSS` ou `YYYYMMDD…`.
+2. Aplicar todas as pendentes no projeto Supabase alvo (dev/staging/prod), **sem saltar** dependências.
+3. Referência de produto recente: `20260417000002_admin_users_audit_notifications.sql` (papéis/estado de utilizadores, auditoria admin, entregas de notificação). Sem esta migration, o backend admin que lê/escreve essas colunas/tabelas falha ou fica inconsistente.
+
 ### Dependências
 
 | Migration | Depende de | Cria |
