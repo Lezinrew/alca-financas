@@ -1,7 +1,14 @@
 # TODO.md - Alça Finanças
 
-**Última atualização:** 2026-04-13  
-**Status:** 🟡 Em progresso — P0 #1 (Chatbot) em validação
+**Última atualização:** 2026-04-16  
+**Status:** 🟡 Em progresso — P0-B (runtime único chatbot) e P0-D (docs mínimas) em curso; frente **auth/RLS/tenant** estável no código e nas migrations `00001`–`00004` (aplicar no Supabase de cada ambiente).
+
+### Concluído recentemente (código na `main`)
+
+- RLS `accounts` / `categories` / `transactions` por **membership** (`tenant_members`), sem depender de claim `tenant_id` no JWT (`20260416000003`, `20260416000004`).
+- **Cliente Supabase singleton:** removido `set_session` em `get_user` sobre o cliente global; `sign_out` usa cliente efémero — evita PostgREST com JWT de utilizador e **42501** em writes após `GET /api/auth/me`.
+- Smoke pós-deploy: `scripts/prod/smoke-auth-bootstrap.sh` cobre health → bootstrap → me → accounts → categories → transactions.
+- Verificação SQL: `scripts/sql/verify_bootstrap_rls_and_data.sql`; checklist incidente: `backend/EXECUTION_TENANT_BOOTSTRAP_CHECKLIST.md`.
 
 ---
 
@@ -71,10 +78,12 @@
   - [ ] Arquivar `services/chatbot/` após validação
 - **Rollback:** `git checkout frontend/src/components/chat/ChatWidget.tsx frontend/src/utils/api.ts .env.example`
 
-### 2.2 Validar autenticação Supabase JWT
-- **Hipótese:** JWT expirando ou RLs policies bloqueando
-- **Arquivos:** `backend/utils/supabase_jwt.py`, `backend/routes/auth_supabase.py`, `backend/utils/auth_utils_supabase.py`
-- **Impacto:** Usuários não logam, loop infinito
+### 2.2 Validar autenticação Supabase JWT (parcial — RLS + singleton corrigidos no código)
+- **Hipótese residual:** JWT expirando, drift de `SUPABASE_JWT_SECRET`, ou chave **anon** no backend em produção (PostgREST aplica RLS).
+- **Arquivos:** `backend/utils/supabase_jwt.py`, `backend/routes/auth_supabase.py`, `backend/utils/auth_utils_supabase.py`, `backend/services/supabase_auth_service.py`, `backend/database/connection.py`
+- **Impacto:** Usuários não logam, loop infinito, ou **42501** em dados se `SUPABASE_SERVICE_ROLE_KEY` não for a chave **service_role** (JWT com `role: service_role`).
+- **Feito no código:** policies por `tenant_members`; sem `set_session` no singleton; warning se JWT da API ≠ `service_role`.
+- **Pendente em ambiente:** confirmar env de produção e migrations aplicadas no projeto Supabase.
 - **Ferramenta:** Claude CLI
 - **Prompt:**
   ```
@@ -268,9 +277,10 @@
 ## 🚨 RISCOS IMEDIATOS
 
 1. **Docker parado** = dev travado
-2. **Chatbot duplicado** = auth pode falhar em produção
-3. **Migrations bagunçadas** = próxima deploy quebra schema
-4. **Python 3.9** = urllib3 pode quebrar em update
+2. **Chatbot duplicado** = ambiguidade de runtime até P0-B fechado
+3. **Migrations não aplicadas no Supabase remoto** = schema/RLS divergente do repo (`00001`–`00004`)
+4. **`SUPABASE_SERVICE_ROLE_KEY` errada (anon no lugar de service_role)** = 42501 em writes mesmo com código correto
+5. **Python 3.9** = urllib3 pode quebrar em update
 
 ---
 
@@ -278,4 +288,4 @@
 
 - Backend está rodando no Mac (192.168.1.60), workspace no Windows
 - Validar qual máquina é "produção local" antes de deploy
-- MEMORY.md atualizado em 2026-04-09 com arquitetura alvo
+- Estado canónico de execução: `EXECUTION_RUNBOOK.md` + `EXECUTION_BASELINE.md` (não existe `MEMORY.md` na raiz; usar estes + `ARCHITECTURE.md`)

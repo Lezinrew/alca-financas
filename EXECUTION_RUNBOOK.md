@@ -97,6 +97,8 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 
 - `backend/utils/auth_utils.py`
 - `backend/utils/auth_utils_supabase.py`
+- `backend/services/supabase_auth_service.py` (sessão Auth **não** pode poluir o cliente PostgREST global)
+- `backend/database/connection.py` (chave Supabase JWT: validar `role=service_role` no backend)
 - `scripts/dev/up.sh`
 - `scripts/setup-env.sh`
 - `.env.example`
@@ -110,13 +112,14 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - [ ] Validar bootstrap após login.
 - [ ] Validar carregamento do dashboard autenticado.
 - [ ] Validar acesso de contas (`accounts`) com autenticação.
+- [ ] Regressão **42501:** após `GET /api/auth/me`, `POST /api/accounts` (criar conta) deve responder **201** — confirma que o singleton não ficou com `set_session` do utilizador.
 - [ ] Validar chat autenticado no caminho oficial.
 
 ### Critério de saída
 
 - Fluxo de auth/chat funciona sem fallback legado.
 - Scripts de setup/subida não exigem `JWT_SECRET` como caminho principal.
-- Validação ponta a ponta de login -> bootstrap -> dashboard -> accounts -> chat autenticado concluída.
+- Validação ponta a ponta de login -> bootstrap -> dashboard -> accounts (**incl. POST criar conta após `me`**) -> chat autenticado concluída.
 
 ### Responsável principal
 
@@ -237,7 +240,7 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 ## 11) Registro rápido de execução (preencher durante a fase)
 
 - **Data início:** 2026-04-14
-- **Última atualização runbook:** 2026-04-16 (sincronizado com `main` até `a103b77`: RLS accounts/categories/transactions, CI pytest, smoke estendido, P0-B UI/chatbot)
+- **Última atualização runbook:** 2026-04-16 (revisão operacional alinhada ao repo: RLS `00003`/`00004`, smoke estendido, fix singleton Supabase em `supabase_auth_service`, warning de role JWT em `connection.py`, P0-B UI/chatbot)
 - **Bloco atual:** P0-D (documentação mínima crítica) e, em paralelo, **P0-B** (runtime único do chatbot) conforme capacidade do time
 - **Responsável:** Backend owner + Infra/Docs owner (conforme trilha)
 - **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` … `20260416000004` aplicáveis em Supabase (reconcile + RLS users/tenants/members + **accounts** + **categories/transactions** via `tenant_members`); smoke **`/api/health` → bootstrap → me → accounts → categories → transactions`** (`scripts/prod/smoke-auth-bootstrap.sh`); regressão de conflito email legado coberta em CI por `backend/tests/unit/test_auth_bootstrap_service.py` (ex.: `test_bootstrap_reconciles_stale_email_without_memberships`, `test_bootstrap_blocks_conflicting_email_when_legacy_has_membership`) e `test_tenant_context.py` (fallback bootstrap); ver secção CI acima.
@@ -309,6 +312,16 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
   - `GET /api/categories` e `GET /api/transactions` incluídos no script de smoke (mesma ordem de dependência: bootstrap antes de dados tenant-aware).
   - Sweep de endpoints de páginas (dashboard/accounts/categories/transactions/planning/goals/reports/tenants) -> **200** no estado validado.
 - **Status:** frente de bootstrap/workspace resolvida no runtime local validado.
+
+### Atualização de execução — cliente Supabase singleton e 42501 em `accounts`
+
+- **Sintoma:** `POST /api/accounts` com **500** / detalhe Postgres **42501** (`new row violates row-level security policy for table "accounts"`), por vezes só após o utilizador chamar `GET /api/auth/me` ou rotas que usam `SupabaseAuthService.get_user`.
+- **Causa raiz:** `auth.set_session(access_token, …)` no **mesmo** cliente retornado por `get_supabase()` fazia o PostgREST passar a enviar o JWT do utilizador nas operações seguintes do repositório. As policies antigas exigiam `tenant_id = current_tenant_id()` derivado de claims que o access token padrão **não** inclui → falha no `WITH CHECK` do INSERT.
+- **Correções aplicadas no backend:**
+  - `backend/services/supabase_auth_service.py`: `get_user` usa apenas `auth.get_user(access_token)` **sem** `set_session` no singleton; `sign_out` usa **cliente Supabase efémero** (`create_client` local) para não poluir o global.
+  - `backend/database/connection.py`: se a chave for JWT e o payload `role` ≠ `service_role`, regista **warning** (anon/authenticated no backend → RLS em writes).
+- **Defesa em profundidade (SQL):** migrations `20260416000003` e `20260416000004` recriam policies de `accounts`, `categories` e `transactions` com **EXISTS** em `tenant_members` para `(tenant_id, auth.uid())`, alinhado ao modelo multi-tenant sem claim `tenant_id` no JWT.
+- **Validação sugerida:** smoke `scripts/prod/smoke-auth-bootstrap.sh` + fluxo manual: login → me → criar conta → categorias/transações.
 
 ### Atualização de execução — CI, E2E e operações VPS (2026-04-16)
 
