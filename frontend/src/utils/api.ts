@@ -387,6 +387,65 @@ export const goalsAPI = {
   }) => api.post<GoalContribution>(`/goals/${goalId}/contributions`, data),
 };
 
+/** Contas a pagar (financial_expenses) */
+export type FinancialExpenseStoredStatus = 'pending' | 'partial' | 'paid' | 'canceled';
+export type FinancialExpenseDisplayStatus = FinancialExpenseStoredStatus | 'overdue';
+
+export interface FinancialExpense {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  title: string;
+  description?: string | null;
+  category: string;
+  subcategory?: string | null;
+  amount_expected: number | string;
+  amount_paid: number | string;
+  due_date?: string | null;
+  paid_at?: string | null;
+  competency_month?: number | null;
+  competency_year?: number | null;
+  is_recurring: boolean;
+  recurrence_type?: string | null;
+  installment_current?: number | null;
+  installment_total?: number | null;
+  payment_method?: string | null;
+  source_type?: string | null;
+  responsible_person?: string | null;
+  vehicle_name?: string | null;
+  notes?: string | null;
+  status: FinancialExpenseStoredStatus;
+  is_overdue?: boolean;
+  display_status?: FinancialExpenseDisplayStatus;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FinancialExpenseListResponse {
+  data: FinancialExpense[];
+  pagination: { total: number; page: number; per_page: number; pages: number };
+}
+
+export const financialExpensesAPI = {
+  list: (filters: Record<string, string | number | boolean | undefined> = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        params.append(k, String(v));
+      }
+    });
+    const q = params.toString();
+    return api.get<FinancialExpenseListResponse>(`/financial-expenses${q ? `?${q}` : ''}`);
+  },
+  get: (id: string) => api.get<FinancialExpense>(`/financial-expenses/${id}`),
+  create: (data: Record<string, unknown>) => api.post<FinancialExpense>('/financial-expenses', data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put<FinancialExpense>(`/financial-expenses/${id}`, data),
+  delete: (id: string) => api.delete(`/financial-expenses/${id}`),
+  markPaid: (id: string, body?: { amount_paid?: number; paid_at?: string }) =>
+    api.post<FinancialExpense>(`/financial-expenses/${id}/mark-paid`, body ?? {}),
+};
+
 // Funções do dashboard
 export const dashboardAPI = {
   getData: (month?: string, year?: string) => {

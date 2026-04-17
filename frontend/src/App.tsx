@@ -31,6 +31,7 @@ const NewGoal = lazy(() => import('./components/goals/NewGoal'));
 const EditGoal = lazy(() => import('./components/goals/EditGoal'));
 const CreditCards = lazy(() => import('./components/credit-cards/CreditCards'));
 const CreditCardDetail = lazy(() => import('./components/credit-cards/CreditCardDetail'));
+const FinancialExpensesPage = lazy(() => import('./components/financial-expenses/FinancialExpensesPage'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
 const UserDetail = lazy(() => import('./pages/admin/UserDetail'));
@@ -132,6 +133,7 @@ const AppRoutes: React.FC = () => {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="transactions" element={<Transactions />} />
+          <Route path="financial-expenses" element={<FinancialExpensesPage />} />
           <Route path="categories" element={<Categories />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="planning" element={<Planning />} />
