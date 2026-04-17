@@ -156,8 +156,8 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                 className={
                   'px-3 py-1.5 text-xs font-medium ' +
                   (filters.types.includes('income')
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-transparent text-slate-600 dark:text-slate-300')
+                    ? 'bg-emerald-500 text-white dark:bg-emerald-300 dark:text-slate-900'
+                    : 'bg-transparent text-slate-600 dark:text-slate-100')
                 }
                 onClick={() => handleTypeToggle('income')}
               >
@@ -168,8 +168,8 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                 className={
                   'px-3 py-1.5 text-xs font-medium border-l border-slate-200 dark:border-slate-700 ' +
                   (filters.types.includes('expense')
-                    ? 'bg-red-500 text-white'
-                    : 'bg-transparent text-slate-600 dark:text-slate-300')
+                    ? 'bg-red-500 text-white dark:bg-red-300 dark:text-slate-900'
+                    : 'bg-transparent text-slate-600 dark:text-slate-100')
                 }
                 onClick={() => handleTypeToggle('expense')}
               >
@@ -194,7 +194,7 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
           <button
             type="button"
             onClick={() => setShowMore((prev) => !prev)}
-            className="h-9 px-3 text-xs font-medium text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1"
+            className="h-9 px-3 text-xs font-medium text-slate-600 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
           >
             <i className="bi bi-funnel" />
             Mais filtros
@@ -202,7 +202,7 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
           <button
             type="button"
             onClick={onClear}
-            className="h-9 px-3 text-xs font-medium text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="h-9 px-3 text-xs font-medium text-slate-600 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
           >
             {t('common.clear') || 'Limpar filtros'}
           </button>

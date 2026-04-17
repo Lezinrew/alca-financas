@@ -83,7 +83,7 @@ export const FilterChipsBar: FC<FilterChipsBarProps> = ({
           <button
             key={idx}
             type="button"
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-slate-50 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 border border-slate-200/70 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-100 border border-slate-200/70 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             onClick={chip.onRemove}
           >
             <span>{chip.label}</span>
