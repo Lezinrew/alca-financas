@@ -13,6 +13,8 @@ SET lock_timeout = 0;
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user';
 
+-- Idempotente: reexecução no SQL Editor ou retry após falha parcial
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE public.users
   ADD CONSTRAINT users_role_check
   CHECK (role = ANY (ARRAY['admin'::text, 'user'::text]))
@@ -21,6 +23,7 @@ ALTER TABLE public.users
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
 
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_status_check;
 ALTER TABLE public.users
   ADD CONSTRAINT users_status_check
   CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text, 'pending_deletion'::text, 'disabled'::text]))
