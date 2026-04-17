@@ -445,7 +445,6 @@ def transactions_facets():
     transaction_repo = current_app.config['TRANSACTIONS']
     categories_repo = current_app.config['CATEGORIES']
     accounts_repo = current_app.config['ACCOUNTS']
-    _ = TransactionService(transaction_repo, categories_repo, accounts_repo)
 
     # Reaproveita lógica de filtros avançados (sem paginação)
     filters = {
@@ -468,11 +467,8 @@ def transactions_facets():
 
     # Aplica filtros principais de período / tipo / método, etc, de forma similar a find_advanced
     params = {k: v for k, v in filters.items() if v not in (None, '', [])}
-    from repositories.transaction_repository_supabase import TransactionRepository
-    tmp_repo = TransactionRepository()
-
     tenant_id = getattr(request, 'tenant_id', None)
-    adv = tmp_repo.find_advanced(request.user_id, {**params, 'limit': 5000}, tenant_id=tenant_id)
+    adv = transaction_repo.find_advanced(request.user_id, {**params, 'limit': 5000}, tenant_id=tenant_id)
     data = adv.get('data') or []
 
     # Agregações em memória (para o subconjunto filtrado)
@@ -493,26 +489,40 @@ def transactions_facets():
     # Resolve nomes de categorias e contas
     categories = []
     if cat_counter:
-        cat_ids = list(cat_counter.keys())
-        for cid in cat_ids:
-            cat = categories_repo.find_by_id(cid) if hasattr(categories_repo, 'find_by_id') else None
+        category_items = []
+        if hasattr(categories_repo, 'find_by_user'):
+            category_items = categories_repo.find_by_user(request.user_id, tenant_id=tenant_id) or []
+        category_map = {
+            str((cat.get('id') or cat.get('_id'))): cat
+            for cat in category_items
+            if (cat.get('id') or cat.get('_id'))
+        }
+        for cid, count in cat_counter.items():
+            cat = category_map.get(str(cid))
             if cat:
                 categories.append({
                     'id': cid,
                     'name': cat.get('name', ''),
-                    'count': cat_counter[cid],
+                    'count': count,
                 })
 
     accounts = []
     if acc_counter:
-        acc_ids = list(acc_counter.keys())
-        for aid in acc_ids:
-            acc = accounts_repo.find_by_id(aid) if hasattr(accounts_repo, 'find_by_id') else None
+        account_items = []
+        if hasattr(accounts_repo, 'find_by_user'):
+            account_items = accounts_repo.find_by_user(request.user_id, tenant_id=tenant_id) or []
+        account_map = {
+            str((acc.get('id') or acc.get('_id'))): acc
+            for acc in account_items
+            if (acc.get('id') or acc.get('_id'))
+        }
+        for aid, count in acc_counter.items():
+            acc = account_map.get(str(aid))
             if acc:
                 accounts.append({
                     'id': aid,
                     'name': acc.get('name', ''),
-                    'count': acc_counter[aid],
+                    'count': count,
                 })
 
     types = [{'type': t, 'count': c} for t, c in type_counter.items()]

@@ -23,6 +23,17 @@ from services.planning_constants import (
 )
 
 
+def _build_category_map(categories_repo, user_id: str, tenant_id: Optional[str]) -> Dict[str, Dict[str, Any]]:
+    if not hasattr(categories_repo, "find_by_user"):
+        return {}
+    categories = categories_repo.find_by_user(user_id, tenant_id=tenant_id) or []
+    return {
+        str(cat.get("id") or cat.get("_id")): cat
+        for cat in categories
+        if (cat.get("id") or cat.get("_id"))
+    }
+
+
 def _period_iso(month: int, year: int) -> Tuple[str, str]:
     start = datetime(year, month, 1)
     if month == 12:
@@ -102,13 +113,14 @@ def get_planning_month_payload(
     for p in plans:
         cid = str(p.get("category_id", ""))
         planned_by_cat[cid] = float(p.get("planned_amount") or 0)
+    category_map = _build_category_map(categories_repo, user_id, tenant_id)
     planned_expenses = sum(
         planned_by_cat.get(cid, 0) for cid in planned_by_cat
-        if _category_type(categories_repo, cid) == "expense"
+        if _category_type(category_map, cid) == "expense"
     )
     planned_income_from_plans = sum(
         planned_by_cat.get(cid, 0) for cid in planned_by_cat
-        if _category_type(categories_repo, cid) == "income"
+        if _category_type(category_map, cid) == "income"
     )
     if planned_income_from_plans > 0:
         planned_income = planned_income_from_plans
@@ -122,7 +134,7 @@ def get_planning_month_payload(
     all_cat_ids.discard("__none__")
 
     for cid in all_cat_ids:
-        cat = _get_category(categories_repo, cid)
+        cat = _get_category(category_map, cid)
         cat_type = cat.get("type", "expense") if cat else "expense"
         name = cat.get("name", "Sem categoria") if cat else "Sem categoria"
         color = cat.get("color", "#6b7280") if cat else "#6b7280"
@@ -214,16 +226,14 @@ def get_planning_month_payload(
     }
 
 
-def _get_category(categories_repo, category_id: str) -> Optional[Dict[str, Any]]:
+def _get_category(category_map: Dict[str, Dict[str, Any]], category_id: str) -> Optional[Dict[str, Any]]:
     if not category_id or category_id == "__none__":
         return None
-    if hasattr(categories_repo, "find_by_id"):
-        return categories_repo.find_by_id(category_id)
-    return None
+    return category_map.get(str(category_id))
 
 
-def _category_type(categories_repo, category_id: str) -> str:
-    cat = _get_category(categories_repo, category_id)
+def _category_type(category_map: Dict[str, Dict[str, Any]], category_id: str) -> str:
+    cat = _get_category(category_map, category_id)
     if not cat:
         return "expense"
     return (cat.get("type") or "expense").lower()

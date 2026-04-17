@@ -130,22 +130,22 @@ const Profile = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('navigation.profile')}</h1>
-          <p className="text-sm text-slate-600 mt-1">Gerencie suas informações pessoais e segurança</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('navigation.profile')}</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Gerencie suas informações pessoais e segurança</p>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-          <i className="bi bi-exclamation-triangle-fill text-red-600"></i>
-          <span className="text-red-800">{error}</span>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
+          <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
+          <span className="text-red-800 dark:text-red-200">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-2">
-          <i className="bi bi-check-circle-fill text-emerald-600"></i>
-          <span className="text-emerald-800">{success}</span>
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-center gap-2">
+          <i className="bi bi-check-circle-fill text-emerald-600 dark:text-emerald-400"></i>
+          <span className="text-emerald-800 dark:text-emerald-200">{success}</span>
         </div>
       )}
 
@@ -153,24 +153,24 @@ const Profile = () => {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Personal Information */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+          <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-person-circle text-slate-600"></i>
-                <h2 className="text-lg font-semibold text-slate-900">Informações Pessoais</h2>
+                <i className="bi bi-person-circle text-slate-600 dark:text-slate-300"></i>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Informações Pessoais</h2>
               </div>
             </div>
             <div className="p-6">
               <form onSubmit={handleProfileSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 mb-2">Nome Completo</label>
+                    <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome Completo</label>
                     <input
                       type="text"
                       id="profile-name"
                       name="name"
                       autoComplete="name"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input-base w-full"
                       value={profileData.name}
                       onChange={handleProfileChange}
                       required
@@ -179,13 +179,13 @@ const Profile = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                    <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
                     <input
                       type="email"
                       id="profile-email"
                       name="email"
                       autoComplete="email"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input-base w-full"
                       value={profileData.email}
                       onChange={handleProfileChange}
                       required
@@ -218,24 +218,24 @@ const Profile = () => {
           </div>
 
           {/* Change Password */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+          <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-shield-lock text-slate-600"></i>
-                <h2 className="text-lg font-semibold text-slate-900">Alterar Senha</h2>
+                <i className="bi bi-shield-lock text-slate-600 dark:text-slate-300"></i>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Alterar Senha</h2>
               </div>
             </div>
             <div className="p-6">
               <form onSubmit={handlePasswordSubmit}>
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor="profile-current-password" className="block text-sm font-medium text-slate-700 mb-2">Senha Atual</label>
+                    <label htmlFor="profile-current-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Senha Atual</label>
                     <input
                       type="password"
                       id="profile-current-password"
                       name="currentPassword"
                       autoComplete="current-password"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input-base w-full"
                       value={passwordData.currentPassword}
                       onChange={handlePasswordChange}
                       required
@@ -246,13 +246,13 @@ const Profile = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="profile-new-password" className="block text-sm font-medium text-slate-700 mb-2">Nova Senha</label>
+                      <label htmlFor="profile-new-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nova Senha</label>
                       <input
                         type="password"
                         id="profile-new-password"
                         name="newPassword"
                         autoComplete="new-password"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="input-base w-full"
                         value={passwordData.newPassword}
                         onChange={handlePasswordChange}
                         required
@@ -263,13 +263,13 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="profile-confirm-password" className="block text-sm font-medium text-slate-700 mb-2">Confirmar Nova Senha</label>
+                      <label htmlFor="profile-confirm-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Confirmar Nova Senha</label>
                       <input
                         type="password"
                         id="profile-confirm-password"
                         name="confirmPassword"
                         autoComplete="new-password"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="input-base w-full"
                         value={passwordData.confirmPassword}
                         onChange={handlePasswordChange}
                         required
@@ -308,7 +308,7 @@ const Profile = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Profile Card */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="card-base overflow-hidden">
             <div className="p-6 text-center">
               <div
                 className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-full inline-flex items-center justify-center mb-4"
@@ -316,17 +316,17 @@ const Profile = () => {
               >
                 <i className="bi bi-person-fill text-white" style={{ fontSize: '3rem' }}></i>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">{user?.name}</h3>
-              <p className="text-sm text-slate-600 mb-6">{user?.email}</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{user?.name}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">{user?.email}</p>
 
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <div className="text-center">
-                  <div className="text-xs text-slate-500 mb-1">Membro desde</div>
-                  <div className="font-semibold text-slate-900">Ago 2025</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Membro desde</div>
+                  <div className="font-semibold text-slate-900 dark:text-white">Ago 2025</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xs text-slate-500 mb-1">Último acesso</div>
-                  <div className="font-semibold text-slate-900">Hoje</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Último acesso</div>
+                  <div className="font-semibold text-slate-900 dark:text-white">Hoje</div>
                 </div>
               </div>
             </div>
@@ -334,21 +334,21 @@ const Profile = () => {
 
           {/* Connected Accounts */}
           {user?.auth_providers && user.auth_providers.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+            <div className="card-base overflow-hidden">
+              <div className="card-header px-6 py-4">
                 <div className="flex items-center gap-2">
-                  <i className="bi bi-shield-check text-slate-600"></i>
-                  <h3 className="text-sm font-semibold text-slate-900">Contas Conectadas</h3>
+                  <i className="bi bi-shield-check text-slate-600 dark:text-slate-300"></i>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Contas Conectadas</h3>
                 </div>
               </div>
               <div className="p-6">
                 <div className="space-y-3">
                   {user.auth_providers.map((provider, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <i className={`bi bi-${provider.provider} text-slate-600 text-xl`}></i>
+                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                      <i className={`bi bi-${provider.provider} text-slate-600 dark:text-slate-300 text-xl`}></i>
                       <div className="flex-1">
-                        <div className="font-medium text-sm text-slate-900 capitalize">{provider.provider}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="font-medium text-sm text-slate-900 dark:text-white capitalize">{provider.provider}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
                           {provider.email_verified ? (
                             <span className="text-emerald-600">
                               <i className="bi bi-check-circle-fill"></i> Verificado
@@ -368,28 +368,28 @@ const Profile = () => {
           )}
 
           {/* Security Tips */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+            <div className="card-base overflow-hidden">
+            <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-info-circle text-slate-600"></i>
-                <h3 className="text-sm font-semibold text-slate-900">Dicas de Segurança</h3>
+                <i className="bi bi-info-circle text-slate-600 dark:text-slate-300"></i>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Dicas de Segurança</h3>
               </div>
             </div>
             <div className="p-6">
               <ul className="space-y-3">
-                <li className="flex items-start gap-2 text-sm text-slate-600">
+                <li className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <i className="bi bi-check-circle-fill text-emerald-500 mt-0.5 flex-shrink-0"></i>
                   <span>Use senhas fortes e únicas</span>
                 </li>
-                <li className="flex items-start gap-2 text-sm text-slate-600">
+                <li className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <i className="bi bi-check-circle-fill text-emerald-500 mt-0.5 flex-shrink-0"></i>
                   <span>Altere sua senha regularmente</span>
                 </li>
-                <li className="flex items-start gap-2 text-sm text-slate-600">
+                <li className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <i className="bi bi-check-circle-fill text-emerald-500 mt-0.5 flex-shrink-0"></i>
                   <span>Não compartilhe suas credenciais</span>
                 </li>
-                <li className="flex items-start gap-2 text-sm text-slate-600">
+                <li className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <i className="bi bi-check-circle-fill text-emerald-500 mt-0.5 flex-shrink-0"></i>
                   <span>Mantenha seu email atualizado</span>
                 </li>

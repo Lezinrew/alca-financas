@@ -26,6 +26,14 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
 
   const pillBase =
     'h-8 px-3 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1';
+  const inactivePill =
+    ' bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600';
+  const activeDatePill =
+    ' bg-blue-600 text-white border-blue-600 dark:bg-blue-400 dark:text-slate-900 dark:border-blue-400';
+  const activeIncomePill =
+    ' bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-400 dark:text-slate-900 dark:border-emerald-400';
+  const activeExpensePill =
+    ' bg-red-500 text-white border-red-500 dark:bg-red-400 dark:text-slate-900 dark:border-red-400';
 
   return (
     <div className="flex flex-wrap gap-2 mb-2">
@@ -35,8 +43,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.datePreset === 'today'
-            ? ' bg-blue-600 text-white border-blue-600 dark:bg-blue-300 dark:text-slate-900 dark:border-blue-300'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
+            ? activeDatePill
+            : inactivePill)
         }
         onClick={() => applyPreset('today')}
       >
@@ -47,8 +55,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.datePreset === '7d'
-            ? ' bg-blue-600 text-white border-blue-600 dark:bg-blue-300 dark:text-slate-900 dark:border-blue-300'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
+            ? activeDatePill
+            : inactivePill)
         }
         onClick={() => applyPreset('7d')}
       >
@@ -59,8 +67,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.datePreset === 'this_month'
-            ? ' bg-blue-600 text-white border-blue-600 dark:bg-blue-300 dark:text-slate-900 dark:border-blue-300'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
+            ? activeDatePill
+            : inactivePill)
         }
         onClick={() => applyPreset('this_month')}
       >
@@ -73,8 +81,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.types.includes('income')
-            ? ' bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-300 dark:text-slate-900 dark:border-emerald-300'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
+            ? activeIncomePill
+            : inactivePill)
         }
         onClick={() => applyType('income')}
       >
@@ -85,8 +93,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.types.includes('expense')
-            ? ' bg-red-500 text-white border-red-500 dark:bg-red-300 dark:text-slate-900 dark:border-red-300'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
+            ? activeExpensePill
+            : inactivePill)
         }
         onClick={() => applyType('expense')}
       >

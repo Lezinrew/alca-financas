@@ -11,6 +11,30 @@ def _period_iso(month: int, year: int):
     return start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')
 
 
+def _build_category_map(categories_repo, user_id: str, tenant_id: str = None) -> Dict[str, Dict[str, Any]]:
+    if not hasattr(categories_repo, "find_by_user"):
+        return {}
+    categories = categories_repo.find_by_user(user_id, tenant_id=tenant_id) or []
+    return {
+        str(cat.get("id") or cat.get("_id")): cat
+        for cat in categories
+        if (cat.get("id") or cat.get("_id"))
+    }
+
+
+def _build_account_map(accounts_repo, user_id: str, tenant_id: str = None, active_only: bool = False) -> Dict[str, Dict[str, Any]]:
+    if not hasattr(accounts_repo, "find_by_user"):
+        return {}
+    accounts = accounts_repo.find_by_user(user_id, tenant_id=tenant_id) or []
+    if active_only:
+        accounts = [acc for acc in accounts if acc.get("is_active", True)]
+    return {
+        str(acc.get("id") or acc.get("_id")): acc
+        for acc in accounts
+        if (acc.get("id") or acc.get("_id"))
+    }
+
+
 def dashboard_summary_supabase(
     transactions_repo,
     categories_repo,
@@ -35,6 +59,7 @@ def dashboard_summary_supabase(
 
     # Filtra apenas transações pagas para consistência com saldo das contas
     paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
+    category_map = _build_category_map(categories_repo, user_id, tenant_id=tenant_id)
 
     total_income = sum(float(t.get('amount', 0)) for t in paid_transactions if t.get('type') == 'income')
     total_expense = sum(float(t.get('amount', 0)) for t in paid_transactions if t.get('type') == 'expense')
@@ -46,7 +71,7 @@ def dashboard_summary_supabase(
         row = dict(t)
         cat_id = row.get('category_id')
         if cat_id:
-            category = categories_repo.find_by_id(cat_id)
+            category = category_map.get(str(cat_id))
             if category:
                 row['category'] = {
                     'name': category.get('name', ''),
@@ -77,7 +102,7 @@ def dashboard_summary_supabase(
             by_cat_income[cat_id]['count'] += 1
 
     for cat_id, v in sorted(by_cat_expense.items(), key=lambda x: -x[1]['total']):
-        category = categories_repo.find_by_id(cat_id) if cat_id else None
+        category = category_map.get(str(cat_id)) if cat_id else None
         expense_by_category.append({
             'category_id': cat_id,
             'category_name': category.get('name', 'Sem categoria') if category else 'Sem categoria',
@@ -88,7 +113,7 @@ def dashboard_summary_supabase(
             'percentage': (v['total'] / total_expense * 100) if total_expense > 0 else 0
         })
     for cat_id, v in sorted(by_cat_income.items(), key=lambda x: -x[1]['total']):
-        category = categories_repo.find_by_id(cat_id) if cat_id else None
+        category = category_map.get(str(cat_id)) if cat_id else None
         income_by_category.append({
             'category_id': cat_id,
             'category_name': category.get('name', 'Sem categoria') if category else 'Sem categoria',
@@ -556,6 +581,8 @@ def overview_report_supabase(
     # Filtra por conta se fornecido
     if account_id:
         transactions_list = [t for t in transactions_list if t.get('account_id') == account_id]
+    category_map = _build_category_map(categories_repo, user_id, tenant_id=tenant_id)
+    account_map = _build_account_map(accounts_repo, user_id, tenant_id=tenant_id, active_only=True)
 
     result: Dict[str, Any] = {
         'period': {
@@ -583,7 +610,7 @@ def overview_report_supabase(
         total_amount = 0.0
         categories_data: List[Dict[str, Any]] = []
         for cat_id, v in sorted(by_category.items(), key=lambda x: -x[1]['total']):
-            category = categories_repo.find_by_id(cat_id) if cat_id else None
+            category = category_map.get(str(cat_id)) if cat_id else None
             total_amount += v['total']
             categories_data.append({
                 'category_id': cat_id,
@@ -616,7 +643,7 @@ def overview_report_supabase(
         total_amount = 0.0
         categories_data: List[Dict[str, Any]] = []
         for cat_id, v in sorted(by_category.items(), key=lambda x: -x[1]['total']):
-            category = categories_repo.find_by_id(cat_id) if cat_id else None
+            category = category_map.get(str(cat_id)) if cat_id else None
             total_amount += v['total']
             categories_data.append({
                 'category_id': cat_id,
@@ -648,7 +675,7 @@ def overview_report_supabase(
         total_amount = 0.0
         accounts_data: List[Dict[str, Any]] = []
         for acc_id, v in sorted(by_account.items(), key=lambda x: -x[1]['total']):
-            account = accounts_repo.find_by_id(acc_id) if acc_id else None
+            account = account_map.get(str(acc_id)) if acc_id else None
             total_amount += v['total']
             accounts_data.append({
                 'account_id': acc_id,
@@ -680,7 +707,7 @@ def overview_report_supabase(
         total_amount = 0.0
         accounts_data: List[Dict[str, Any]] = []
         for acc_id, v in sorted(by_account.items(), key=lambda x: -x[1]['total']):
-            account = accounts_repo.find_by_id(acc_id) if acc_id else None
+            account = account_map.get(str(acc_id)) if acc_id else None
             total_amount += v['total']
             accounts_data.append({
                 'account_id': acc_id,
@@ -699,23 +726,27 @@ def overview_report_supabase(
 
     elif report_type == 'balance_by_account':
         # Busca todas as contas ativas do usuário
-        accounts_query = {'user_id': user_id, 'is_active': True}
-        if tenant_id:
-            accounts_query['tenant_id'] = tenant_id
-        accounts_list = accounts_repo.find_all(accounts_query)
+        accounts_list = list(account_map.values())
         accounts_data: List[Dict[str, Any]] = []
+        paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
+        totals_by_account: Dict[str, Dict[str, float]] = {}
+        for tx in paid_transactions:
+            acc_id = tx.get('account_id')
+            if not acc_id:
+                continue
+            aid = str(acc_id)
+            totals_by_account.setdefault(aid, {"income": 0.0, "expense": 0.0})
+            amount = float(tx.get('amount', 0) or 0)
+            if tx.get('type') == 'income':
+                totals_by_account[aid]["income"] += amount
+            elif tx.get('type') == 'expense':
+                totals_by_account[aid]["expense"] += amount
 
         for account in accounts_list:
-            acc_id = account.get('id') or account.get('_id')
-            # Busca todas as transações PAGAS da conta (consistência com current_balance)
-            account_tx_query = {'user_id': user_id, 'account_id': acc_id}
-            if tenant_id:
-                account_tx_query['tenant_id'] = tenant_id
-            account_transactions = transactions_repo.find_all(account_tx_query)
-            paid_account_transactions = [t for t in account_transactions if t.get('status') == 'paid']
-
-            income_total = sum(float(t.get('amount', 0)) for t in paid_account_transactions if t.get('type') == 'income')
-            expense_total = sum(float(t.get('amount', 0)) for t in paid_account_transactions if t.get('type') == 'expense')
+            acc_id = str(account.get('id') or account.get('_id'))
+            totals = totals_by_account.get(acc_id, {"income": 0.0, "expense": 0.0})
+            income_total = totals["income"]
+            expense_total = totals["expense"]
             initial_balance = float(account.get('initial_balance', 0))
 
             # IMPORTANTE: Usa current_balance direto do banco (sempre consistente)

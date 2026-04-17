@@ -156,8 +156,8 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                 className={
                   'px-3 py-1.5 text-xs font-medium ' +
                   (filters.types.includes('income')
-                    ? 'bg-emerald-500 text-white dark:bg-emerald-300 dark:text-slate-900'
-                    : 'bg-transparent text-slate-600 dark:text-slate-100')
+                    ? 'bg-emerald-500 text-white dark:bg-emerald-400 dark:text-slate-900'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-white')
                 }
                 onClick={() => handleTypeToggle('income')}
               >
@@ -168,8 +168,8 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                 className={
                   'px-3 py-1.5 text-xs font-medium border-l border-slate-200 dark:border-slate-700 ' +
                   (filters.types.includes('expense')
-                    ? 'bg-red-500 text-white dark:bg-red-300 dark:text-slate-900'
-                    : 'bg-transparent text-slate-600 dark:text-slate-100')
+                    ? 'bg-red-500 text-white dark:bg-red-400 dark:text-slate-900'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-white')
                 }
                 onClick={() => handleTypeToggle('expense')}
               >
