@@ -37,6 +37,7 @@ from routes.tenants import bp as tenants_bp
 from routes.chatbot import bp as chatbot_bp
 from routes.planning import bp as planning_bp
 from routes.goals import bp as goals_bp
+from routes.financial_expenses import bp as financial_expenses_bp
 
 # Permite subir o app (CI/testes/smoke) sem tentar conectar no Supabase
 SKIP_DB_INIT = os.getenv("SKIP_DB_INIT", "false").strip().lower() == "true"
@@ -138,6 +139,7 @@ try:
         from repositories.budget_repository_supabase import BudgetRepositorySupabase
         from repositories.goal_repository_supabase import GoalRepositorySupabase
         from repositories.merchant_alias_repository_supabase import MerchantAliasRepositorySupabase
+        from repositories.financial_expense_repository_supabase import FinancialExpenseRepository
 
         app.config['SUPABASE'] = db_client
         app.config['OAUTH_STATES'] = db_client.table('oauth_states')
@@ -148,6 +150,7 @@ try:
         app.config['BUDGET_REPO'] = BudgetRepositorySupabase()
         app.config['GOAL_REPO'] = GoalRepositorySupabase()
         app.config['MERCHANT_ALIAS_REPO'] = MerchantAliasRepositorySupabase()
+        app.config['FINANCIAL_EXPENSE_REPO'] = FinancialExpenseRepository()
 
         app.config['USERS'] = app.config['USER_REPO']
         app.config['CATEGORIES'] = app.config['CATEGORY_REPO']
@@ -204,6 +207,7 @@ if not SKIP_DB_INIT:
     app.register_blueprint(chatbot_bp)
     app.register_blueprint(planning_bp)
     app.register_blueprint(goals_bp)
+    app.register_blueprint(financial_expenses_bp)
 else:
     logger.warning("⚠️  SKIP_DB_INIT=true: blueprints de dados NÃO registrados (somente /api/health disponível)")
 

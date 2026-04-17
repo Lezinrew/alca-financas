@@ -16,7 +16,8 @@ import {
   Menu,
   X,
   Shield,
-  ChevronDown
+  ChevronDown,
+  Receipt
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -30,6 +31,7 @@ const AppShell = () => {
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/transactions', icon: ArrowLeftRight, label: 'Transações' },
+    { path: '/financial-expenses', icon: Receipt, label: 'Contas a pagar' },
     { path: '/categories', icon: Tag, label: 'Categorias' },
     { path: '/accounts', icon: Wallet, label: 'Contas' },
     { path: '/credit-cards', icon: CreditCard, label: 'Cartões de crédito' },
