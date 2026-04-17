@@ -49,7 +49,9 @@ const Import = () => {
       const response = await accountsAPI.getAll();
       if (response.data) {
         const data = response.data;
-        const activeAccounts = data.filter((acc: any) => acc.is_active);
+        const activeAccounts = data.filter(
+          (acc: any) => acc.is_active !== false && acc.active !== false
+        );
         
         // Separa contas normais e cartões de crédito
         const normalAccounts = activeAccounts.filter((acc: AccountOption) => acc.type !== 'credit_card');
