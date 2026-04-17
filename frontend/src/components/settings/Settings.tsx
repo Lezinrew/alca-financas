@@ -22,6 +22,7 @@ const Settings = () => {
   const [categoryImportLoading, setCategoryImportLoading] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const categoryFileInputRef = useRef<HTMLInputElement>(null);
+  const settingsLoadInFlightRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -36,12 +37,22 @@ const Settings = () => {
   }, [theme]);
 
   const loadSettings = async () => {
+    if (settingsLoadInFlightRef.current) {
+      await settingsLoadInFlightRef.current;
+      return;
+    }
+    const task = (async () => {
     try {
       const response = await authAPI.getSettings();
       setSettings(response.data);
     } catch (err) {
       console.error('Load settings error:', err);
     }
+    })();
+    settingsLoadInFlightRef.current = task;
+    await task.finally(() => {
+      settingsLoadInFlightRef.current = null;
+    });
   };
 
   const handleChange = (field: string, value: any) => {

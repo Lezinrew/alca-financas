@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, formatDate, categoriesAPI, accountsAPI, transactionsAPI } from '../../utils/api';
@@ -37,13 +37,20 @@ const CreditCardDetail: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [sortField, setSortField] = useState<'date' | 'description' | 'amount'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const cardRequestSeqRef = useRef(0);
+  const categoriesLoadedRef = useRef(false);
 
   useEffect(() => {
     if (isAuthenticated && !authLoading && cardId) {
-      loadCardData();
-      loadCategories();
+      void loadCardData();
     }
   }, [isAuthenticated, authLoading, cardId, selectedMonth, selectedYear, billPreset]);
+
+  useEffect(() => {
+    if (!isAuthenticated || authLoading || !cardId || categoriesLoadedRef.current) return;
+    categoriesLoadedRef.current = true;
+    void loadCategories();
+  }, [isAuthenticated, authLoading, cardId]);
 
   const toISODate = (d: Date) => {
     const yyyy = d.getFullYear();
@@ -90,6 +97,7 @@ const CreditCardDetail: React.FC = () => {
   }, [card, billPreset, selectedMonth, selectedYear]);
 
   const loadCardData = async () => {
+    const requestId = ++cardRequestSeqRef.current;
     try {
       setLoading(true);
       setError('');
@@ -102,6 +110,7 @@ const CreditCardDetail: React.FC = () => {
 
       // Carrega o cartão
       const cardResponse = await accountsAPI.getById(cardId);
+      if (requestId !== cardRequestSeqRef.current) return;
       const accountData = cardResponse.data;
 
       // Converte para formato CreditCard
@@ -155,17 +164,25 @@ const CreditCardDetail: React.FC = () => {
           : (expensesData?.data && Array.isArray(expensesData.data))
             ? expensesData.data
             : [];
-        setExpenses(expensesArray as any);
+        if (requestId === cardRequestSeqRef.current) {
+          setExpenses(expensesArray as any);
+        }
       } catch (expensesErr) {
         // Se falhar ao carregar despesas, define como array vazio
         console.warn('Erro ao carregar despesas:', expensesErr);
-        setExpenses([]);
+        if (requestId === cardRequestSeqRef.current) {
+          setExpenses([]);
+        }
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados do cartão');
+      if (requestId === cardRequestSeqRef.current) {
+        setError(err.message || 'Erro ao carregar dados do cartão');
+      }
       console.error('Load card data error:', err);
     } finally {
-      setLoading(false);
+      if (requestId === cardRequestSeqRef.current) {
+        setLoading(false);
+      }
     }
   };
 

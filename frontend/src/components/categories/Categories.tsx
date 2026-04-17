@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -34,6 +34,7 @@ const Categories = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
@@ -43,6 +44,11 @@ const Categories = () => {
   }, [isAuthenticated, authLoading]);
 
   const loadCategories = async () => {
+    if (loadInFlightRef.current) {
+      await loadInFlightRef.current;
+      return;
+    }
+    const task = (async () => {
     try {
       setLoading(true);
       setError('');
@@ -61,6 +67,11 @@ const Categories = () => {
     } finally {
       setLoading(false);
     }
+    })();
+    loadInFlightRef.current = task;
+    await task.finally(() => {
+      loadInFlightRef.current = null;
+    });
   };
 
   const handleAddCategory = () => {
