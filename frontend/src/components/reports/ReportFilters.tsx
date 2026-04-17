@@ -39,7 +39,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
     <div className="flex items-center gap-3">
       {/* Navigation Buttons */}
       <button
-        className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+        className="p-2.5 text-slate-600 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
         onClick={handlePrevMonth}
         title="Mês anterior"
       >
@@ -47,12 +47,12 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
       </button>
 
       {/* Current Period Display */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-md">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-300 dark:to-indigo-300 text-white dark:text-slate-900 px-6 py-2.5 rounded-lg font-bold text-sm shadow-md">
         {months[filters.month - 1]} {filters.year}
       </div>
 
       <button
-        className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+        className="p-2.5 text-slate-600 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
         onClick={handleNextMonth}
         title="Próximo mês"
       >
@@ -62,7 +62,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
       {/* Quick Select Dropdown */}
       <div className="relative group">
         <button
-          className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+          className="p-2.5 text-slate-600 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
           type="button"
           title="Selecionar período"
         >
@@ -80,8 +80,8 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
                   key={index}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     filters.month === index + 1
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      ? 'bg-blue-50 dark:bg-blue-300 text-blue-700 dark:text-slate-900 font-medium'
+                      : 'text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                   onClick={() => onFilterChange('month', index + 1)}
                 >
@@ -100,8 +100,8 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
                   key={year}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     filters.year === year
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      ? 'bg-blue-50 dark:bg-blue-300 text-blue-700 dark:text-slate-900 font-medium'
+                      : 'text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                   onClick={() => onFilterChange('year', year)}
                 >

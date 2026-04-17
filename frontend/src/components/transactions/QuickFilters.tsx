@@ -35,8 +35,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.datePreset === 'today'
-            ? ' bg-blue-600 text-white border-blue-600'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+            ? ' bg-blue-600 text-white border-blue-600 dark:bg-blue-300 dark:text-slate-900 dark:border-blue-300'
+            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
         }
         onClick={() => applyPreset('today')}
       >
@@ -47,8 +47,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.datePreset === '7d'
-            ? ' bg-blue-600 text-white border-blue-600'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+            ? ' bg-blue-600 text-white border-blue-600 dark:bg-blue-300 dark:text-slate-900 dark:border-blue-300'
+            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
         }
         onClick={() => applyPreset('7d')}
       >
@@ -59,8 +59,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.datePreset === 'this_month'
-            ? ' bg-blue-600 text-white border-blue-600'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+            ? ' bg-blue-600 text-white border-blue-600 dark:bg-blue-300 dark:text-slate-900 dark:border-blue-300'
+            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
         }
         onClick={() => applyPreset('this_month')}
       >
@@ -73,8 +73,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.types.includes('income')
-            ? ' bg-emerald-500 text-white border-emerald-500'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+            ? ' bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-300 dark:text-slate-900 dark:border-emerald-300'
+            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
         }
         onClick={() => applyType('income')}
       >
@@ -85,8 +85,8 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         className={
           pillBase +
           (filters.types.includes('expense')
-            ? ' bg-red-500 text-white border-red-500'
-            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800')
+            ? ' bg-red-500 text-white border-red-500 dark:bg-red-300 dark:text-slate-900 dark:border-red-300'
+            : ' bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700')
         }
         onClick={() => applyType('expense')}
       >
