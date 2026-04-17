@@ -38,14 +38,29 @@ export function useTransactionFilters() {
     const saved = savedRaw ? (JSON.parse(savedRaw) as Partial<TransactionFilterState>) : {};
 
     const get = (key: string) => searchParams.get(key) || (saved as any)?.[key];
+    const urlTypes = parseList(searchParams.get('types'));
+    const savedTypes = Array.isArray((saved as any)?.types)
+      ? ((saved as any).types as string[])
+      : parseList(((saved as any)?.types as string) || null);
+    const urlAccountIds = parseList(searchParams.get('account_ids'));
+    const savedAccountIds = Array.isArray((saved as any)?.accountIds)
+      ? ((saved as any).accountIds as string[])
+      : parseList(((saved as any)?.accountIds as string) || null);
+    const urlCategoryIds = parseList(searchParams.get('category_ids'));
+    const savedCategoryIds = Array.isArray((saved as any)?.categoryIds)
+      ? ((saved as any).categoryIds as string[])
+      : parseList(((saved as any)?.categoryIds as string) || null);
 
     return {
-      datePreset: (searchParams.get('date_preset') as any) || 'this_month',
+      datePreset:
+        (searchParams.get('date_preset') as any) ||
+        (saved.datePreset as any) ||
+        'this_month',
       dateFrom: get('date_from') || undefined,
       dateTo: get('date_to') || undefined,
-      types: parseList(searchParams.get('types')) as any,
-      accountIds: parseList(searchParams.get('account_ids')),
-      categoryIds: parseList(searchParams.get('category_ids')),
+      types: (urlTypes.length ? urlTypes : savedTypes) as any,
+      accountIds: urlAccountIds.length ? urlAccountIds : savedAccountIds,
+      categoryIds: urlCategoryIds.length ? urlCategoryIds : savedCategoryIds,
       minAmount: get('min_amount')
         ? Number(get('min_amount'))
         : undefined,
@@ -95,6 +110,11 @@ export function useTransactionFilters() {
   };
 
   const clearFilters = () => {
+    try {
+      window.localStorage.removeItem('transactions_filters_v1');
+    } catch {
+      // ignore
+    }
     setSearchParams({});
   };
 

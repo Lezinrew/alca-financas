@@ -50,12 +50,14 @@ const Transactions = () => {
           date_from: filters.dateFrom,
           date_to: filters.dateTo,
           types: filters.types.join(','),
+          type: filters.types.length === 1 ? filters.types[0] : undefined,
           account_ids: filters.accountIds.join(','),
           category_ids: filters.categoryIds.join(','),
           min_amount: filters.minAmount,
           max_amount: filters.maxAmount,
           search: filters.search,
           status: filters.status,
+          is_recurring: filters.isRecurring,
           page: filters.page,
           limit: filters.limit,
           sort: filters.sort,
@@ -188,9 +190,11 @@ const Transactions = () => {
       const fetchFacetsAndData = async () => {
         try {
           const facetsRes = await transactionsAPI.getFacets({
+            date_preset: filters.datePreset,
             date_from: filters.dateFrom,
             date_to: filters.dateTo,
             types: filters.types.join(','),
+            type: filters.types.length === 1 ? filters.types[0] : undefined,
             account_ids: filters.accountIds.join(','),
             category_ids: filters.categoryIds.join(','),
             min_amount: filters.minAmount,

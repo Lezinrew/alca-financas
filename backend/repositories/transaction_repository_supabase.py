@@ -2,7 +2,7 @@
 Transaction Repository para Supabase
 """
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from .base_repository_supabase import BaseRepository
 from database.connection import get_supabase
 
@@ -175,6 +175,7 @@ class TransactionRepository(BaseRepository):
             date_to = params.get("date_to")
             month = params.get("month")
             year = params.get("year")
+            date_preset = params.get("date_preset")
 
             if date_from and date_to:
                 query = query.gte("date", str(date_from)).lte("date", str(date_to))
@@ -188,9 +189,39 @@ class TransactionRepository(BaseRepository):
                 else:
                     end_date = f"{y}-{m + 1:02d}-01"
                 query = query.gte("date", start_date).lt("date", end_date)
+            elif date_preset:
+                today = date.today()
+                if str(date_preset) == "today":
+                    start_date = today.isoformat()
+                    end_date = (today + timedelta(days=1)).isoformat()
+                    query = query.gte("date", start_date).lt("date", end_date)
+                elif str(date_preset) == "7d":
+                    start_date = (today - timedelta(days=6)).isoformat()
+                    end_date = (today + timedelta(days=1)).isoformat()
+                    query = query.gte("date", start_date).lt("date", end_date)
+                elif str(date_preset) == "last_month":
+                    first_this = today.replace(day=1)
+                    last_prev = first_this - timedelta(days=1)
+                    first_prev = last_prev.replace(day=1)
+                    query = query.gte("date", first_prev.isoformat()).lt("date", first_this.isoformat())
+                else:
+                    # default: this_month
+                    first_this = today.replace(day=1)
+                    if first_this.month == 12:
+                        first_next = first_this.replace(year=first_this.year + 1, month=1)
+                    else:
+                        first_next = first_this.replace(month=first_this.month + 1)
+                    query = query.gte("date", first_this.isoformat()).lt("date", first_next.isoformat())
 
-            # Tipo
-            if params.get("type"):
+            # Tipo (compatível com type único e types múltiplos)
+            tx_types = params.get("types")
+            if tx_types:
+                types = [str(x).strip() for x in str(tx_types).split(",") if str(x).strip()]
+                if len(types) == 1:
+                    query = query.eq("type", types[0])
+                elif types:
+                    query = query.in_("type", types)
+            elif params.get("type"):
                 query = query.eq("type", params["type"])
 
             # Contas múltiplas
@@ -221,11 +252,19 @@ class TransactionRepository(BaseRepository):
 
             # Status
             if params.get("status"):
-                query = query.eq("status", params["status"])
+                raw_status = str(params["status"]).strip().lower()
+                if raw_status == "canceled":
+                    raw_status = "cancelled"
+                if raw_status == "overdue":
+                    query = query.in_("status", ["pending", "overdue"]).lt("date", date.today().isoformat())
+                else:
+                    query = query.eq("status", raw_status)
 
             # Recorrente
-            if params.get("is_recurring") in (True, "true", "1", 1):
-                query = query.eq("is_recurring", True)
+            if params.get("is_recurring") not in (None, ""):
+                recurring_raw = params.get("is_recurring")
+                recurring = recurring_raw in (True, "true", "1", 1, "yes")
+                query = query.eq("is_recurring", recurring)
 
             # Busca textual em múltiplos campos (description, merchant_name, notes)
             search = params.get("search")
