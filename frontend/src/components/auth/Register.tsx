@@ -48,15 +48,28 @@ const Register = () => {
       return;
     }
 
+    const nameTrim = formData.name.trim();
+    const emailTrim = formData.email.trim();
+    if (!nameTrim || !emailTrim) {
+      setError('Preencha nome e e-mail.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await register({
-        name: formData.name,
-        email: formData.email,
+        name: nameTrim,
+        email: emailTrim,
         password: formData.password,
       });
 
       if (result.success) {
-        navigate('/dashboard');
+        // Sem sessão (ex.: confirmação de e-mail): não enviar para área autenticada.
+        if (result.message) {
+          navigate('/login', { replace: true, state: { registrationNotice: result.message } });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       } else {
         setError(result.message || 'Erro no cadastro');
       }

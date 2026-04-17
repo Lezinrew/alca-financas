@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -7,6 +7,7 @@ const MainLayout = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const navigationItems = [
@@ -47,10 +48,10 @@ const MainLayout = () => {
     }
   ];
 
-  const handleLogout = () => {
-    if (window.confirm('Tem certeza que deseja sair?')) {
-      logout();
-    }
+  const handleLogout = async () => {
+    if (!window.confirm('Tem certeza que deseja sair?')) return;
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   const toggleSidebar = () => {
@@ -100,6 +101,8 @@ const MainLayout = () => {
           
           <button
             onClick={handleLogout}
+            aria-label={t('auth.logout')}
+            title={t('auth.logout')}
             className="btn btn-outline-light btn-sm w-100 d-flex align-items-center justify-content-center"
           >
             <i className={`bi bi-box-arrow-right ${sidebarCollapsed ? '' : 'me-2'}`}></i>
@@ -117,6 +120,8 @@ const MainLayout = () => {
               onClick={toggleSidebar}
               className="btn btn-outline-secondary me-3"
               type="button"
+              aria-label={sidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+              title={sidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
             >
               <i className={`bi ${sidebarCollapsed ? 'bi-list' : 'bi-chevron-left'}`}></i>
             </button>

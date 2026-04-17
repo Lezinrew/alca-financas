@@ -148,6 +148,8 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                 <button
                   type="button"
                   onClick={step === 1 ? onHide : () => setStep(1)}
+                  aria-label={step === 1 ? 'Voltar e fechar planejamento' : 'Voltar para etapa anterior'}
+                  title={step === 1 ? 'Voltar e fechar planejamento' : 'Voltar para etapa anterior'}
                   className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   <i className="bi bi-arrow-left text-xl"></i>
@@ -168,6 +170,8 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
               <button
                 type="button"
                 onClick={onHide}
+                aria-label="Fechar planejamento"
+                title="Fechar planejamento"
                 className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <i className="bi bi-x-lg"></i>
@@ -188,7 +192,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                 <div className="space-y-6">
                   {/* Renda Mensal */}
                   <div>
-                    <label htmlFor="monthly_income" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    <label htmlFor="monthly_income_input" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Renda mensal
                     </label>
                     <div>

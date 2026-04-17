@@ -47,7 +47,8 @@ const lookupCache: {
 const isLookupCacheValid = <T>(entry?: LookupCacheEntry<T>) =>
   !!entry && Date.now() - entry.ts < LOOKUP_CACHE_TTL_MS;
 
-const invalidateLookupCache = (kind?: 'accounts' | 'categories') => {
+/** Limpa cache in-memory de listagens (ex.: após logout). */
+export const invalidateLookupCache = (kind?: 'accounts' | 'categories') => {
   if (!kind || kind === 'accounts') lookupCache.accounts = undefined;
   if (!kind || kind === 'categories') lookupCache.categories = undefined;
 };
@@ -106,6 +107,7 @@ api.interceptors.response.use(
     }
 
     clearAuthStorage();
+    invalidateLookupCache();
     await supabase.auth.signOut().catch(() => {});
     toast.error('Sessão inválida ou expirada. Entre novamente.');
     window.location.href = '/login';

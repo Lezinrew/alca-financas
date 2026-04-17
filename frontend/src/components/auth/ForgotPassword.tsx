@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { ArrowLeft, Loader2, Mail } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { formatSupabaseAuthError } from '../../utils/supabaseAuthErrors';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ const ForgotPassword: React.FC = () => {
       if (resetError) throw resetError;
       setSent(true);
     } catch (err: any) {
-      setError(err?.message || 'Não foi possível enviar o e-mail. Tente novamente.');
+      setError(formatSupabaseAuthError(err));
     } finally {
       setLoading(false);
     }
