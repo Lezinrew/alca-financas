@@ -2,7 +2,14 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 export type TransactionFilterState = {
-  datePreset: 'today' | '7d' | 'this_month' | 'last_month' | 'custom';
+  datePreset:
+    | 'today'
+    | '7d'
+    | 'this_month'
+    | 'last_month'
+    | 'last_90_days'
+    | 'year_to_date'
+    | 'custom';
   dateFrom?: string;
   dateTo?: string;
   types: ('income' | 'expense' | 'transfer')[];
@@ -55,7 +62,7 @@ export function useTransactionFilters() {
       datePreset:
         (searchParams.get('date_preset') as any) ||
         (saved.datePreset as any) ||
-        'this_month',
+        'year_to_date',
       dateFrom: get('date_from') || undefined,
       dateTo: get('date_to') || undefined,
       types: (urlTypes.length ? urlTypes : savedTypes) as any,
@@ -81,7 +88,7 @@ export function useTransactionFilters() {
 
     const nextParams: Record<string, string> = {};
 
-    if (next.datePreset !== 'this_month') nextParams.date_preset = next.datePreset;
+    if (next.datePreset !== 'year_to_date') nextParams.date_preset = next.datePreset;
     if (next.dateFrom) nextParams.date_from = next.dateFrom;
     if (next.dateTo) nextParams.date_to = next.dateTo;
     if (next.types.length) nextParams.types = next.types.join(',');

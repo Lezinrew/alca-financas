@@ -34,7 +34,14 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
   }, [filters.search]);
 
   const handleDatePresetChange = (value: string) => {
-    if (value === 'today' || value === '7d' || value === 'this_month' || value === 'last_month') {
+    if (
+      value === 'today' ||
+      value === '7d' ||
+      value === 'this_month' ||
+      value === 'last_month' ||
+      value === 'last_90_days' ||
+      value === 'year_to_date'
+    ) {
       onChange({ datePreset: value as any, page: 1 });
     }
   };
@@ -82,6 +89,8 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
             >
               <option value="today">Hoje</option>
               <option value="7d">Últimos 7 dias</option>
+              <option value="year_to_date">Ano atual (desde jan.)</option>
+              <option value="last_90_days">Últimos 90 dias</option>
               <option value="this_month">Este mês</option>
               <option value="last_month">Mês passado</option>
             </select>

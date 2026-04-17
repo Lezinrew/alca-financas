@@ -226,10 +226,27 @@ const Transactions = () => {
         setShowForm(true);
       }
 
-      // Se veio com filtro de tipo (Receitas ou Despesas)
+      const allowedPresets = [
+        'today',
+        '7d',
+        'this_month',
+        'last_month',
+        'last_90_days',
+        'year_to_date',
+      ] as const;
+      const nextPreset =
+        state.datePreset && allowedPresets.includes(state.datePreset) ? state.datePreset : undefined;
+
+      // Filtro vindo da dashboard (tipo e/ou período)
       if (state.filterType && (state.filterType === 'income' || state.filterType === 'expense')) {
         updateFilters({
           types: [state.filterType],
+          page: 1,
+          ...(nextPreset ? { datePreset: nextPreset } : {}),
+        } as any);
+      } else if (nextPreset) {
+        updateFilters({
+          datePreset: nextPreset,
           page: 1,
         } as any);
       }
