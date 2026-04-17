@@ -190,6 +190,73 @@ def test_extract_account_info_ofx():
 
     assert info['institution'] == 'Nubank'
 
+
+def test_extract_account_info_ofx_nubank_real_layout():
+    ofx_content = b"""<OFX>
+<SIGNONMSGSRSV1>
+<SONRS>
+<FI>
+<ORG>NU PAGAMENTOS S.A.</ORG>
+</FI>
+</SONRS>
+</SIGNONMSGSRSV1>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<STMTRS>
+<BANKACCTFROM>
+<BANKID>0260</BANKID>
+<BRANCHID>1</BRANCHID>
+<ACCTID>9301586-5</ACCTID>
+<ACCTTYPE>CHECKING</ACCTTYPE>
+</BANKACCTFROM>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>
+"""
+    info = extract_account_info_from_ofx(ofx_content, "NU_93015865_01JAN2026_31JAN2026.ofx")
+    assert info is not None
+    assert info['institution'] == 'Nubank'
+    assert info['account_number'] == '93015865'
+
+
+def test_extract_account_info_ofx_credit_card_section():
+    ofx_content = b"""<OFX>
+<CREDITCARDMSGSRSV1>
+<CCSTMTTRNRS>
+<CCSTMTRS>
+<CCACCTFROM>
+<ACCTID>99990000
+</CCACCTFROM>
+</CCSTMTRS>
+</CCSTMTTRNRS>
+</CREDITCARDMSGSRSV1>
+</OFX>
+"""
+    info = extract_account_info_from_ofx(ofx_content)
+    assert info is not None
+    assert info['account_number'] == '99990000'
+    assert info['account_type'] == 'credit_card'
+
+
+def test_extract_account_info_ofx_fallback_filename_when_no_acctid():
+    ofx_content = b"""<OFX>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<STMTRS>
+<BANKACCTFROM>
+<BANKID>260
+</BANKACCTFROM>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>
+"""
+    info = extract_account_info_from_ofx(ofx_content, "NU_93015865_01OUT2025_31OUT2025.ofx")
+    assert info is not None
+    assert info['account_number'] == '93015865'
+    assert info['institution'] == 'Nubank'
+
 def test_parse_nubank_csv_old_format():
     csv_content = b"""Data,Valor,Identificador,Descri\xc3\xa7\xc3\xa3o
 01/01/2023,-100.00,123,Compra Teste
@@ -257,3 +324,34 @@ def test_parse_ofx_valid_xml():
     assert len(transactions) == 1
     assert transactions[0]['description'] == 'Valid XML Test'
     assert transactions[0]['amount'] == 75.50
+
+
+def test_parse_ofx_nubank_pix_description_normalization():
+    ofx_content = b"""<OFX>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<STMTRS>
+<BANKTRANLIST>
+<STMTTRN>
+<TRNTYPE>CREDIT</TRNTYPE>
+<DTPOSTED>20260101000000[-3:BRT]</DTPOSTED>
+<TRNAMT>150.00</TRNAMT>
+<FITID>abc-123</FITID>
+<MEMO>Transfer\xc3\xaancia Recebida - Glenda David Vaz - \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2.151.966-\xe2\x80\xa2\xe2\x80\xa2 - NU PAGAMENTOS - IP (0260) Ag\xc3\xaancia: 1 Conta: 70986903-7</MEMO>
+</STMTTRN>
+</BANKTRANLIST>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>
+"""
+    format, transactions = parse_import_file('nu.ofx', ofx_content)
+    assert format == 'ofx'
+    assert len(transactions) == 1
+    assert transactions[0]['description'] == 'Pix recebido - Glenda David Vaz'
+    assert transactions[0]['raw_data']['memo_type'] == 'pix_in'
+    assert transactions[0]['raw_data']['pix_details']['counterparty_document_masked'] == '•••.151.966-••'
+    assert transactions[0]['raw_data']['pix_details']['bank_name'] == 'NU PAGAMENTOS - IP'
+    assert transactions[0]['raw_data']['pix_details']['bank_code'] == '0260'
+    assert transactions[0]['raw_data']['pix_details']['agency'] == '1'
+    assert transactions[0]['raw_data']['pix_details']['account'] == '70986903-7'

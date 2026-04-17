@@ -156,7 +156,7 @@ def import_transactions():
         try:
             account_info = None
             if filename_lower.endswith('.ofx'):
-                account_info = extract_account_info_from_ofx(file_content)
+                account_info = extract_account_info_from_ofx(file_content, file.filename)
             elif filename_lower.endswith('.csv'):
                 account_info = extract_account_info_from_csv(file.filename, file_content)
             

@@ -6,7 +6,68 @@ from typing import Dict, Any, Optional, Tuple
 import xml.etree.ElementTree as ET
 
 
-def extract_account_info_from_ofx(content: bytes) -> Optional[Dict[str, Any]]:
+def _find_first_element(root: ET.Element, paths: list[str]) -> Optional[ET.Element]:
+    for path in paths:
+        element = root.find(path)
+        if element is not None:
+            return element
+    return None
+
+
+def _normalize_institution_name(institution: Optional[str]) -> Optional[str]:
+    if not institution:
+        return institution
+    normalized = institution.strip()
+    normalized_upper = normalized.upper()
+    if 'NU PAGAMENTOS' in normalized_upper or normalized_upper == 'NUBANK':
+        return 'Nubank'
+    if 'BANCO INTER' in normalized_upper or normalized_upper == 'INTER':
+        return 'Banco Inter'
+    if 'ITAU' in normalized_upper or 'ITAÚ' in normalized_upper:
+        return 'Itaú'
+    if 'BRADESCO' in normalized_upper:
+        return 'Bradesco'
+    if 'SANTANDER' in normalized_upper:
+        return 'Santander'
+    if 'BANCO DO BRASIL' in normalized_upper or 'BCO DO BRASIL' in normalized_upper:
+        return 'Banco do Brasil'
+    return normalized
+
+
+def _normalize_account_number(account_number: Optional[str]) -> Optional[str]:
+    if not account_number:
+        return None
+    normalized = re.sub(r'\D', '', account_number)
+    return normalized or account_number.strip()
+
+
+def _extract_account_number_from_filename(filename: Optional[str]) -> Optional[str]:
+    if not filename:
+        return None
+    account_number_match = re.search(r'[A-Z]+[_-](\d+)', filename.upper())
+    return account_number_match.group(1) if account_number_match else None
+
+
+def _infer_institution_from_filename(filename: Optional[str]) -> Optional[str]:
+    if not filename:
+        return None
+    filename_lower = filename.lower()
+    if 'nubank' in filename_lower or filename_lower.startswith('nu_'):
+        return 'Nubank'
+    if 'inter' in filename_lower:
+        return 'Banco Inter'
+    if 'itau' in filename_lower or 'itaú' in filename_lower:
+        return 'Itaú'
+    if 'bradesco' in filename_lower:
+        return 'Bradesco'
+    if 'santander' in filename_lower:
+        return 'Santander'
+    if 'bb' in filename_lower or 'brasil' in filename_lower:
+        return 'Banco do Brasil'
+    return None
+
+
+def extract_account_info_from_ofx(content: bytes, filename: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Extrai informações da conta do arquivo OFX.
     Retorna: {
@@ -39,15 +100,15 @@ def extract_account_info_from_ofx(content: bytes) -> Optional[Dict[str, Any]]:
                 root = ET.fromstring(xml_content_fixed)
             except:
                 # Tenta método alternativo com regex
-                return extract_account_info_from_ofx_regex(content_str)
+                return extract_account_info_from_ofx_regex(content_str, filename)
         
         # Busca informações da instituição financeira
-        fi_org = root.find('.//FI/ORG') or root.find('.//fi/org') or root.find('.//Fi/Org')
+        fi_org = _find_first_element(root, ['.//FI/ORG', './/fi/org', './/Fi/Org'])
         institution = fi_org.text.strip() if fi_org is not None and fi_org.text else None
         
         # Busca BANKID
         bank_id = None
-        bankid_elem = root.find('.//BANKID') or root.find('.//bankid') or root.find('.//BankId')
+        bankid_elem = _find_first_element(root, ['.//BANKID', './/bankid', './/BankId'])
         if bankid_elem is not None and bankid_elem.text:
             bank_id = bankid_elem.text.strip()
             
@@ -55,31 +116,47 @@ def extract_account_info_from_ofx(content: bytes) -> Optional[Dict[str, Any]]:
         if not institution and bank_id:
             bank_map = {
                 '001': 'Banco do Brasil',
+                '0001': 'Banco do Brasil',
                 '033': 'Santander',
+                '0033': 'Santander',
                 '077': 'Banco Inter',
+                '0077': 'Banco Inter',
                 '104': 'Caixa Econômica Federal',
+                '0104': 'Caixa Econômica Federal',
                 '237': 'Bradesco',
+                '0237': 'Bradesco',
                 '260': 'Nubank',
+                '0260': 'Nubank',
                 '341': 'Itaú'
             }
             institution = bank_map.get(bank_id)
         
-        # Busca informações da conta
-        acct_from = root.find('.//BANKACCTFROM') or root.find('.//bankacctfrom') or root.find('.//BankAcctFrom')
+        # Busca informações da conta (conta corrente/poupança ou cartão de crédito)
+        acct_from = _find_first_element(
+            root,
+            [
+                './/BANKACCTFROM',
+                './/bankacctfrom',
+                './/BankAcctFrom',
+                './/CCACCTFROM',
+                './/ccacctfrom',
+                './/CcAcctFrom',
+            ],
+        )
         if acct_from is None:
             # Tenta método alternativo
-            return extract_account_info_from_ofx_regex(content_str)
+            return extract_account_info_from_ofx_regex(content_str, filename)
         
         # ACCTID (número da conta)
-        acctid_elem = acct_from.find('ACCTID') or acct_from.find('acctid') or acct_from.find('AcctId')
+        acctid_elem = _find_first_element(acct_from, ['ACCTID', 'acctid', 'AcctId'])
         account_number = acctid_elem.text.strip() if acctid_elem is not None and acctid_elem.text else None
         
         # ACCTTYPE (tipo da conta)
-        accttype_elem = acct_from.find('ACCTTYPE') or acct_from.find('accttype') or acct_from.find('AcctType')
+        accttype_elem = _find_first_element(acct_from, ['ACCTTYPE', 'accttype', 'AcctType'])
         acct_type_raw = accttype_elem.text.strip() if accttype_elem is not None and accttype_elem.text else None
         
         # BRANCHID (agência)
-        branchid_elem = acct_from.find('BRANCHID') or acct_from.find('branchid') or acct_from.find('BranchId')
+        branchid_elem = _find_first_element(acct_from, ['BRANCHID', 'branchid', 'BranchId'])
         branch_id = branchid_elem.text.strip() if branchid_elem is not None and branchid_elem.text else None
         
         # Mapeia ACCTTYPE para tipo do sistema
@@ -92,10 +169,27 @@ def extract_account_info_from_ofx(content: bytes) -> Optional[Dict[str, Any]]:
             'INVESTMENT': 'investment'
         }
         
-        account_type = account_type_map.get(acct_type_raw.upper() if acct_type_raw else '', 'wallet')
+        if acct_type_raw:
+            account_type = account_type_map.get(acct_type_raw.upper(), 'wallet')
+        else:
+            # OFX de cartão costuma vir em CCACCTFROM sem ACCTTYPE
+            has_credit_card_section = (
+                root.find('.//CREDITCARDMSGSRSV1') is not None
+                or root.find('.//creditcardmsgsrsv1') is not None
+                or root.find('.//CCACCTFROM') is not None
+                or root.find('.//ccacctfrom') is not None
+            )
+            account_type = 'credit_card' if has_credit_card_section else 'wallet'
         
         if not account_number:
+            account_number = _extract_account_number_from_filename(filename)
+        account_number = _normalize_account_number(account_number)
+        if not account_number:
             return None
+
+        if not institution:
+            institution = _infer_institution_from_filename(filename)
+        institution = _normalize_institution_name(institution)
         
         return {
             'institution': institution or 'Banco Desconhecido',
@@ -108,7 +202,7 @@ def extract_account_info_from_ofx(content: bytes) -> Optional[Dict[str, Any]]:
         return None
 
 
-def extract_account_info_from_ofx_regex(content_str: str) -> Optional[Dict[str, Any]]:
+def extract_account_info_from_ofx_regex(content_str: str, filename: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Método alternativo usando regex para extrair informações do OFX"""
     try:
         # Extrai ORG
@@ -122,11 +216,17 @@ def extract_account_info_from_ofx_regex(content_str: str) -> Optional[Dict[str, 
         if not institution and bank_id:
             bank_map = {
                 '001': 'Banco do Brasil',
+                '0001': 'Banco do Brasil',
                 '033': 'Santander',
+                '0033': 'Santander',
                 '077': 'Banco Inter',
+                '0077': 'Banco Inter',
                 '104': 'Caixa Econômica Federal',
+                '0104': 'Caixa Econômica Federal',
                 '237': 'Bradesco',
+                '0237': 'Bradesco',
                 '260': 'Nubank',
+                '0260': 'Nubank',
                 '341': 'Itaú'
             }
             institution = bank_map.get(bank_id)
@@ -144,6 +244,9 @@ def extract_account_info_from_ofx_regex(content_str: str) -> Optional[Dict[str, 
         branch_id = branchid_match.group(1).strip() if branchid_match else None
         
         if not account_number:
+            account_number = _extract_account_number_from_filename(filename)
+        account_number = _normalize_account_number(account_number)
+        if not account_number:
             return None
         
         account_type_map = {
@@ -155,7 +258,17 @@ def extract_account_info_from_ofx_regex(content_str: str) -> Optional[Dict[str, 
             'INVESTMENT': 'investment'
         }
         
-        account_type = account_type_map.get(acct_type_raw.upper() if acct_type_raw else '', 'wallet')
+        if acct_type_raw:
+            account_type = account_type_map.get(acct_type_raw.upper(), 'wallet')
+        else:
+            has_credit_card_section = bool(
+                re.search(r'<CREDITCARDMSGSRSV1|<CCACCTFROM', content_str, re.IGNORECASE)
+            )
+            account_type = 'credit_card' if has_credit_card_section else 'wallet'
+
+        if not institution:
+            institution = _infer_institution_from_filename(filename)
+        institution = _normalize_institution_name(institution)
         
         return {
             'institution': institution or 'Banco Desconhecido',

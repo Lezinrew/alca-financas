@@ -5,7 +5,116 @@ from typing import List, Dict, Any, Tuple
 from io import StringIO
 import xml.etree.ElementTree as ET
 
-from utils.money_utils import parse_money_value
+def _parse_signed_money_value(value: Any) -> float:
+    """Parse monetário para importação bancária, preservando sinal."""
+    if value is None or value == "":
+        raise ValueError("Valor financeiro não fornecido.")
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    s = str(value).strip().replace("R$", "").replace(" ", "")
+    if not s:
+        raise ValueError("Valor financeiro não fornecido.")
+
+    sign = -1 if s.startswith("-") else 1
+    s = s.lstrip("+-")
+
+    if "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    elif "." in s:
+        parts = s.split(".")
+        if len(parts) == 2 and len(parts[1]) == 3 and parts[1].isdigit():
+            s = s.replace(".", "")
+
+    parsed = float(s)
+    return sign * parsed
+
+
+def _classify_ofx_memo_type(memo: str) -> str:
+    memo_lower = (memo or '').strip().lower()
+    if memo_lower.startswith('transferência recebida pelo pix') or memo_lower.startswith('transferência recebida -'):
+        return 'pix_in'
+    if memo_lower.startswith('transferência enviada pelo pix'):
+        return 'pix_out'
+    if memo_lower.startswith('compra no débito'):
+        return 'debit_purchase'
+    if memo_lower.startswith('pagamento de fatura'):
+        return 'invoice_payment'
+    if memo_lower.startswith('pagamento de boleto'):
+        return 'boleto_payment'
+    if memo_lower.startswith('estorno'):
+        return 'reversal'
+    if 'empréstimo' in memo_lower:
+        return 'loan'
+    return 'other'
+
+
+def _extract_counterparty_name_from_memo(memo: str, memo_type: str) -> str:
+    if memo_type not in {'pix_in', 'pix_out', 'reversal'}:
+        return ''
+    patterns = [
+        r'^Transferência recebida pelo Pix - (.+?) - ',
+        r'^Transferência Recebida - (.+?) - ',
+        r'^Transferência enviada pelo Pix - (.+?) - ',
+        r'^Estorno - Transferência enviada pelo Pix - (.+?) - ',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, memo, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return ''
+
+
+def _extract_pix_details_from_memo(memo: str, memo_type: str, counterparty_name: str = '') -> Dict[str, str]:
+    if memo_type not in {'pix_in', 'pix_out', 'reversal'}:
+        return {}
+
+    details: Dict[str, str] = {}
+
+    source = memo
+    source = re.sub(
+        r'^(?:Estorno\s*-\s*)?Transferência\s+(?:recebida(?:\s+pelo)?\s+Pix|Recebida|enviada\s+pelo\s+Pix)\s*-\s*',
+        '',
+        source,
+        flags=re.IGNORECASE,
+    )
+    if counterparty_name:
+        source = re.sub(rf'^{re.escape(counterparty_name)}\s*-\s*', '', source, flags=re.IGNORECASE)
+
+    document_start_match = re.match(r'^([0-9*.\-/•]{11,20})\s*-\s*', source)
+    if document_start_match:
+        details['counterparty_document_masked'] = document_start_match.group(1).strip()
+        source = source[document_start_match.end():]
+    else:
+        document_any_match = re.search(r'-\s*([0-9*.\-/•]{11,20})\s*-', memo)
+        if document_any_match:
+            details['counterparty_document_masked'] = document_any_match.group(1).strip()
+
+    bank_match = re.search(
+        r'^(.*?)\s*\((\d{3,4})\)\s*Ag[êe]ncia:\s*([0-9A-Za-z-]+)\s*Conta:\s*([0-9A-Za-z-]+)',
+        source,
+        flags=re.IGNORECASE,
+    )
+    if bank_match:
+        details['bank_name'] = bank_match.group(1).strip()
+        details['bank_code'] = bank_match.group(2).strip()
+        details['agency'] = bank_match.group(3).strip()
+        details['account'] = bank_match.group(4).strip()
+
+    return details
+
+
+def _normalize_ofx_description(memo: str, memo_type: str, counterparty_name: str) -> str:
+    memo = (memo or '').strip()
+    if not memo:
+        return 'Transação sem descrição'
+    if memo_type == 'pix_in':
+        return f'Pix recebido - {counterparty_name}' if counterparty_name else 'Pix recebido'
+    if memo_type == 'pix_out':
+        return f'Pix enviado - {counterparty_name}' if counterparty_name else 'Pix enviado'
+    if memo_type == 'reversal':
+        return f'Estorno Pix - {counterparty_name}' if counterparty_name else 'Estorno Pix'
+    return memo
 
 
 def detect_file_format(filename: str, content: bytes) -> str:
@@ -98,7 +207,7 @@ def parse_nubank_csv(content: bytes) -> List[Dict[str, Any]]:
                     continue
                 
                 # Parse do valor (aceita pt-BR: 1.000,50 ou 1000,50)
-                amount = parse_money_value(amount_str)
+                amount = _parse_signed_money_value(amount_str)
                 if amount == 0 and amount_str.strip():
                     continue
                 
@@ -145,7 +254,7 @@ def parse_nubank_csv(content: bytes) -> List[Dict[str, Any]]:
                     continue
                 
                 # Parse do valor (aceita pt-BR: 1.000,50 ou 1000,50)
-                amount = parse_money_value(amount_str)
+                amount = _parse_signed_money_value(amount_str)
                 if amount == 0 and amount_str.strip():
                     continue
                 
@@ -254,14 +363,19 @@ def parse_ofx(content: bytes) -> List[Dict[str, Any]]:
                 continue
             
             # Descrição
-            description = (memo_text if memo_text else '') or \
+            memo_raw = (memo_text if memo_text else '') or \
                          (name_text if name_text else '') or \
                          'Transação sem descrição'
+            memo_raw = memo_raw.strip()
+            memo_type = _classify_ofx_memo_type(memo_raw)
+            counterparty_name = _extract_counterparty_name_from_memo(memo_raw, memo_type)
+            pix_details = _extract_pix_details_from_memo(memo_raw, memo_type, counterparty_name)
+            description = _normalize_ofx_description(memo_raw, memo_type, counterparty_name)
             
             # Valor (aceita pt-BR ou en)
             if not trnamt_text:
                 continue
-            amount = parse_money_value(trnamt_text.strip())
+            amount = _parse_signed_money_value(trnamt_text.strip())
             if amount == 0 and trnamt_text.strip():
                 continue
             
@@ -276,7 +390,12 @@ def parse_ofx(content: bytes) -> List[Dict[str, Any]]:
                 'type': transaction_type,
                 'raw_data': {
                     'fitid': fitid_text,
-                    'trntype': trntype_text
+                    'trntype': trntype_text,
+                    'memo_original': memo_raw,
+                    'memo_type': memo_type,
+                    'counterparty_name': counterparty_name,
+                    'is_reversal': memo_type == 'reversal' or (fitid_text or '').endswith(':reversal'),
+                    'pix_details': pix_details,
                 }
             })
         except Exception:
@@ -320,7 +439,7 @@ def parse_ofx_alternative(content_str: str) -> List[Dict[str, Any]]:
             trnamt_match = re.search(r'<TRNAMT[^>]*>([^<]+)', match, re.IGNORECASE)
             if not trnamt_match:
                 continue
-            amount = parse_money_value(trnamt_match.group(1).strip())
+            amount = _parse_signed_money_value(trnamt_match.group(1).strip())
             if amount == 0 and trnamt_match.group(1).strip():
                 continue
             
@@ -366,7 +485,7 @@ def parse_standard_csv(content: bytes) -> List[Dict[str, Any]]:
                 continue
             
             # Parse do valor (aceita pt-BR ou número)
-            amount = parse_money_value(amount_str)
+            amount = _parse_signed_money_value(amount_str)
             if amount == 0 and (amount_str or '').strip():
                 continue
             
