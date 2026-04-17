@@ -268,7 +268,7 @@ const Settings = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Gerencie suas preferências da aplicação</p>
+          <p className="text-sm text-slate-600 dark:text-dark-text-secondary mt-1">Gerencie suas preferências da aplicação</p>
         </div>
       </div>
 
@@ -293,7 +293,7 @@ const Settings = () => {
           <div className="card-base overflow-hidden">
             <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-gear text-slate-600 dark:text-slate-300"></i>
+                <i className="bi bi-gear text-slate-600 dark:text-dark-text-secondary"></i>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Preferências da Aplicação</h2>
               </div>
             </div>
@@ -302,13 +302,13 @@ const Settings = () => {
                 {/* Currency */}
                 <div>
                   <label htmlFor="settings-currency" className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
-                    <i className="bi bi-currency-exchange text-slate-600 dark:text-slate-400"></i>
+                    <i className="bi bi-currency-exchange text-slate-600 dark:text-dark-text-secondary"></i>
                     {t('settings.currency')}
                   </label>
                   <select
                     id="settings-currency"
                     name="currency"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-[#1a1d29] border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="native-select-themed"
                     value={settings.currency}
                     onChange={(e) => handleChange('currency', e.target.value)}
                     disabled={loading}
@@ -319,7 +319,7 @@ const Settings = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  <p className="text-xs text-slate-500 dark:text-dark-text-secondary mt-2">
                     Moeda padrão para exibição de valores
                   </p>
                 </div>
@@ -327,13 +327,13 @@ const Settings = () => {
                 {/* Language */}
                 <div>
                   <label htmlFor="settings-language" className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
-                    <i className="bi bi-translate text-slate-600 dark:text-slate-400"></i>
+                    <i className="bi bi-translate text-slate-600 dark:text-dark-text-secondary"></i>
                     {t('settings.language')}
                   </label>
                   <select
                     id="settings-language"
                     name="language"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-[#1a1d29] border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="native-select-themed"
                     value={settings.language}
                     onChange={(e) => handleChange('language', e.target.value)}
                     disabled={loading}
@@ -344,7 +344,7 @@ const Settings = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  <p className="text-xs text-slate-500 dark:text-dark-text-secondary mt-2">
                     Idioma da interface da aplicação
                   </p>
                 </div>
@@ -352,7 +352,7 @@ const Settings = () => {
                 {/* Theme */}
                 <div>
                   <label htmlFor="theme-selector" className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">
-                    <i className="bi bi-palette text-slate-600 dark:text-slate-400"></i>
+                    <i className="bi bi-palette text-slate-600 dark:text-dark-text-secondary"></i>
                     {t('settings.theme')}
                   </label>
                   <div id="theme-selector" className="grid grid-cols-2 gap-3" role="group" aria-label="Selecionar tema">
@@ -362,31 +362,31 @@ const Settings = () => {
                         type="button"
                         name={`theme-${themeOption.code}`}
                         aria-label={`Selecionar tema ${themeOption.name}`}
-                        className={`p-6 rounded-xl border-2 transition-all ${
+                        className={`settings-theme-card ${
                           settings.theme === themeOption.code
-                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1a1d29] hover:border-slate-300 dark:hover:border-slate-600'
+                            ? 'settings-theme-card--selected'
+                            : 'settings-theme-card--idle'
                         }`}
                         onClick={() => handleChange('theme', themeOption.code)}
                         disabled={loading}
                       >
                         <div className="text-center">
                           <i className={`${themeOption.icon} text-4xl mb-3 ${
-                            settings.theme === themeOption.code ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'
+                            settings.theme === themeOption.code ? 'text-blue-600 dark:text-blue-300' : 'text-slate-400 dark:text-slate-300'
                           }`}></i>
                           <h3 className={`font-semibold text-sm ${
-                            settings.theme === themeOption.code ? 'text-blue-900 dark:text-blue-200' : 'text-slate-900 dark:text-slate-100'
+                            settings.theme === themeOption.code ? 'text-blue-900 dark:text-blue-100' : 'text-slate-900 dark:text-white'
                           }`}>
                             {themeOption.name}
                           </h3>
                           {settings.theme === themeOption.code && (
-                            <i className="bi bi-check-circle-fill text-blue-600 dark:text-blue-400 mt-2 block"></i>
+                            <i className="bi bi-check-circle-fill text-blue-600 dark:text-blue-300 mt-2 block"></i>
                           )}
                         </div>
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  <p className="text-xs text-slate-500 dark:text-dark-text-secondary mt-2">
                     Aparência da aplicação
                   </p>
                 </div>
@@ -398,39 +398,39 @@ const Settings = () => {
           <div className="card-base overflow-hidden">
             <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-person-circle text-slate-600 dark:text-slate-300"></i>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Informações da Conta</h2>
+                <i className="bi bi-person-circle text-slate-600 dark:text-dark-text-secondary"></i>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Informações da Conta</h2>
               </div>
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="settings-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome</label>
+                  <label htmlFor="settings-name" className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-2">Nome</label>
                   <input
                     type="text"
                     id="settings-name"
                     name="name"
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1d29] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-dark-surface-elevated border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-dark-text-muted"
                     value={user?.name || ''}
                     disabled
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="settings-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                  <label htmlFor="settings-email" className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-2">Email</label>
                   <input
                     type="email"
                     id="settings-email"
                     name="email"
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1d29] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-dark-surface-elevated border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-dark-text-muted"
                     value={user?.email || ''}
                     disabled
                   />
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-sm text-blue-800 dark:text-blue-300 flex items-center gap-2">
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/50 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-100 flex items-center gap-2">
                   <i className="bi bi-info-circle-fill"></i>
                   Para alterar dados da conta, acesse a seção Perfil
                 </p>
@@ -466,37 +466,37 @@ const Settings = () => {
           <div className="card-base overflow-hidden">
             <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-info-circle text-slate-600 dark:text-slate-300"></i>
+                <i className="bi bi-info-circle text-slate-600 dark:text-dark-text-secondary"></i>
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Sobre as Configurações</h3>
               </div>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-300 mb-2">
                   <i className="bi bi-currency-exchange"></i>
                   Moeda
                 </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-slate-600 dark:text-dark-text-secondary">
                   Define a moeda padrão para exibição de valores em toda a aplicação.
                 </p>
               </div>
 
               <div>
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-300 mb-2">
                   <i className="bi bi-translate"></i>
                   Idioma
                 </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-slate-600 dark:text-dark-text-secondary">
                   Altera o idioma da interface. A mudança é aplicada imediatamente.
                 </p>
               </div>
 
               <div>
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-300 mb-2">
                   <i className="bi bi-palette"></i>
                   Tema
                 </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-slate-600 dark:text-dark-text-secondary">
                   Escolha entre tema claro ou escuro. Funcionalidade em desenvolvimento.
                 </p>
               </div>
@@ -507,12 +507,12 @@ const Settings = () => {
           <div className="card-base overflow-hidden">
             <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
-                <i className="bi bi-shield-check text-slate-600 dark:text-slate-300"></i>
+                <i className="bi bi-shield-check text-slate-600 dark:text-dark-text-secondary"></i>
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Privacidade</h3>
               </div>
             </div>
             <div className="p-6">
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-slate-600 dark:text-dark-text-secondary">
                 Suas configurações são salvas de forma segura e criptografada.
                 Apenas você tem acesso aos seus dados financeiros.
               </p>
@@ -525,7 +525,7 @@ const Settings = () => {
       <div className="card-base overflow-hidden">
         <div className="card-header px-6 py-4 border-b border-slate-200 dark:border-slate-700/50">
           <div className="flex items-center gap-2">
-            <i className="bi bi-database text-slate-600 dark:text-slate-300"></i>
+            <i className="bi bi-database text-slate-600 dark:text-dark-text-secondary"></i>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Gerenciamento de Dados</h2>
           </div>
         </div>
@@ -534,7 +534,7 @@ const Settings = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Backup e Restauração</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
+              <p className="text-xs text-slate-600 dark:text-dark-text-secondary mb-4">
                 Exporte todos os seus dados (categorias, transações e contas) para um arquivo JSON ou importe um backup anterior.
               </p>
             </div>
@@ -589,7 +589,7 @@ const Settings = () => {
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
             <div>
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Importar Categorias</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
+              <p className="text-xs text-slate-600 dark:text-dark-text-secondary mb-4">
                 Importe categorias de um arquivo JSON ou CSV. O arquivo deve conter as colunas: name, type, color, icon, description.
               </p>
             </div>
@@ -625,9 +625,9 @@ const Settings = () => {
           {/* Clear Data Section */}
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
             <div>
-              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Zona de Perigo</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
-                <strong className="text-red-600 dark:text-red-400">Atenção:</strong> Esta ação irá deletar permanentemente todas as suas categorias, transações e contas. Esta ação não pode ser desfeita. Certifique-se de ter um backup antes de continuar.
+              <h3 className="text-sm font-semibold text-red-600 dark:text-red-300 mb-2">Zona de Perigo</h3>
+              <p className="text-xs text-slate-600 dark:text-dark-text-secondary mb-4">
+                <strong className="text-red-600 dark:text-red-300">Atenção:</strong> Esta ação irá deletar permanentemente todas as suas categorias, transações e contas. Esta ação não pode ser desfeita. Certifique-se de ter um backup antes de continuar.
               </p>
             </div>
             

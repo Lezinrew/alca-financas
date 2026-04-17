@@ -86,3 +86,7 @@ scripts/db/_exports/
 scripts/insecure-legacy/
 scripts/**/insecure*.sh
 scripts/**/*password*.sh
+
+# TypeScript incremental / declarações geradas (tsc composite local)
+*.tsbuildinfo
+frontend/vite.config.d.ts
