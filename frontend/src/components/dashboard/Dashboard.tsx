@@ -161,14 +161,16 @@ const Dashboard: React.FC = () => {
       const dashboardData = dashboardRes.data;
       const accounts = Array.isArray(accountsRes) ? accountsRes : [];
 
-      // Filtrar apenas cartões de crédito que estão explicitamente ativos (is_active === true)
+      const isAccountActive = (acc: any) => acc?.is_active !== false && acc?.active !== false;
+
+      // Filtrar apenas cartões de crédito ativos
       const creditCards = accounts.filter((acc: any) => 
-        acc.type === 'credit_card' && acc.is_active === true
+        acc.type === 'credit_card' && isAccountActive(acc)
       );
 
       // Calcula saldo total das contas ativas (excluindo cartões de crédito)
       const totalBalance = accounts
-        .filter((acc: any) => acc.is_active && acc.type !== 'credit_card')
+        .filter((acc: any) => isAccountActive(acc) && acc.type !== 'credit_card')
         .reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0);
 
       // Calcula variação de receitas e despesas (comparando com mês anterior)
@@ -623,7 +625,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
                   }`}>
-                  {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                  {transaction.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(Number(transaction.amount) || 0))}
                 </div>
               </div>
             ))}

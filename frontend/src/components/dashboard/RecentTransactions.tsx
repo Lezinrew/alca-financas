@@ -59,7 +59,7 @@ const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions })
           <div className="text-end">
             <div className={`fw-bold ${transaction.type === 'income' ? 'text-success' : 'text-danger'}`}>
               {transaction.type === 'income' ? '+' : '-'}
-              {formatCurrency(transaction.amount)}
+              {formatCurrency(Math.abs(Number(transaction.amount) || 0))}
             </div>
           </div>
         </div>

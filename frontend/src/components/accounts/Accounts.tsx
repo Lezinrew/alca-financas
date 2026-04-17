@@ -107,7 +107,9 @@ const Accounts: React.FC = () => {
   }
 
   // Filtra apenas contas ativas e exclui cartões de crédito (que ficam na página de cartões)
-  const activeAccounts = accounts.filter(acc => acc.is_active && acc.type !== 'credit_card');
+  const activeAccounts = accounts.filter(
+    (acc) => acc.is_active !== false && (acc as any).active !== false && acc.type !== 'credit_card'
+  );
   // Calcula saldo total apenas de contas (excluindo cartões de crédito)
   const totalBalance = activeAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
   // Usa o saldo previsto calculado pelo backend para cada conta

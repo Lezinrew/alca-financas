@@ -72,7 +72,7 @@ const Reports = () => {
       const accountsArray = Array.isArray(response.data) ? response.data : [];
       // Filtra apenas contas ativas
       const activeAccounts = accountsArray
-        .filter((acc: any) => acc.is_active !== false)
+        .filter((acc: any) => acc.is_active !== false && acc.active !== false)
         .map((acc: any) => ({
           ...acc,
           id: acc.id || acc._id || '',
