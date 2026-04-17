@@ -29,11 +29,13 @@ def transactions():
         filters = {
             'page': page,
             'limit': per_page,
+            'date_preset': request.args.get('date_preset'),
             'month': request.args.get('month'),
             'year': request.args.get('year'),
             'date_from': request.args.get('date_from'),
             'date_to': request.args.get('date_to'),
             'type': request.args.get('type'),
+            'types': request.args.get('types'),
             'account_id': request.args.get('account_id'),
             'account_ids': request.args.get('account_ids'),
             'category_id': request.args.get('category_id'),
@@ -42,6 +44,7 @@ def transactions():
             'max_amount': request.args.get('max_amount'),
             'search': request.args.get('search'),
             'status': request.args.get('status'),
+            'is_recurring': request.args.get('is_recurring'),
             'sort': request.args.get('sort'),
         }
         
@@ -446,11 +449,13 @@ def transactions_facets():
 
     # Reaproveita lógica de filtros avançados (sem paginação)
     filters = {
+        'date_preset': request.args.get('date_preset'),
         'date_from': request.args.get('date_from'),
         'date_to': request.args.get('date_to'),
         'month': request.args.get('month'),
         'year': request.args.get('year'),
         'type': request.args.get('type'),
+        'types': request.args.get('types'),
         'account_ids': request.args.get('account_ids'),
         'category_ids': request.args.get('category_ids'),
         'min_amount': request.args.get('min_amount'),
