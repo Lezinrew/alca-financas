@@ -30,6 +30,8 @@ interface User {
   email: string;
   auth_providers?: AuthProviderInfo[];
   is_admin?: boolean;
+  role?: string;
+  status?: string;
 }
 
 interface AuthContextType {
@@ -64,13 +66,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const bootstrapInFlightRef = useRef<Promise<void> | null>(null);
   const bootstrapDoneForUserRef = useRef<string | null>(null);
+  /** Evita rajadas de GET /api/auth/me (HMR, onAuthStateChange, vários efeitos). */
+  const lastProfileSyncAtRef = useRef(0);
 
   const resetLocalAuthCaches = () => {
     bootstrapDoneForUserRef.current = null;
     bootstrapInFlightRef.current = null;
+    lastProfileSyncAtRef.current = 0;
     clearAuthStorage();
     invalidateLookupCache();
   };
+
+  const syncProfileFromBackend = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastProfileSyncAtRef.current < 12_000) {
+      return;
+    }
+    lastProfileSyncAtRef.current = now;
+    try {
+      const { data } = await authAPI.getMe();
+      if (!data?.id) return;
+      setUser((prev) => ({
+        id: data.id,
+        name: data.name ?? prev?.name ?? 'Usuário',
+        email: data.email ?? prev?.email ?? '',
+        auth_providers: prev?.auth_providers,
+        role: data.role,
+        status: data.status,
+        is_admin: Boolean(data.is_admin ?? data.role === 'admin'),
+      }));
+    } catch {
+      /* perfil opcional */
+    }
+  }, []);
 
   const ensureBackendBootstrap = useCallback(async () => {
     // Bootstrap precisa rodar também quando a sessão é restaurada (F5/reopen),
@@ -82,7 +110,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         authDiag('bootstrap:skip (sem sessão)');
         return;
       }
-      if (bootstrapDoneForUserRef.current === userId) return;
+      if (bootstrapDoneForUserRef.current === userId) {
+        await syncProfileFromBackend(false);
+        return;
+      }
       authDiag('bootstrap:start', { userIdPrefix: `${userId.slice(0, 8)}…` });
       if (!bootstrapInFlightRef.current) {
         bootstrapInFlightRef.current = authAPI
@@ -95,12 +126,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             bootstrapInFlightRef.current = null;
           });
       }
-      await bootstrapInFlightRef.current;
+      try {
+        await bootstrapInFlightRef.current;
+      } catch {
+        authDiag('bootstrap:erro (ignorado para não bloquear sessão)');
+      }
+      await syncProfileFromBackend(true);
     } catch {
       authDiag('bootstrap:erro (ignorado para não bloquear sessão)');
-      // Não bloqueia a sessão por falha transitória no bootstrap.
+      await syncProfileFromBackend(true);
     }
-  }, []);
+  }, [syncProfileFromBackend]);
 
   // Sessão do Supabase é a fonte de verdade (banco limpo / Supabase-only).
   useEffect(() => {

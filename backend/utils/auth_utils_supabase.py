@@ -62,7 +62,9 @@ def admin_required_supabase(f):
         if not hasattr(request, 'user'):
             return jsonify({'error': 'Autenticação necessária'}), 401
 
-        if not request.user.get('is_admin', False):
+        role = request.user.get('role') or 'user'
+        is_admin = bool(request.user.get('is_admin')) or role == 'admin'
+        if not is_admin:
             return jsonify({'error': 'Acesso negado. Requer privilégios de administrador.'}), 403
 
         return f(*args, **kwargs)

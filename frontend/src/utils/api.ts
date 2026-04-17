@@ -565,13 +565,34 @@ export const oauthAPI = {
 // Funções de Admin
 export const adminAPI = {
   getStats: () => api.get('/admin/stats'),
-  getUsers: (page = 1, perPage = 10, search = '') => api.get(`/admin/users?page=${page}&per_page=${perPage}&search=${search}`),
+  getUserStats: () => api.get('/admin/users/stats'),
+  getInactiveUsers: (minDays = 30, limit = 200) =>
+    api.get(`/admin/users/inactive?min_days=${minDays}&limit=${limit}`),
+  getUsers: (page = 1, perPage = 10, search = '', status = 'all', adminsOnly = false) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: String(perPage),
+      search: search || '',
+    });
+    if (status && status !== 'all') params.append('status', status);
+    if (adminsOnly) params.append('admins_only', 'true');
+    return api.get(`/admin/users?${params.toString()}`);
+  },
   getUserDetails: (id: string) => api.get(`/admin/users/${id}/details`),
   getLogs: (page = 1, perPage = 50) => api.get(`/admin/logs?page=${page}&per_page=${perPage}`),
   exportUserData: (id: string) => api.get(`/admin/users/${id}/export`, { responseType: 'blob' }),
   createUser: (userData: any) => api.post('/admin/users', userData),
-  updateUserStatus: (id: string, data: { is_blocked?: boolean; is_admin?: boolean }) => api.put(`/admin/users/${id}`, data),
+  updateUserStatus: (id: string, data: { is_blocked?: boolean; is_admin?: boolean }) =>
+    api.put(`/admin/users/${id}`, data),
+  patchUserRole: (id: string, role: string) => api.patch(`/admin/users/${id}/role`, { role }),
+  patchUserStatus: (id: string, status: string) => api.patch(`/admin/users/${id}/status`, { status }),
+  sendInactiveWarning: (id: string) => api.post(`/admin/users/${id}/send-inactive-warning`),
+  sendBulkInactiveWarning: (userIds: string[]) =>
+    api.post('/admin/users/send-bulk-inactive-warning', { user_ids: userIds }),
+  reactivateUser: (id: string) => api.post(`/admin/users/${id}/reactivate`),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
+  purgeUser: (id: string, body: { confirm_email: string }) =>
+    api.post(`/admin/users/${id}/purge`, body),
 };
 
 // Chatbot (Backend Flask) - caminho oficial nesta fase.

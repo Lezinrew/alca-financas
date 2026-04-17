@@ -1,52 +1,66 @@
-"""
-Serviço de e-mail para reset de senha.
-Em produção: configurar SMTP (SendGrid, etc.) e implementar send_reset_link.
-Em dev: loga o link no console para copiar e testar.
-"""
-import os
+"""Envio de e-mail com fallback em log estruturado (sem quebrar fluxos)."""
+from __future__ import annotations
+
 import logging
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def send_reset_link(email: str, reset_url: str) -> bool:
-    """
-    Envia e-mail com link de redefinição de senha.
-    Retorna True se enviado (ou em dev, se logado com sucesso).
-    """
-    smtp_configured = bool(os.getenv('SMTP_HOST') and os.getenv('SMTP_USER'))
-    if smtp_configured:
-        return _send_via_smtp(email, reset_url)
-    # Modo dev: logar link no console
-    logger.warning("SMTP não configurado. Modo dev: link de reset no console.")
-    print("\n" + "=" * 60)
-    print("[DEV] Link de redefinição de senha (não enviado por e-mail):")
-    print(reset_url)
-    print("=" * 60 + "\n")
-    return True
+def _parse_recipients(raw: str) -> List[str]:
+    return [p.strip() for p in (raw or "").replace(";", ",").split(",") if p.strip()]
 
 
-def _send_via_smtp(email: str, reset_url: str) -> bool:
-    """Envia e-mail via SMTP quando configurado."""
+def send_email(
+    *,
+    to_addresses: List[str],
+    subject: str,
+    text_body: str,
+    html_body: Optional[str] = None,
+) -> None:
+    """
+    Envia via SMTP se SMTP_HOST estiver definido; caso contrário registra log estruturado.
+    """
+    to_addresses = [t for t in to_addresses if t]
+    if not to_addresses:
+        logger.warning("email_service: lista de destinatários vazia, assunto=%s", subject)
+        return
+
+    host = (os.getenv("SMTP_HOST") or "").strip()
+    port = int(os.getenv("SMTP_PORT") or "587")
+    user = (os.getenv("SMTP_USER") or "").strip()
+    password = (os.getenv("SMTP_PASSWORD") or "").strip()
+    mail_from = (os.getenv("EMAIL_FROM") or user or "no-reply@alca.financas").strip()
+
+    if not host:
+        logger.info(
+            "email_service:fallback_log to=%s subject=%s body_preview=%s",
+            to_addresses,
+            subject,
+            (text_body or "")[:500],
+        )
+        return
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = mail_from
+    msg["To"] = ", ".join(to_addresses)
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    if html_body:
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Alça Finanças - Redefinir senha'
-        msg['From'] = os.getenv('SMTP_FROM', os.getenv('SMTP_USER', ''))
-        msg['To'] = email
-        text = f"Use o link abaixo para redefinir sua senha (válido por 1 hora):\n\n{reset_url}"
-        html = f"<p>Use o link abaixo para redefinir sua senha (válido por 1 hora):</p><p><a href=\"{reset_url}\">{reset_url}</a></p>"
-        msg.attach(MIMEText(text, 'plain'))
-        msg.attach(MIMEText(html, 'html'))
-
-        with smtplib.SMTP(os.getenv('SMTP_HOST'), int(os.getenv('SMTP_PORT', 587))) as server:
-            server.starttls()
-            server.login(os.getenv('SMTP_USER', ''), os.getenv('SMTP_PASSWORD', ''))
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        logger.exception("Erro ao enviar e-mail de reset: %s", e)
-        return False
+        with smtplib.SMTP(host, port, timeout=30) as server:
+            if os.getenv("SMTP_TLS", "true").strip().lower() in ("1", "true", "yes"):
+                server.starttls()
+            if user and password:
+                server.login(user, password)
+            server.sendmail(mail_from, to_addresses, msg.as_string())
+        logger.info("email_service:sent to=%s subject=%s", to_addresses, subject)
+    except Exception as exc:
+        logger.error("email_service:smtp_failed to=%s subject=%s err=%s", to_addresses, subject, exc)
+        raise

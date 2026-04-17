@@ -82,6 +82,25 @@ const PublicRoute: React.FC<RouteWrapperProps> = ({ children }) => {
   return <>{children}</>;
 };
 
+const AdminRoute: React.FC<RouteWrapperProps> = ({ children }) => {
+  const { user, loading, isAuthenticated } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const isAdmin = user?.role === 'admin' || user?.is_admin;
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 // Componente que cria as rotas dentro do contexto do AuthProvider
 const AppRoutes: React.FC = () => {
   return (
@@ -149,11 +168,11 @@ const AppRoutes: React.FC = () => {
           <Route path="import" element={<Import />} />
 
           {/* Admin Routes */}
-          <Route path="admin" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="admin/dashboard" element={<AdminDashboard />} />
-          <Route path="admin/users" element={<UserManagement />} />
-          <Route path="admin/users/:userId" element={<UserDetail />} />
-          <Route path="admin/logs" element={<AdminLogs />} />
+          <Route path="admin" element={<AdminRoute><Navigate to="/admin/dashboard" replace /></AdminRoute>} />
+          <Route path="admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+          <Route path="admin/users/:userId" element={<AdminRoute><UserDetail /></AdminRoute>} />
+          <Route path="admin/logs" element={<AdminRoute><AdminLogs /></AdminRoute>} />
         </Route>
 
         {/* Redirecionar qualquer outra rota */}

@@ -157,6 +157,8 @@ try:
         app.config['GOAL_REPO'] = GoalRepositorySupabase()
         app.config['MERCHANT_ALIAS_REPO'] = MerchantAliasRepositorySupabase()
         app.config['FINANCIAL_EXPENSE_REPO'] = FinancialExpenseRepository()
+        # E-mails extra para alertas administrativos (vírgulas). Se vazio, usa admins ativos em public.users.
+        app.config['ADMIN_ALERT_EMAILS'] = os.getenv('ADMIN_ALERT_EMAILS', '').strip()
 
         app.config['USERS'] = app.config['USER_REPO']
         app.config['CATEGORIES'] = app.config['CATEGORY_REPO']

@@ -1,229 +1,524 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-interface User {
-    id: string;
-    name: string;
-    email: string;
-    is_admin: boolean;
-    is_blocked: boolean;
-    created_at: string;
-    auth_provider: string;
+interface AdminUserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  is_admin?: boolean;
+  created_at?: string | null;
+  last_login_at?: string | null;
+  last_activity_at?: string | null;
+  inactive_warning_sent_at?: string | null;
+  scheduled_deletion_at?: string | null;
+  auth_providers?: { provider?: string }[];
+}
+
+const ADMIN_CARD =
+  'rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-dark-border dark:bg-dark-surface dark:shadow-none';
+const ADMIN_TABLE_SHELL = `${ADMIN_CARD} overflow-hidden`;
+
+const statusLabel: Record<string, string> = {
+  active: 'Ativo',
+  inactive: 'Inativo',
+  pending_deletion: 'Pendente exclusão',
+  disabled: 'Desativado',
+};
+
+function formatDt(v?: string | null) {
+  if (!v) return '—';
+  try {
+    return new Date(v).toLocaleString('pt-BR');
+  } catch {
+    return v;
+  }
 }
 
 const UserManagement: React.FC = () => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [search, setSearch] = useState('');
-    const { user: currentUser } = useAuth();
-    const navigate = useNavigate();
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [stats, setStats] = useState<{
+    total_users: number;
+    active: number;
+    inactive: number;
+    pending_deletion: number;
+    disabled: number;
+    admins: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [adminsOnly, setAdminsOnly] = useState(false);
+  const [purgeTarget, setPurgeTarget] = useState<AdminUserRow | null>(null);
+  const [purgeEmail, setPurgeEmail] = useState('');
+  const [purging, setPurging] = useState(false);
+  const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
 
-    const fetchUsers = async () => {
-        setLoading(true);
-        try {
-            const response = await adminAPI.getUsers(page, 10, search);
-            setUsers(response.data.users);
-            setTotalPages(response.data.pages);
-        } catch (error) {
-            console.error('Erro ao carregar usuários:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.is_admin;
 
-    useEffect(() => {
-        if (currentUser && !currentUser.is_admin) {
-            navigate('/dashboard');
-            return;
-        }
-        fetchUsers();
-    }, [currentUser, navigate, page, search]); // Re-fetch when page or search changes
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await adminAPI.getUserStats();
+      setStats(res.data);
+    } catch {
+      /* opcional */
+    }
+  }, []);
 
-    const handleBlockUser = async (userId: string, isBlocked: boolean) => {
-        if (!window.confirm(`Tem certeza que deseja ${isBlocked ? 'desbloquear' : 'bloquear'} este usuário?`)) return;
-        try {
-            await adminAPI.updateUserStatus(userId, { is_blocked: !isBlocked });
-            fetchUsers();
-        } catch (error) {
-            alert('Erro ao atualizar status do usuário');
-        }
-    };
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await adminAPI.getUsers(page, 15, search, statusFilter, adminsOnly);
+      setUsers(response.data.users);
+      setTotalPages(Math.max(1, response.data.pages ?? 1));
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error('Não foi possível carregar utilizadores.');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, statusFilter, adminsOnly]);
 
-    const handleDeleteUser = async (userId: string) => {
-        if (!window.confirm('ATENÇÃO: Isso irá deletar o usuário e TODOS os seus dados permanentemente. Continuar?')) return;
-        try {
-            await adminAPI.deleteUser(userId);
-            fetchUsers();
-        } catch (error) {
-            alert('Erro ao deletar usuário');
-        }
-    };
+  useEffect(() => {
+    if (currentUser && !isAdmin) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    void fetchStats();
+    void fetchUsers();
+  }, [currentUser, isAdmin, navigate, fetchUsers, fetchStats]);
 
-    const handlePromoteAdmin = async (userId: string, isAdmin: boolean) => {
-        if (!window.confirm(`Tem certeza que deseja ${isAdmin ? 'remover' : 'conceder'} privilégios de administrador?`)) return;
-        try {
-            await adminAPI.updateUserStatus(userId, { is_admin: !isAdmin });
-            fetchUsers();
-        } catch (error) {
-            alert('Erro ao atualizar privilégios');
-        }
-    };
-
-    return (
-        <div className="p-6">
-            <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="relative w-full md:w-96">
-                    <input
-                        type="text"
-                        placeholder="Buscar por nome ou email..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1a1d29] text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    />
-                    <svg className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </div>
-                <button
-                    onClick={() => fetchUsers()}
-                    className="px-4 py-2 bg-white dark:bg-[#1a1d29] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                    Atualizar
-                </button>
-            </div>
-
-            <div className="bg-white dark:bg-[#1a1d29] rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Usuário</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Admin</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Origem</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Carregando...</td>
-                                </tr>
-                            ) : users.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Nenhum usuário encontrado</td>
-                                </tr>
-                            ) : (
-                                users.map((user) => (
-                                    <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                                                    {user.name.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div className="ml-4">
-                                                    <div className="text-sm font-medium text-slate-900 dark:text-white">{user.name}</div>
-                                                    <div className="text-sm text-slate-500 dark:text-slate-400">{user.email}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.is_blocked
-                                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                }`}>
-                                                {user.is_blocked ? 'Bloqueado' : 'Ativo'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.is_admin
-                                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
-                                                    : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'
-                                                }`}>
-                                                {user.is_admin ? 'Sim' : 'Não'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 capitalize">
-                                            {user.auth_provider}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex justify-end space-x-2">
-                                                <button
-                                                    onClick={() => navigate(`/admin/users/${user.id}`)}
-                                                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                    title="Ver Detalhes"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleBlockUser(user.id, user.is_blocked)}
-                                                    className={`p-2 rounded-lg transition-colors ${user.is_blocked
-                                                            ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                                            : 'text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20'
-                                                        }`}
-                                                    title={user.is_blocked ? "Desbloquear" : "Bloquear"}
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handlePromoteAdmin(user.id, user.is_admin)}
-                                                    className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                                                    title={user.is_admin ? "Remover Admin" : "Tornar Admin"}
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteUser(user.id)}
-                                                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                    title="Deletar Usuário"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Pagination */}
-                <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                    <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                    >
-                        Anterior
-                    </button>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">
-                        Página {page} de {totalPages}
-                    </span>
-                    <button
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                    >
-                        Próxima
-                    </button>
-                  </div>
-              </div>
-          </div>
-      );
+  const applySearch = () => {
+    setPage(1);
+    setSearch(searchInput.trim());
   };
+
+  const patchStatus = async (id: string, status: string) => {
+    try {
+      await adminAPI.patchUserStatus(id, status);
+      toast.success('Estado atualizado.');
+      await fetchUsers();
+      await fetchStats();
+    } catch {
+      toast.error('Falha ao atualizar estado.');
+    }
+  };
+
+  const patchRole = async (id: string, role: 'admin' | 'user') => {
+    if (!window.confirm(role === 'admin' ? 'Promover a administrador?' : 'Remover privilégios de administrador?')) return;
+    try {
+      await adminAPI.patchUserRole(id, role);
+      toast.success('Papel atualizado.');
+      await fetchUsers();
+      await fetchStats();
+    } catch {
+      toast.error('Falha ao atualizar papel.');
+    }
+  };
+
+  const sendWarning = async (id: string) => {
+    try {
+      const res = await adminAPI.sendInactiveWarning(id);
+      if (res.data?.skipped) toast('Aviso já tinha sido registado para este utilizador.');
+      else toast.success('Aviso enviado (ou registado em log se SMTP não configurado).');
+      await fetchUsers();
+    } catch {
+      toast.error('Falha ao enviar aviso.');
+    }
+  };
+
+  const deactivate = async (id: string) => {
+    if (!window.confirm('Desativar esta conta? O utilizador deixará de aceder (remoção lógica).')) return;
+    try {
+      await adminAPI.deleteUser(id);
+      toast.success('Conta desativada.');
+      await fetchUsers();
+      await fetchStats();
+    } catch {
+      toast.error('Não foi possível desativar.');
+    }
+  };
+
+  const openPurge = (u: AdminUserRow) => {
+    setPurgeTarget(u);
+    setPurgeEmail('');
+  };
+
+  const closePurge = () => {
+    setPurgeTarget(null);
+    setPurgeEmail('');
+  };
+
+  const submitPurge = async () => {
+    if (!purgeTarget) return;
+    setPurging(true);
+    try {
+      await adminAPI.purgeUser(purgeTarget.id, { confirm_email: purgeEmail.trim() });
+      toast.success('Conta e dados apagados permanentemente.');
+      closePurge();
+      await fetchUsers();
+      await fetchStats();
+    } catch (e: unknown) {
+      const msg =
+        (e as { response?: { data?: { error?: string; detail?: string } } })?.response?.data?.error ||
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg ? String(msg) : 'Falha na exclusão total.');
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const reactivate = async (id: string) => {
+    try {
+      await adminAPI.reactivateUser(id);
+      toast.success('Conta reativada.');
+      await fetchUsers();
+      await fetchStats();
+    } catch {
+      toast.error('Falha ao reativar.');
+    }
+  };
+
+  const authProvider = (u: AdminUserRow) => {
+    const p = u.auth_providers?.[0];
+    return (p?.provider as string) || 'email';
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Administração — Utilizadores</h1>
+        <button
+          type="button"
+          onClick={() => {
+            void fetchUsers();
+            void fetchStats();
+          }}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+        >
+          Atualizar
+        </button>
+      </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          {[
+            { k: 'Total', v: stats.total_users },
+            { k: 'Ativos', v: stats.active },
+            { k: 'Inativos', v: stats.inactive },
+            { k: 'Pend. exclusão', v: stats.pending_deletion },
+            { k: 'Desativados', v: stats.disabled },
+            { k: 'Admins', v: stats.admins },
+          ].map((c) => (
+            <div key={c.k} className={`${ADMIN_CARD} p-4`}>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-dark-text-muted">
+                {c.k}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{c.v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="relative w-full max-w-md flex-1">
+          <input
+            id="admin-user-search"
+            name="admin-user-search"
+            type="text"
+            placeholder="Nome ou e-mail…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-24 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-surface dark:text-white"
+          />
+          <svg
+            className="absolute left-3 top-2.5 h-5 w-5 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <button
+            type="button"
+            onClick={applySearch}
+            className="absolute right-2 top-1.5 rounded-lg bg-primary px-3 py-1 text-xs font-medium text-white"
+          >
+            Buscar
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(['all', 'active', 'inactive', 'pending_deletion', 'disabled'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                setPage(1);
+                setStatusFilter(s);
+                setAdminsOnly(false);
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                statusFilter === s && !adminsOnly
+                  ? 'bg-primary text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+              }`}
+            >
+              {s === 'all' ? 'Todos' : statusLabel[s] || s}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              setPage(1);
+              setAdminsOnly(true);
+              setStatusFilter('all');
+            }}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+              adminsOnly ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+            }`}
+          >
+            Admins
+          </button>
+        </div>
+      </div>
+
+      <div className={ADMIN_TABLE_SHELL}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-dark-border dark:bg-dark-surface-elevated dark:text-dark-text-muted">
+                <th className="px-4 py-3">Utilizador</th>
+                <th className="px-4 py-3">Papel</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Criado</th>
+                <th className="px-4 py-3">Último login</th>
+                <th className="px-4 py-3">Última atividade</th>
+                <th className="px-4 py-3">Aviso inat.</th>
+                <th className="px-4 py-3">Exclusão agend.</th>
+                <th className="px-4 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-dark-border">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-slate-500 dark:text-dark-text-muted">
+                    A carregar…
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-slate-500 dark:text-dark-text-muted">
+                    Nenhum utilizador encontrado.
+                  </td>
+                </tr>
+              ) : (
+                users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-dark-surface-hover/40">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-900 dark:text-white">{u.name}</div>
+                      <div className="text-xs text-slate-600 dark:text-dark-text-secondary">{u.email}</div>
+                      <div className="mt-0.5 text-[10px] uppercase text-slate-500 dark:text-dark-text-muted">
+                        {authProvider(u)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          u.role === 'admin'
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}
+                      >
+                        {u.role === 'admin' ? 'admin' : 'user'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-medium text-slate-700 dark:text-dark-text-secondary">
+                        {statusLabel[u.status] || u.status}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-dark-text-secondary">
+                      {formatDt(u.created_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-dark-text-secondary">
+                      {formatDt(u.last_login_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-dark-text-secondary">
+                      {formatDt(u.last_activity_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-dark-text-secondary">
+                      {formatDt(u.inactive_warning_sent_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-dark-text-secondary">
+                      {formatDt(u.scheduled_deletion_at)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/admin/users/${u.id}`)}
+                          className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        >
+                          Detalhe
+                        </button>
+                        {u.role !== 'admin' ? (
+                          <button
+                            type="button"
+                            onClick={() => patchRole(u.id, 'admin')}
+                            className="rounded-lg px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                          >
+                            Admin
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => patchRole(u.id, 'user')}
+                            className="rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          >
+                            Remover admin
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => patchStatus(u.id, 'inactive')}
+                          className="rounded-lg px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                        >
+                          Inativo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => patchStatus(u.id, 'pending_deletion')}
+                          className="rounded-lg px-2 py-1 text-xs text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-900/20"
+                        >
+                          Pend. exclusão
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => reactivate(u.id)}
+                          className="rounded-lg px-2 py-1 text-xs text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-900/20"
+                        >
+                          Reativar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => sendWarning(u.id)}
+                          className="rounded-lg px-2 py-1 text-xs text-cyan-700 hover:bg-cyan-50 dark:text-cyan-300 dark:hover:bg-cyan-900/20"
+                        >
+                          Aviso
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deactivate(u.id)}
+                          className="rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          Desativar
+                        </button>
+                        {currentUser?.id !== u.id && (
+                          <button
+                            type="button"
+                            onClick={() => openPurge(u)}
+                            className="rounded-lg border border-red-200/80 bg-red-50/80 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70"
+                          >
+                            Excluir total
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 dark:border-dark-border">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Anterior
+          </button>
+          <span className="text-xs text-slate-500 dark:text-dark-text-muted">
+            Página {page} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Seguinte
+          </button>
+        </div>
+      </div>
+
+      {purgeTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="purge-dialog-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-dark-border dark:bg-dark-surface">
+            <h2 id="purge-dialog-title" className="text-lg font-bold text-slate-900 dark:text-white">
+              Exclusão total da conta
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-dark-text-secondary">
+              Isto remove o utilizador do Auth, apaga o perfil em <span className="font-mono">public.users</span> e todos
+              os dados em cascata. Não pode ser desfeito.
+            </p>
+            <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+              Alvo: {purgeTarget.name}{' '}
+              <span className="font-normal text-slate-500 dark:text-dark-text-muted">({purgeTarget.email})</span>
+            </p>
+            <label htmlFor="purge-confirm-email" className="mt-4 block text-sm font-medium text-slate-700 dark:text-dark-text-secondary">
+              Escreva o e-mail do utilizador para confirmar
+            </label>
+            <input
+              id="purge-confirm-email"
+              name="purge-confirm-email"
+              type="email"
+              autoComplete="off"
+              value={purgeEmail}
+              onChange={(e) => setPurgeEmail(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-surface-elevated dark:text-white"
+              placeholder={purgeTarget.email}
+            />
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closePurge}
+                disabled={purging}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-dark-border dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitPurge()}
+                disabled={purging}
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {purging ? 'A apagar…' : 'Apagar permanentemente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default UserManagement;

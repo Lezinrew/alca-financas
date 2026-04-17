@@ -186,10 +186,19 @@ def admin_required(f):
                 user = users_repo.find_by_id(request.user_id)
             else:
                 user = users_repo.find_one({"id": request.user_id})
-        
-        if not user or not user.get('is_admin'):
+
+        role = (user or {}).get("role") or "user"
+        is_admin_flag = bool((user or {}).get("is_admin")) or role == "admin"
+        setattr(request, "user_email", (user or {}).get("email") or "")
+
+        if not user or not is_admin_flag:
             return jsonify({'error': 'Acesso negado. Requer privilégios de administrador.'}), 403
-            
+
         return f(*args, **kwargs)
     return decorated
+
+
+def require_admin(f):
+    """Autenticação JWT + papel admin em public.users (uso: @require_admin)."""
+    return require_auth(admin_required(f))
 
