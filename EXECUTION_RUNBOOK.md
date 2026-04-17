@@ -247,6 +247,38 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **Histórico P0-C (contexto):** `JWT_SECRET` deixou de ser caminho principal do runtime ativo; `scripts/dev/up.sh` valida `SUPABASE_JWT_SECRET` e `SECRET_KEY`; fluxo principal é token Supabase nos helpers Supabase.
 - **Próximo passo imediato:** fechar **P0-D** (docs mínimas + este runbook alinhado), avançar **P0-B** (chatbot único / sem consumo legado na UI) e, quando existir ambiente de teste dedicado, correr **E2E (Playwright)** manualmente ou reintegrar no CI com `if` condicionado a secrets.
 
+### Atualização de execução — importação OFX Nubank (compatibilidade jan/fev/mar 2026)
+
+- **Contexto:** importação de OFX do Nubank falhava com `400` na autodetecção de conta (`Não foi possível identificar a conta de destino...`) e havia perda de transações por parsing de valores negativos no fluxo de importação bancária.
+- **Causa raiz (conta):**
+  - variações de layout OFX Nubank (`BANKID` com zero à esquerda, `ACCTID` com hífen, `ORG=NU PAGAMENTOS S.A.`) não eram normalizadas de forma consistente;
+  - uso de `find(... ) or find(...)` em elementos XML podia descartar nós válidos sem filhos (`Element` vazio é falsey), degradando extração de `BANKID/BRANCHID/ACCTID`.
+- **Causa raiz (valores):**
+  - parser de importação reaproveitava utilitário monetário global que rejeita `<= 0`; em extrato bancário isso removia débitos legítimos (valores negativos), reduzindo contagem importada.
+- **Correções aplicadas (backend):**
+  - `backend/services/account_detector.py`
+    - normalização de instituição (`NU PAGAMENTOS` -> `Nubank`);
+    - suporte a códigos bancários com e sem zero à esquerda (`0260/260`, etc.);
+    - normalização de número de conta (remove pontuação/hífen);
+    - fallback por nome de ficheiro (`NU_93015865_...ofx`) quando `ACCTID` ausente;
+    - helper `_find_first_element(...)` para evitar curto-circuito indevido de nós XML.
+  - `backend/routes/transactions.py`
+    - passa `file.filename` para `extract_account_info_from_ofx(...)`, habilitando fallback e heurísticas por nome do ficheiro.
+  - `backend/services/import_service.py`
+    - parse monetário assinado para importação (`_parse_signed_money_value`) preservando sinal;
+    - enriquecimento de OFX em `raw_data` (`memo_original`, `memo_type`, `counterparty_name`, `is_reversal`, `pix_details`);
+    - normalização de descrição para Pix (`Pix recebido/enviado`, `Estorno Pix`) mantendo memo original para rastreio.
+  - `backend/tests/test_import.py`
+    - cobertura para layout real Nubank (`BANKID 0260`, `ACCTID` com hífen, `ORG NU PAGAMENTOS S.A.`);
+    - cobertura para fallback por filename sem `ACCTID`;
+    - cobertura para `CCACCTFROM` (cartão) e normalização de descrição Pix + `pix_details`.
+- **Validação com ficheiros reais (Downloads):**
+  - `NU_93015865_01JAN2026_31JAN2026.ofx` -> **119** transações;
+  - `NU_93015865_01FEV2026_28FEV2026.ofx` -> **167** transações;
+  - `NU_93015865_01MAR2026_15MAR2026.ofx` -> **74** transações;
+  - conta detectada consistentemente: instituição `Nubank`, `account_number=93015865`, `bank_id=0260`, `branch_id=1`.
+- **Status:** frente OFX Nubank estabilizada para lote mensal (jan/fev/mar) com deduplicação por `FITID` preservada no fluxo de importação.
+
 ### Atualização de execução — bootstrap/tenant (resolvido para fluxo validado)
 
 - **Contexto:** após resolver a frente JWT (token Supabase válido aceito pelo backend), o bloqueio remanescente era `tenant_bootstrap_failed` em `POST /api/auth/bootstrap`, com cascata `tenant_required` em `/api/dashboard` e `/api/accounts`.
