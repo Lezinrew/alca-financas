@@ -234,4 +234,4 @@ Get-Content frontend.log -Tail 50
 
 ---
 
-_Última atualização: 2026-04-16_
+_Última atualização: 2026-04-17_

@@ -4,6 +4,14 @@ Documento gerado a partir da avaliação da estrutura do projeto. Itens prioriza
 
 ---
 
+## Registro de entregas (não apagar — atualizar datas)
+
+| Data | Entrega | Referência |
+|------|---------|------------|
+| 2026-04-17 | Módulo admin (API + UI), tema escuro nas páginas admin, exclusão total (`purge`), auditoria `purge_user` nos logs, mitigação 429 `/api/auth/me`, migration `20260417000002`, script `scripts/supabase-wipe-all-data.sql` | `EXECUTION_RUNBOOK.md` secção Admin; `TODO.md` “Concluído recentemente” |
+
+---
+
 ## Limpeza / Dívida técnica
 
 | Prioridade | Descrição | Onde | Ação sugerida |

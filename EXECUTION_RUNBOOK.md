@@ -240,7 +240,8 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 ## 11) Registro rápido de execução (preencher durante a fase)
 
 - **Data início:** 2026-04-14
-- **Última atualização runbook:** 2026-04-16 (revisão operacional alinhada ao repo: RLS `00003`/`00004`, smoke estendido, fix singleton Supabase em `supabase_auth_service`, warning de role JWT em `connection.py`, P0-B UI/chatbot)
+- **Última atualização runbook:** 2026-04-17 (módulo administrativo, UI admin em modo escuro, exclusão total de conta, logs; ver secção **Admin** abaixo)
+- **Atualização anterior:** 2026-04-16 (revisão operacional alinhada ao repo: RLS `00003`/`00004`, smoke estendido, fix singleton Supabase em `supabase_auth_service`, warning de role JWT em `connection.py`, P0-B UI/chatbot)
 - **Bloco atual:** P0-D (documentação mínima crítica) e, em paralelo, **P0-B** (runtime único do chatbot) conforme capacidade do time
 - **Responsável:** Backend owner + Infra/Docs owner (conforme trilha)
 - **Status (frente auth/bootstrap/tenant):** migrations `20260416000001` … `20260416000004` aplicáveis em Supabase (reconcile + RLS users/tenants/members + **accounts** + **categories/transactions** via `tenant_members`); smoke **`/api/health` → bootstrap → me → accounts → categories → transactions`** (`scripts/prod/smoke-auth-bootstrap.sh`); regressão de conflito email legado coberta em CI por `backend/tests/unit/test_auth_bootstrap_service.py` (ex.: `test_bootstrap_reconciles_stale_email_without_memberships`, `test_bootstrap_blocks_conflicting_email_when_legacy_has_membership`) e `test_tenant_context.py` (fallback bootstrap); ver secção CI acima.
@@ -376,6 +377,19 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - **`mobile/`:** sem referências a endpoints de chat legados (grep na data acima).
 - **Compose:** `docker-compose.yml` / `docker-compose.prod.yml` não sobem `services/chatbot` por omissão; OpenClaw (gateway/bridge) é stack à parte.
 - **Legado no repo:** `services/chatbot/app.py` (FastAPI) — ver **`services/chatbot/README.md`**. Próximo passo formal de P0-B: arquivoção/remoção após checklist de validação em produção, sem reintroduzir consumo `/api/chat*` na UI.
+
+### Atualização de execução — Módulo administrativo, UI dark, exclusão total e `/api/auth/me` (2026-04-17)
+
+- **Contexto:** painel admin com cartões claros no tema escuro; necessidade de **exclusão permanente** de conta (além de desativação lógica); risco de **429** por limite global do Flask-Limiter em rajadas de `GET /api/auth/me` (bootstrap, HMR, vários componentes).
+- **Base de dados:** migration `supabase/migrations/20260417000002_admin_users_audit_notifications.sql` — `public.users` com `role`/`status`/timestamps de ciclo de vida; `public.admin_audit_logs`; `public.admin_notification_delivery`; checks e índices. **Aplicar no Supabase de cada ambiente** na ordem correta relativamente às migrations já existentes (`20260416000001`… e anteriores).
+- **Backend (Flask):**
+  - Rotas em `backend/routes/admin.py`: estatísticas, listagem/filtros de utilizadores, papel e estado, avisos de inatividade, export CSV, `POST /api/admin/users/<id>/purge` com corpo `{ "confirm_email": "<email do alvo>" }` (validação de e-mail, não auto-purge, não último admin).
+  - **Purge:** apaga utilizador em **Auth** via `auth.admin.delete_user` (cliente criado com **`SUPABASE_SERVICE_ROLE_KEY`** obrigatória) e remove a linha em **`public.users`** (`AdminUserRepository.delete_user_row`); dados da app ligados ao `user_id` seguem **ON DELETE CASCADE** onde definido.
+  - Serviços/repositórios: `admin_user_service`, `admin_user_repository`, `admin_audit_repository`, `admin_notification_service`, ciclo de vida / atividade conforme ficheiros em `backend/services/`.
+  - **`GET /api/auth/me`:** `@limiter.exempt` em `backend/routes/auth.py` para não consumir o teto global por refreshes legítimos.
+- **Frontend:** páginas `AdminDashboard`, `UserManagement`, `UserDetail`, `AdminLogs` com superfícies Tailwind alinhadas a tokens `dark-surface` / `dark-border` / `dark-text-*`; modal de purge com confirmação por e-mail; `adminAPI.purgeUser`; entrada de ação **`purge_user`** na UI de logs; campo de pesquisa admin com `id`/`name` para acessibilidade.
+- **Script operacional (dev/staging):** `scripts/supabase-wipe-all-data.sql` — truncates em `public.*` + remoção em `auth.users`; **nunca** correr em produção sem backup e confirmação explícita do projeto no dashboard Supabase.
+- **Validação sugerida:** login como admin → `/admin/dashboard` → `/admin/users` → ações não destrutivas; purge apenas em utilizador de teste com `SUPABASE_SERVICE_ROLE_KEY` configurada; `GET /api/auth/me` sem 429 em navegação normal; logs em `/admin/logs` com ação `purge_user` após purge.
 
 ## 12) Matriz operacional simplificada
 

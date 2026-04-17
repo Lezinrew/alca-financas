@@ -1,14 +1,18 @@
 # TODO.md - Alça Finanças
 
-**Última atualização:** 2026-04-16  
-**Status:** 🟡 Em progresso — P0-B (runtime único chatbot) e P0-D (docs mínimas) em curso; frente **auth/RLS/tenant** estável no código e nas migrations `00001`–`00004` (aplicar no Supabase de cada ambiente).
+**Última atualização:** 2026-04-17  
+**Status:** 🟡 Em progresso — P0-B (runtime único chatbot) e P0-D (docs mínimas) em curso; frente **auth/RLS/tenant** estável no código e nas migrations `00001`–`00004` (aplicar no Supabase de cada ambiente). **Admin:** migration `20260417000002` + código alinhados — aplicar migration em cada ambiente antes de usar purge em produção.
 
 ### Concluído recentemente (código na `main`)
 
+- **Módulo administrativo (2026-04-17):** API `/api/admin/*` (stats, utilizadores, papel/estado, avisos inatividade, export CSV), auditoria em `admin_audit_logs`, notificações; **`POST /api/admin/users/<id>/purge`** (exclusão total: Auth + `public.users` com confirmação por e-mail; requer **`SUPABASE_SERVICE_ROLE_KEY`**).
+- **UI admin modo escuro:** `AdminDashboard`, `UserManagement`, `UserDetail`, `AdminLogs` com tokens Tailwind `dark-surface` / `dark-border` / `dark-text-*`; modal de purge; ação `purge_user` nos logs.
+- **429 em `GET /api/auth/me`:** rota isenta do limiter global no Flask + throttle no `AuthContext` ao sincronizar perfil com o backend.
 - RLS `accounts` / `categories` / `transactions` por **membership** (`tenant_members`), sem depender de claim `tenant_id` no JWT (`20260416000003`, `20260416000004`).
 - **Cliente Supabase singleton:** removido `set_session` em `get_user` sobre o cliente global; `sign_out` usa cliente efémero — evita PostgREST com JWT de utilizador e **42501** em writes após `GET /api/auth/me`.
 - Smoke pós-deploy: `scripts/prod/smoke-auth-bootstrap.sh` cobre health → bootstrap → me → accounts → categories → transactions.
 - Verificação SQL: `scripts/sql/verify_bootstrap_rls_and_data.sql`; checklist incidente: `backend/EXECUTION_TENANT_BOOTSTRAP_CHECKLIST.md`.
+- **Runbook:** `EXECUTION_RUNBOOK.md` (secção Admin 2026-04-17); `supabase/DEPLOY_RUNBOOK.md` (migrations posteriores ao pacote 001–004).
 
 ---
 
@@ -278,9 +282,10 @@
 
 1. **Docker parado** = dev travado
 2. **Chatbot duplicado** = ambiguidade de runtime até P0-B fechado
-3. **Migrations não aplicadas no Supabase remoto** = schema/RLS divergente do repo (`00001`–`00004`)
-4. **`SUPABASE_SERVICE_ROLE_KEY` errada (anon no lugar de service_role)** = 42501 em writes mesmo com código correto
+3. **Migrations não aplicadas no Supabase remoto** = schema/RLS divergente do repo (`00001`–`00004` e posteriores, **incl. admin `20260417000002`**)
+4. **`SUPABASE_SERVICE_ROLE_KEY` errada (anon no lugar de service_role)** = 42501 em writes mesmo com código correto; **purge admin** devolve `503 service_role_required` sem chave de serviço
 5. **Python 3.9** = urllib3 pode quebrar em update
+6. **`scripts/supabase-wipe-all-data.sql`** = destrutivo total; só em dev/staging com projeto confirmado no Supabase
 
 ---
 
