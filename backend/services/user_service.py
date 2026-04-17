@@ -57,7 +57,9 @@ def create_user(users_repo_or_collection, data: Dict[str, Any], hash_password):
             'language': 'pt'
         },
         'auth_providers': [],
-        'is_admin': False
+        'is_admin': False,
+        'role': data.get('role') or 'user',
+        'status': data.get('status') or 'active',
     }
     
     # Verificar se é repositório Supabase ou collection MongoDB

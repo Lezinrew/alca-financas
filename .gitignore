@@ -51,6 +51,11 @@ debug_google_login.sh
 fix_google_login.sh
 test_*.sh
 
+# Python / pytest
+.coverage
+backend/.coverage
+htmlcov/
+
 # Build outputs
 dist/
 build/

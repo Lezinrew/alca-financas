@@ -210,7 +210,75 @@ def test_bootstrap_reconciles_stale_email_without_memberships(app_ctx, monkeypat
     assert users_repo.deleted == ["legacy-id"]
 
 
-def test_bootstrap_blocks_conflicting_email_when_legacy_has_membership(app_ctx, monkeypatch):
+def test_bootstrap_idempotent_when_create_races_on_same_pkey(app_ctx, monkeypatch):
+    """Dois pedidos paralelos: insert duplicado na mesma PK mas a linha já existe — segue sem 503."""
+    users_repo = FakeUsersRepo()
+    tenant_repo = FakeTenantRepo()
+    service = AuthBootstrapService(tenant_repo=tenant_repo)
+
+    monkeypatch.setattr(
+        service,
+        "_extract_profile_from_auth",
+        lambda *_a, **_kw: ("Paralelo", "race@example.com"),
+    )
+
+    def _create_then_raise_pkey_conflict(repo, payload, hash_password=None):
+        repo.create(payload)
+        exc = Exception("duplicate key")
+        exc.code = "23505"
+        exc.message = 'duplicate key value violates unique constraint "users_pkey"'
+        exc.details = f'Key (id)=({payload["id"]}) already exists.'
+        raise exc
+
+    monkeypatch.setattr("services.bootstrap_service.create_user", _create_then_raise_pkey_conflict)
+
+    uid = "race-user-id"
+    result = service.ensure_user_and_tenant(
+        user_id=uid,
+        users_repo=users_repo,
+        access_token="token",
+    )
+
+    assert users_repo.find_by_id(uid) is not None
+    assert result.tenant_id == f"tenant-{uid}"
+    assert result.user_created is False
+
+
+def test_bootstrap_raises_when_stale_row_remains_after_delete(app_ctx, monkeypatch):
+    """Se delete não remove o legado, falhar cedo em vez de 23505 opaco no insert."""
+    users_repo = FakeUsersRepo()
+    users_repo.create(
+        {"id": "legacy-id", "name": "Legacy", "email": "same@example.com", "password": ""}
+    )
+
+    class _NoOpDeleteRepo(FakeUsersRepo):
+        def delete(self, user_id):
+            return True
+
+    noop_repo = _NoOpDeleteRepo()
+    noop_repo.rows = users_repo.rows
+    tenant_repo = FakeTenantRepo()
+    service = AuthBootstrapService(tenant_repo=tenant_repo)
+
+    monkeypatch.setattr(
+        service,
+        "_extract_profile_from_auth",
+        lambda *_: ("Novo", "same@example.com"),
+    )
+
+    with pytest.raises(TenantBootstrapError) as exc:
+        service.ensure_user_and_tenant(
+            user_id="new-auth-id",
+            users_repo=noop_repo,
+            access_token="token",
+        )
+
+    assert exc.value.status_code == 503
+    assert "libertar" in exc.value.message.lower() or "antigo" in exc.value.message.lower()
+
+
+def test_bootstrap_reclaims_email_when_legacy_has_membership_same_email_new_sub(app_ctx, monkeypatch):
+    """Mesmo email + id public legado ≠ novo auth sub: remove legado (órfão pós-recreate no Auth)."""
     users_repo = FakeUsersRepo()
     users_repo.create(
         {"id": "legacy-id", "name": "Legacy", "email": "same@example.com", "password": ""}
@@ -227,14 +295,14 @@ def test_bootstrap_blocks_conflicting_email_when_legacy_has_membership(app_ctx, 
     )
     monkeypatch.setattr("services.bootstrap_service.create_user", lambda repo, payload, **_: repo.create(payload))
 
-    with pytest.raises(TenantBootstrapError) as exc:
-        service.ensure_user_and_tenant(
-            user_id="new-auth-id",
-            users_repo=users_repo,
-            access_token="token",
-            jwt_claims={"email": "same@example.com"},
-        )
+    result = service.ensure_user_and_tenant(
+        user_id="new-auth-id",
+        users_repo=users_repo,
+        access_token="token",
+        jwt_claims={"email": "same@example.com"},
+    )
 
-    assert exc.value.code == "tenant_bootstrap_failed"
-    assert exc.value.status_code == 503
-    assert "já está associado a outro perfil" in exc.value.message
+    assert result.tenant_id == "tenant-new-auth-id"
+    assert users_repo.find_by_id("legacy-id") is None
+    assert "legacy-id" in users_repo.deleted
+    assert users_repo.find_by_id("new-auth-id") is not None

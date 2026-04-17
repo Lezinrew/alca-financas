@@ -41,8 +41,8 @@ const AppShell = () => {
     { path: '/import', icon: Upload, label: 'Importar' },
   ];
 
-  if (user?.is_admin) {
-    navItems.push({ path: '/admin/dashboard', icon: Settings, label: 'Admin' });
+  if (user?.role === 'admin' || user?.is_admin) {
+    navItems.push({ path: '/admin/dashboard', icon: Settings, label: 'Administração' });
   }
 
   const handleLogout = async () => {
@@ -172,7 +172,7 @@ const AppShell = () => {
                   <Settings className="w-4 h-4 mr-3" />
                   Configurações
                 </button>
-                {user?.is_admin && (
+                {(user?.role === 'admin' || user?.is_admin) && (
                   <>
                     <div className="my-1 border-t border-slate-700" />
                     <button

@@ -3,6 +3,9 @@ import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
+const ADMIN_CARD =
+    'rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-surface dark:shadow-none';
+
 interface Stats {
     users: {
         total: number;
@@ -39,7 +42,8 @@ const AdminDashboard: React.FC = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (user && !user.is_admin) {
+        const isAdmin = user && (user.role === 'admin' || user.is_admin);
+        if (user && !isAdmin) {
             navigate('/dashboard');
             return;
         }
@@ -72,7 +76,7 @@ const AdminDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 {/* Card Usuários */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total de Usuários</p>
@@ -88,12 +92,12 @@ const AdminDashboard: React.FC = () => {
                         <span className="text-green-500 font-medium flex items-center">
                             +{stats?.users.new_this_month}
                         </span>
-                        <span className="text-slate-400 ml-2">novos este mês</span>
+                        <span className="ml-2 text-slate-400 dark:text-dark-text-muted">novos este mês</span>
                     </div>
                 </div>
 
                 {/* Card Transações */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total de Transações</p>
@@ -106,12 +110,12 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center text-sm">
-                        <span className="text-slate-400">Registros no banco</span>
+                        <span className="text-slate-400 dark:text-dark-text-muted">Registros no banco</span>
                     </div>
                 </div>
 
                 {/* Card Categorias */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Categorias</p>
@@ -124,12 +128,12 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center text-sm">
-                        <span className="text-slate-400">Total global</span>
+                        <span className="text-slate-400 dark:text-dark-text-muted">Total global</span>
                     </div>
                 </div>
 
                 {/* Card Status */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Status do Sistema</p>
@@ -142,7 +146,7 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center text-sm">
-                        <span className="text-slate-400">Operacional</span>
+                        <span className="text-slate-400 dark:text-dark-text-muted">Operacional</span>
                     </div>
                 </div>
             </div>
@@ -150,7 +154,7 @@ const AdminDashboard: React.FC = () => {
             {/* Additional Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 {/* Active Users 24h */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Usuários Ativos (24h)</p>
@@ -163,12 +167,12 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center text-sm">
-                        <span className="text-slate-400">Últimas 24 horas</span>
+                        <span className="text-slate-400 dark:text-dark-text-muted">Últimas 24 horas</span>
                     </div>
                 </div>
 
                 {/* Financial Volume */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Volume Financeiro</p>
@@ -183,12 +187,12 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center text-sm">
-                        <span className="text-slate-400">Total em transações</span>
+                        <span className="text-slate-400 dark:text-dark-text-muted">Total em transações</span>
                     </div>
                 </div>
 
                 {/* Total Accounts */}
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Contas Cadastradas</p>
@@ -201,31 +205,31 @@ const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center text-sm">
-                        <span className="text-slate-400">Total global</span>
+                        <span className="text-slate-400 dark:text-dark-text-muted">Total global</span>
                     </div>
                 </div>
             </div>
 
             {/* Top Categories */}
             {stats?.financial?.top_categories && stats.financial.top_categories.length > 0 && (
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-8">
+                <div className={`${ADMIN_CARD} mb-8`}>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">🏆 Top 10 Categorias Mais Usadas</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-700">
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">#</th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">Categoria</th>
-                                    <th className="text-right py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">Transações</th>
-                                    <th className="text-right py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">Total</th>
+                                <tr className="border-b border-slate-200 dark:border-dark-border">
+                                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">#</th>
+                                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">Categoria</th>
+                                    <th className="text-right py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">Transações</th>
+                                    <th className="text-right py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {stats.financial.top_categories.map((cat, idx) => (
-                                    <tr key={cat.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                        <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-300">{idx + 1}</td>
+                                    <tr key={cat.id} className="border-b border-slate-100 dark:border-dark-border hover:bg-slate-50 dark:hover:bg-dark-surface-hover/35">
+                                        <td className="py-3 px-4 text-sm text-slate-600 dark:text-dark-text-secondary">{idx + 1}</td>
                                         <td className="py-3 px-4 text-sm font-medium text-slate-900 dark:text-white">{cat.name}</td>
-                                        <td className="py-3 px-4 text-sm text-right text-slate-600 dark:text-slate-300">{cat.count}</td>
+                                        <td className="py-3 px-4 text-sm text-right text-slate-600 dark:text-dark-text-secondary">{cat.count}</td>
                                         <td className="py-3 px-4 text-sm text-right font-medium text-slate-900 dark:text-white">
                                             R$ {cat.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </td>
@@ -239,12 +243,12 @@ const AdminDashboard: React.FC = () => {
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-[#1a1d29] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className={ADMIN_CARD}>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Ações Rápidas</h3>
                     <div className="space-y-3">
                         <button
                             onClick={() => navigate('/admin/users')}
-                            className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="flex w-full items-center justify-between rounded-xl bg-slate-50 p-4 transition-colors hover:bg-slate-100 dark:bg-dark-surface-elevated/60 dark:hover:bg-dark-surface-hover/50"
                         >
                             <div className="flex items-center">
                                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg mr-3">
@@ -254,16 +258,16 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                                 <div className="text-left">
                                     <p className="font-medium text-slate-900 dark:text-white">Gerenciar Usuários</p>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">Listar, bloquear ou remover usuários</p>
+                                    <p className="text-sm text-slate-500 dark:text-dark-text-muted">Listar, bloquear ou remover utilizadores</p>
                                 </div>
                             </div>
-                            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-5 w-5 text-slate-400 dark:text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                         </button>
                         <button
                             onClick={() => navigate('/admin/logs')}
-                            className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="flex w-full items-center justify-between rounded-xl bg-slate-50 p-4 transition-colors hover:bg-slate-100 dark:bg-dark-surface-elevated/60 dark:hover:bg-dark-surface-hover/50"
                         >
                             <div className="flex items-center">
                                 <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg mr-3">
@@ -273,10 +277,10 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                                 <div className="text-left">
                                     <p className="font-medium text-slate-900 dark:text-white">Logs de Ações</p>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">Histórico de ações administrativas</p>
+                                    <p className="text-sm text-slate-500 dark:text-dark-text-muted">Histórico de ações administrativas</p>
                                 </div>
                             </div>
-                            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-5 w-5 text-slate-400 dark:text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                         </button>

@@ -61,14 +61,34 @@ class SupabaseAuthService:
                     'language': 'pt'
                 },
                 'auth_providers': [{'provider': 'email', 'email_verified': auth_user.email_confirmed_at is not None}],
-                'is_admin': False
+                'is_admin': False,
+                'role': 'user',
+                'status': 'active',
             }
             
-            # Verificar se já existe (pode acontecer em caso de retry)
             existing_user = self.user_repo.find_by_id(auth_user_id)
+            created_profile = False
             if not existing_user:
                 self.user_repo.create(user_data)
-            
+                created_profile = True
+
+            if created_profile:
+                try:
+                    from services.admin_notification_service import notify_new_account_if_needed
+
+                    u = self.user_repo.find_by_id(auth_user_id)
+                    if u:
+                        notify_new_account_if_needed(
+                            subject_user_id=str(auth_user_id),
+                            name=str(u.get("name") or name),
+                            email=str(u.get("email") or email),
+                            status=str(u.get("status") or "active"),
+                            tenant_id=None,
+                            source="supabase_auth_sign_up",
+                        )
+                except Exception as exc:
+                    logger.warning("sign_up notification skipped: %s", exc)
+
             # 3. Retornar dados formatados
             return {
                 'user': {
@@ -112,6 +132,13 @@ class SupabaseAuthService:
             auth_user = auth_response.user
             auth_user_id = auth_user.id
 
+            try:
+                from services.user_activity_service import record_login
+
+                record_login(self.user_repo, str(auth_user_id))
+            except Exception as exc:
+                logger.warning("sign_in: falha ao registar login/atividade: %s", exc)
+
             # Buscar dados customizados na tabela users (READ-ONLY no login)
             custom_user = self.user_repo.find_by_id(auth_user_id)
 
@@ -129,6 +156,10 @@ class SupabaseAuthService:
                     'name': name_from_custom or auth_user.user_metadata.get('name', email.split('@')[0]),
                     'email_verified': auth_user.email_confirmed_at is not None,
                     'settings': settings_from_custom,
+                    'role': (custom_user or {}).get('role', 'user'),
+                    'status': (custom_user or {}).get('status', 'active'),
+                    'is_admin': (custom_user or {}).get('role') == 'admin'
+                    or bool((custom_user or {}).get('is_admin')),
                 },
                 'access_token': auth_response.session.access_token,
                 'refresh_token': auth_response.session.refresh_token,
@@ -170,7 +201,9 @@ class SupabaseAuthService:
                 'email': auth_user.user.email,
                 'name': custom_user.get('name'),
                 'settings': custom_user.get('settings', {}),
-                'is_admin': custom_user.get('is_admin', False),
+                'role': custom_user.get('role', 'user'),
+                'status': custom_user.get('status', 'active'),
+                'is_admin': custom_user.get('role') == 'admin' or bool(custom_user.get('is_admin')),
                 'email_verified': auth_user.user.email_confirmed_at is not None
             }
         except Exception as e:

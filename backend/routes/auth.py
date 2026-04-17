@@ -174,18 +174,25 @@ def reset_password():
 
 
 @bp.route('/auth/me', methods=['GET'])
+@limiter.exempt
 @require_auth
 def get_user():
     users_collection = current_app.config['USERS']
     user = users_collection.find_one(_user_id_filter(request.user_id))
     if not user:
         return jsonify({'error': 'Usuário não encontrado'}), 404
+    role = user.get('role') or ('admin' if user.get('is_admin') else 'user')
+    status = user.get('status') or 'active'
+    is_admin = role == 'admin' or bool(user.get('is_admin'))
     return jsonify({
         'id': _user_id(user),
         'name': user['name'],
         'email': user['email'],
         'settings': user.get('settings', {}),
-        'auth_providers': user.get('auth_providers', [])
+        'auth_providers': user.get('auth_providers', []),
+        'role': role,
+        'status': status,
+        'is_admin': is_admin,
     })
 
 
