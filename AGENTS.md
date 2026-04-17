@@ -223,14 +223,15 @@ Get-Content frontend.log -Tail 50
 ## Current Priorities (TODO.md)
 
 **P0 - Bloqueantes:**
-1. ✅ Chatbot duplicado (confirmado)
+1. ✅ Chatbot duplicado (confirmado no código; fecho operacional = P0-B)
 2. ✅ JWT secrets dessincronizados (confirmado)
 3. ✅ Chatbot ausente em produção (confirmado)
 4. ✅ Frontend build path inexistente (confirmado)
 5. ✅ Docker mismatch backend (parcial)
+6. ✅ RLS `accounts`/`categories`/`transactions` + singleton Supabase (`set_session`) — ver `EXECUTION_RUNBOOK.md` e migrations `20260416000003`/`00004`
 
-**Próxima ação:** Aguardando correções P0 antes de deploy.
+**Próxima ação:** Aplicar migrations pendentes no Supabase de **cada** ambiente; fechar **P0-B** (sem consumo legado na UI) e **P0-D** (docs mínimas); **P0-A** se ainda houver segredos em ficheiros versionados.
 
 ---
 
-_Última atualização: 2026-04-09_
+_Última atualização: 2026-04-16_

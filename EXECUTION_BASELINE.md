@@ -17,6 +17,8 @@
 - **[FATO]** Estratégia de auth ativa converge para `SUPABASE_JWT_SECRET`, mas ainda há rastros de `JWT_SECRET` legado em scripts/utilitários.
 - **[FATO]** Há segredo sensível em arquivo versionado recomendado e chave hardcoded em script operacional.
 - **[FATO]** Há divergência documentada entre runtime real (`:8001`, `/api/chatbot/*`) e parte da documentação antiga.
+- **[FATO]** Policies RLS de dados tenant-aware (`accounts`, `categories`, `transactions`) foram alinhadas a **membership** em `tenant_members` (migrations `20260416000003` / `20260416000004`), para não depender de claim `tenant_id` no JWT do Supabase.
+- **[FATO]** O backend evita `auth.set_session` no cliente Supabase **singleton** usado por repositórios (`supabase_auth_service.get_user`), para não misturar contexto PostgREST do utilizador com writes do servidor.
 
 ## 3. Divergências ou ambiguidades entre relatórios
 
