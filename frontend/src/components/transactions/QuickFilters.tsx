@@ -7,7 +7,7 @@ interface QuickFiltersProps {
 }
 
 export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
-  const applyPreset = (preset: 'today' | '7d' | 'this_month') => {
+  const applyPreset = (preset: 'today' | '7d' | 'year_to_date' | 'this_month') => {
     onChange({
       datePreset: preset,
       page: 1,
@@ -61,6 +61,18 @@ export const QuickFilters: FC<QuickFiltersProps> = ({ filters, onChange }) => {
         onClick={() => applyPreset('7d')}
       >
         7 dias
+      </button>
+      <button
+        type="button"
+        className={
+          pillBase +
+          (filters.datePreset === 'year_to_date'
+            ? activeDatePill
+            : inactivePill)
+        }
+        onClick={() => applyPreset('year_to_date')}
+      >
+        Ano atual
       </button>
       <button
         type="button"

@@ -199,6 +199,14 @@ class TransactionRepository(BaseRepository):
                     start_date = (today - timedelta(days=6)).isoformat()
                     end_date = (today + timedelta(days=1)).isoformat()
                     query = query.gte("date", start_date).lt("date", end_date)
+                elif str(date_preset) == "last_90_days":
+                    start_date = (today - timedelta(days=89)).isoformat()
+                    end_date = (today + timedelta(days=1)).isoformat()
+                    query = query.gte("date", start_date).lt("date", end_date)
+                elif str(date_preset) in ("year_to_date", "ytd"):
+                    start_date = date(today.year, 1, 1).isoformat()
+                    end_date = (today + timedelta(days=1)).isoformat()
+                    query = query.gte("date", start_date).lt("date", end_date)
                 elif str(date_preset) == "last_month":
                     first_this = today.replace(day=1)
                     last_prev = first_this - timedelta(days=1)

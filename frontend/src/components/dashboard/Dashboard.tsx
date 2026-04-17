@@ -183,23 +183,27 @@ const Dashboard: React.FC = () => {
       const expenseChange = 0;
 
       // Mapeia KPIs
+      const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+        month: 'short',
+        year: 'numeric',
+      });
       const kpis: FinanceKPI[] = [
         {
-          title: 'Saldo Atual',
+          title: 'Saldo atual (contas)',
           value: totalBalance,
           change: 0,
           changeType: 'increase',
           icon: 'wallet',
         },
         {
-          title: 'Receitas',
+          title: `Receitas (${monthLabel})`,
           value: currentIncome,
           change: incomeChange,
           changeType: 'increase',
           icon: 'trending-up',
         },
         {
-          title: 'Despesas',
+          title: `Despesas (${monthLabel})`,
           value: currentExpense,
           change: expenseChange,
           changeType: 'decrease',
@@ -261,7 +265,7 @@ const Dashboard: React.FC = () => {
       // Define dados vazios em caso de erro
       setFinanceData({
         kpis: [
-          { title: 'Saldo Atual', value: 0, change: 0, changeType: 'increase', icon: 'wallet' },
+          { title: 'Saldo atual (contas)', value: 0, change: 0, changeType: 'increase', icon: 'wallet' },
           { title: 'Receitas', value: 0, change: 0, changeType: 'increase', icon: 'trending-up' },
           { title: 'Despesas', value: 0, change: 0, changeType: 'decrease', icon: 'trending-down' },
           { title: 'Cartões de Crédito', value: 0, change: 0, changeType: 'increase', icon: 'credit-card' },
@@ -445,13 +449,15 @@ const Dashboard: React.FC = () => {
           if (titleLower.includes('saldo')) {
             onClickHandler = () => navigate('/accounts');
           } else if (titleLower.includes('receita')) {
-            onClickHandler = () => navigate('/transactions', {
-              state: { filterType: 'income' }
-            });
+            onClickHandler = () =>
+              navigate('/transactions', {
+                state: { filterType: 'income', datePreset: 'year_to_date' },
+              });
           } else if (titleLower.includes('despesa')) {
-            onClickHandler = () => navigate('/transactions', {
-              state: { filterType: 'expense' }
-            });
+            onClickHandler = () =>
+              navigate('/transactions', {
+                state: { filterType: 'expense', datePreset: 'year_to_date' },
+              });
           } else if (titleLower.includes('cartão') || titleLower.includes('cartões') || titleLower.includes('cartao') || titleLower.includes('cartaes') || (titleLower.includes('cart') && titleLower.includes('crédito'))) {
             onClickHandler = () => navigate('/credit-cards');
           }
