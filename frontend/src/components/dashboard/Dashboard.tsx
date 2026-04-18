@@ -491,7 +491,7 @@ const Dashboard: React.FC = () => {
               onClick={onClickHandler}
             />
           );
-        }        )}
+        })}
       </div>
 
       <PayablesSummaryBlock summary={payablesSummary} titleId="dashboard-payables-title" />
