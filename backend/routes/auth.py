@@ -18,6 +18,7 @@ from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTok
 from extensions import limiter
 from pydantic import ValidationError
 from services.supabase_auth_service import SupabaseAuthService
+from services.user_data_wipe_service import wipe_user_business_data
 
 
 # Remova o 'url_prefix' daqui. Ele será definido em app.py
@@ -631,25 +632,37 @@ def import_backup():
 @bp.route('/auth/data/clear', methods=['POST'])
 @require_auth
 def clear_all_data():
-    """Limpa todos os dados do usuário (exceto a conta)"""
+    """Limpa todos os dados de negócio do utilizador (conta public.users e auth mantêm-se)."""
     try:
+        if not (
+            current_app.config.get('CATEGORIES')
+            and current_app.config.get('TRANSACTIONS')
+            and current_app.config.get('ACCOUNTS')
+        ):
+            return jsonify({'error': 'Operação indisponível (repositórios não inicializados).'}), 503
+
         user_id = request.user_id
-        categories_collection = current_app.config['CATEGORIES']
-        transactions_collection = current_app.config['TRANSACTIONS']
-        accounts_collection = current_app.config['ACCOUNTS']
-        
-        # Deleta todos os dados do usuário
-        categories_deleted = categories_collection.delete_many({'user_id': user_id}).deleted_count
-        transactions_deleted = transactions_collection.delete_many({'user_id': user_id}).deleted_count
-        accounts_deleted = accounts_collection.delete_many({'user_id': user_id}).deleted_count
-        
+        counts = wipe_user_business_data(user_id, dict(current_app.config))
+
         return jsonify({
             'message': 'Todos os dados foram limpos com sucesso',
             'deleted': {
-                'categories': categories_deleted,
-                'transactions': transactions_deleted,
-                'accounts': accounts_deleted
-            }
+                'categories': counts.get('categories', 0),
+                'transactions': counts.get('transactions', 0),
+                'accounts': counts.get('accounts', 0),
+                'financial_expenses': counts.get('financial_expenses', 0),
+                'goals': counts.get('goals', 0),
+                'budget_plans': counts.get('budget_plans', 0),
+                'budget_monthly': counts.get('budget_monthly', 0),
+                'merchant_category_aliases_user': counts.get('merchant_category_aliases_user', 0),
+                'merchant_category_aliases_tenant': counts.get('merchant_category_aliases_tenant', 0),
+                'chatbot_conversations': counts.get('chatbot_conversations', 0),
+                'admin_notification_delivery': counts.get('admin_notification_delivery', 0),
+                'admin_audit_logs_target': counts.get('admin_audit_logs_target', 0),
+                'admin_audit_logs_actor': counts.get('admin_audit_logs_actor', 0),
+                'transaction_tenant_inconsistencies': counts.get('transaction_tenant_inconsistencies', 0),
+            },
+            'deleted_detail': counts,
         })
     except Exception as e:
         return jsonify({'error': f'Erro ao limpar dados: {str(e)}'}), 500

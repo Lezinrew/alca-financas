@@ -179,7 +179,29 @@ class BaseRepository:
         except Exception as e:
             logger.error(f"Erro ao deletar registro {id} em {self.table_name}: {e}")
             return False
-    
+
+    def delete_many(self, filter_query: Dict[str, Any]) -> int:
+        """
+        Remove todos os registos que cumprem o filtro (conjunção de .eq em cada chave).
+
+        Usa count() antes do DELETE para devolver o número de linhas removidas de forma
+        compatível com todos os clientes PostgREST (sem depender de RETURNING).
+        """
+        if not filter_query:
+            raise ValueError("delete_many requer filter_query não vazio")
+        try:
+            total = self.count(filter_query)
+            if total == 0:
+                return 0
+            query = self.supabase.table(self.table_name).delete()
+            for key, value in filter_query.items():
+                query = query.eq(key, value)
+            query.execute()
+            return total
+        except Exception as e:
+            logger.error(f"Erro delete_many em {self.table_name}: {e}")
+            raise
+
     def count(self, filter_query: Dict[str, Any] = None) -> int:
         """
         Conta registros

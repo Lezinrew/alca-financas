@@ -179,16 +179,19 @@ const Settings = () => {
 
   const handleClearAllData = async () => {
     if (!window.confirm(
-      'ATENÇÃO: Esta ação irá deletar PERMANENTEMENTE todas as suas categorias, transações e contas. ' +
-      'Esta ação NÃO PODE ser desfeita. Tem certeza que deseja continuar?'
+      'ATENÇÃO: Serão removidos permanentemente os dados financeiros da sua conta: transações, contas, ' +
+      'categorias, contas a pagar, metas, planeamento por categoria, conversas do assistente, aliases ' +
+      'de comerciante associados a si, e (se for o único membro do workspace) o planeamento mensal e ' +
+      'aliases desse workspace. A conta de login mantém-se. Em workspaces partilhados, o planeamento ' +
+      'mensal comum ao tenant não é apagado. Esta ação não pode ser desfeita. Continuar?'
     )) {
       return;
     }
 
     // Confirmação dupla
     if (!window.confirm(
-      'Última confirmação: Você tem CERTEZA ABSOLUTA que deseja deletar todos os seus dados? ' +
-      'Esta é a última chance de cancelar.'
+      'Última confirmação: tem a certeza absoluta de que pretende apagar todos estes dados? ' +
+      'Esta é a última oportunidade para cancelar.'
     )) {
       return;
     }
@@ -199,11 +202,34 @@ const Settings = () => {
       setSuccess('');
       
       const response = await authAPI.clearAllData();
-      const deleted = response.data.deleted;
-      
+      const deleted = response.data.deleted as Record<string, number | undefined>;
+      const parts: string[] = [];
+      const push = (n: number | undefined, label: string) => {
+        const v = typeof n === 'number' ? n : 0;
+        if (v > 0) parts.push(`${v} ${label}`);
+      };
+      push(deleted.transactions, 'transações');
+      push(deleted.accounts, 'contas');
+      push(deleted.categories, 'categorias');
+      push(deleted.financial_expenses, 'despesas agendadas');
+      push(deleted.goals, 'metas');
+      push(deleted.budget_plans, 'linhas de planeamento por categoria');
+      push(deleted.budget_monthly, 'meses de planeamento (workspace só seu)');
+      const ma =
+        (deleted.merchant_category_aliases_user ?? 0) +
+        (deleted.merchant_category_aliases_tenant ?? 0);
+      push(ma > 0 ? ma : undefined, 'aliases de comerciante');
+      push(deleted.chatbot_conversations, 'conversas do assistente');
+      push(deleted.admin_notification_delivery, 'registos de notificação admin');
+      const audit =
+        (deleted.admin_audit_logs_target ?? 0) + (deleted.admin_audit_logs_actor ?? 0);
+      push(audit > 0 ? audit : undefined, 'linhas de auditoria admin associadas');
+      push(deleted.transaction_tenant_inconsistencies, 'inconsistências de tenant (se existirem)');
+
       setSuccess(
-        `Todos os dados foram limpos com sucesso! ` +
-        `${deleted.categories} categorias, ${deleted.accounts} contas e ${deleted.transactions} transações deletadas.`
+        parts.length > 0
+          ? `Limpeza completa: ${parts.join(', ')}.`
+          : 'Limpeza concluída; não havia registos para remover.'
       );
       setTimeout(() => setSuccess(''), 5000);
       
