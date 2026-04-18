@@ -544,7 +544,7 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 
 ### Arquivos / migration
 
-- `supabase/migrations/20260417120001_transactions_entry_source_and_payable_source_tx.sql` — aplicar no Supabase de cada ambiente antes de usar os novos campos.
+- `supabase/migrations/20260417120001_transactions_entry_source_and_payable_source_tx.sql` — aplicar no Supabase de cada ambiente antes de usar os novos campos. O próprio ficheiro inclui no cabeçalho instruções de aplicação (`supabase db push` / SQL Editor) e notas de rollback manual.
 - Backend: `backend/routes/transactions.py`, `backend/services/transaction_service.py`, `backend/routes/financial_expenses.py`, `backend/services/financial_expense_service.py`, `backend/repositories/financial_expense_repository_supabase.py`, `backend/utils/financial_expense_category_map.py`.
 - Frontend: `frontend/src/utils/api.ts`, `frontend/src/types/transaction.ts`, `frontend/src/components/transactions/TransactionList.tsx`, `frontend/src/components/financial-expenses/FinancialExpensesPage.tsx`.
 

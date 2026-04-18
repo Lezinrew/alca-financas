@@ -46,11 +46,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const PieTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const pct = typeof data.percentage === 'number' ? data.percentage : Number(data.percentage) || 0;
     return (
       <div className="card-base p-3 shadow-modal">
         <p className="font-medium text-primary">{data.name}</p>
         <p className="text-sm text-tertiary">
-          {formatCurrency(data.value)} ({data.percentage.toFixed(1)}%)
+          {formatCurrency(data.value)} ({pct.toFixed(1)}%)
         </p>
       </div>
     );
@@ -475,9 +476,11 @@ const Dashboard: React.FC = () => {
           }
 
           // Determina se é contagem (cartões) ou valor monetário
-          const isCount = kpi.title.toLowerCase().includes('cartão') || 
-                         kpi.title.toLowerCase().includes('cartao') ||
-                         kpi.title.toLowerCase().includes('cartões');
+          const isCount =
+            titleLower.includes('cartão') ||
+            titleLower.includes('cartões') ||
+            titleLower.includes('cartao') ||
+            titleLower.includes('cartaes');
           
           return (
             <KPICard

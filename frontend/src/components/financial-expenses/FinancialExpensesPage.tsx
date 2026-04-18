@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   financialExpensesAPI,
@@ -101,6 +102,7 @@ const emptyForm = (): Record<string, unknown> => ({
 });
 
 const FinancialExpensesPage: React.FC = () => {
+  const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const now = useMemo(() => new Date(), []);
   const [month, setMonth] = useState(String(now.getMonth() + 1));
@@ -384,31 +386,47 @@ const FinancialExpensesPage: React.FC = () => {
         </div>
       )}
 
-      <section className="card-base p-4 md:p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">A partir do livro (transações)</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-          Cole um ou mais UUIDs de transações de <span className="font-medium text-slate-800 dark:text-slate-100">despesa</span>{' '}
-          (página Transações).
-          Cada transação gera no máximo uma conta a pagar; repetições e receitas são ignoradas.
-        </p>
-        <textarea
-          name="from_transactions_ids"
-          value={fromTxText}
-          onChange={(e) => setFromTxText(e.target.value)}
-          rows={3}
-          placeholder="ex.: 3fa85f64-5717-4562-b3fc-2c963f66afa6"
-          className="native-input-themed w-full text-sm font-mono mb-3"
-          disabled={fromTxBusy}
-        />
-        <button
-          type="button"
-          onClick={() => void handleCreateFromTransactions()}
-          disabled={fromTxBusy}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60 dark:bg-slate-600 dark:hover:bg-slate-500"
-        >
-          {fromTxBusy ? 'A gerar…' : 'Gerar contas a pagar'}
-        </button>
-      </section>
+      <details className="card-base p-4 md:p-6 shadow-sm">
+        <summary className="cursor-pointer select-none list-none flex flex-wrap items-center justify-between gap-2 text-lg font-semibold text-slate-900 dark:text-white [&::-webkit-details-marker]:hidden">
+          <span>A partir do livro (transações)</span>
+          <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+            Opcional — clique para expandir
+          </span>
+        </summary>
+        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/80">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+            Cole um ou mais UUIDs de transações de{' '}
+            <span className="font-medium text-slate-800 dark:text-slate-100">despesa</span>. Cada transação gera no
+            máximo uma conta a pagar; repetições e receitas são ignoradas.
+          </p>
+          <textarea
+            name="from_transactions_ids"
+            value={fromTxText}
+            onChange={(e) => setFromTxText(e.target.value)}
+            rows={3}
+            placeholder="Um UUID por linha, ou separados por vírgula"
+            className="native-input-themed w-full text-sm font-mono mb-3"
+            disabled={fromTxBusy}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCreateFromTransactions()}
+              disabled={fromTxBusy}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60 dark:bg-slate-600 dark:hover:bg-slate-500"
+            >
+              {fromTxBusy ? 'A gerar…' : 'Gerar contas a pagar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/transactions')}
+              className="px-4 py-2 rounded-lg text-sm font-medium border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Abrir Transações
+            </button>
+          </div>
+        </div>
+      </details>
 
       <section className="card-base p-4 md:p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">O que falta pagar</h2>
