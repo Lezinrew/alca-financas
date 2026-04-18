@@ -175,11 +175,8 @@ export const categoriesAPI = {
   import: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/categories/import', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }).finally(() => invalidateLookupCache('categories'));
+    // Não definir Content-Type: o browser/axios define multipart com boundary.
+    return api.post('/categories/import', formData).finally(() => invalidateLookupCache('categories'));
   },
 };
 
@@ -228,11 +225,7 @@ export const accountsAPI = {
   import: (cardId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post(`/accounts/${cardId}/import`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }).finally(() => invalidateLookupCache('accounts'));
+    return api.post(`/accounts/${cardId}/import`, formData).finally(() => invalidateLookupCache('accounts'));
   },
 };
 
@@ -314,11 +307,7 @@ export const transactionsAPI = {
     if (accountId) {
       formData.append('account_id', accountId);
     }
-    return api.post('/transactions/import', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return api.post('/transactions/import', formData);
   },
 };
 
