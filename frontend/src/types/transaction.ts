@@ -1,5 +1,6 @@
 export type TransactionType = 'income' | 'expense';
 export type TransactionStatus = 'paid' | 'pending' | 'overdue' | 'cancelled';
+export type TransactionEntrySource = 'manual' | 'csv' | 'ofx';
 
 export interface TransactionCategory {
   id: string;
@@ -27,6 +28,8 @@ export interface TransactionRecord {
   responsible_person?: string;
   is_recurring?: boolean;
   installment_info?: InstallmentInfo;
+  entry_source?: TransactionEntrySource;
+  fitid?: string | null;
 }
 
 export interface TransactionSubmitPayload {

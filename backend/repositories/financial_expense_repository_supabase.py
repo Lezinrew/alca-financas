@@ -128,3 +128,28 @@ class FinancialExpenseRepository(BaseRepository):
 
     def delete_row(self, expense_id: str) -> bool:
         return self.delete(expense_id)
+
+    def find_existing_source_transaction_ids(
+        self, user_id: str, tenant_id: str, transaction_ids: List[str]
+    ) -> List[str]:
+        """IDs de transação que já têm conta a pagar ligada (idempotência)."""
+        if not transaction_ids:
+            return []
+        try:
+            res = (
+                get_supabase()
+                .table(self.table_name)
+                .select("source_transaction_id")
+                .eq("user_id", user_id)
+                .eq("tenant_id", tenant_id)
+                .in_("source_transaction_id", transaction_ids)
+                .execute()
+            )
+            out: List[str] = []
+            for row in res.data or []:
+                sid = row.get("source_transaction_id")
+                if sid:
+                    out.append(str(sid))
+            return out
+        except Exception:
+            return []

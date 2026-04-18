@@ -171,6 +171,7 @@ class TransactionService:
             'status': data.get('status', 'pending'),
             'responsible_person': data.get('responsible_person'),
             'installment_info': None,
+            'entry_source': 'manual',
         }
         try:
             created_id = self.transaction_repo.create(transaction_data)
@@ -353,6 +354,7 @@ class TransactionService:
                     'total': installments,
                     'group_id': group_id
                 },
+                'entry_source': 'manual',
             }
             to_create.append(tx)
 

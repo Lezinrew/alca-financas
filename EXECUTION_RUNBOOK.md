@@ -530,3 +530,27 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 - [ ] Conteúdo legado está claramente marcado.
 - [ ] Onboarding técnico não depende de múltiplas fontes contraditórias.
 ```
+
+---
+
+## 6) Contas a pagar ↔ transações (2026-04-17)
+
+### Escopo
+
+- Rastrear **origem** das linhas do livro: `transactions.entry_source` (`manual` | `csv` | `ofx`) e `transactions.fitid` (OFX).
+- Ligar contas a pagar à transação de origem: `financial_expenses.source_transaction_id` (único quando preenchido).
+- API `POST /api/financial-expenses/from-transactions` com `{ "transaction_ids": ["…"] }` (só despesas; idempotente).
+- UI: secção em Contas a pagar para colar UUIDs; coluna **Origem** nas tabelas; lista de Transações com etiqueta CSV/OFX.
+
+### Arquivos / migration
+
+- `supabase/migrations/20260417120001_transactions_entry_source_and_payable_source_tx.sql` — aplicar no Supabase de cada ambiente antes de usar os novos campos.
+- Backend: `backend/routes/transactions.py`, `backend/services/transaction_service.py`, `backend/routes/financial_expenses.py`, `backend/services/financial_expense_service.py`, `backend/repositories/financial_expense_repository_supabase.py`, `backend/utils/financial_expense_category_map.py`.
+- Frontend: `frontend/src/utils/api.ts`, `frontend/src/types/transaction.ts`, `frontend/src/components/transactions/TransactionList.tsx`, `frontend/src/components/financial-expenses/FinancialExpensesPage.tsx`.
+
+### Checklist pós-migration
+
+- [ ] Import CSV/OFX cria transações com `entry_source` preenchido (`csv` ou `ofx`).
+- [ ] Criação manual de transação grava `entry_source = manual`.
+- [ ] `POST /financial-expenses/from-transactions` devolve `created` / `skipped` / `errors` e não duplica o mesmo `transaction_id`.
+- [ ] Build frontend (`npm run build`) sem erros.

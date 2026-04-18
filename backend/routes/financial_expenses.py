@@ -18,7 +18,11 @@ def _service() -> Optional[FinancialExpenseService]:
     repo = current_app.config.get("FINANCIAL_EXPENSE_REPO")
     if not repo:
         return None
-    return FinancialExpenseService(repo)
+    return FinancialExpenseService(
+        repo,
+        transaction_repo=current_app.config.get("TRANSACTION_REPO"),
+        categories_repo=current_app.config.get("CATEGORIES"),
+    )
 
 
 @bp.route("", methods=["GET"])
@@ -70,6 +74,30 @@ def create_expense():
         row = svc.create_expense(request.user_id, request.tenant_id, data)
         return jsonify(row), 201
     except (ValidationException, NotFoundException) as e:
+        return jsonify(e.to_dict()), e.status_code
+
+
+@bp.route("/from-transactions", methods=["POST"])
+@require_auth
+@require_tenant
+def create_from_transactions():
+    """
+    Body: { "transaction_ids": ["uuid", ...] }
+    Cria contas a pagar a partir de despesas do livro (mesmo tenant).
+    """
+    body = request.get_json() or {}
+    ids = body.get("transaction_ids")
+    if not isinstance(ids, list):
+        return jsonify({"error": "transaction_ids deve ser uma lista de UUIDs"}), 400
+    svc = _service()
+    if not svc:
+        return jsonify({"error": "Módulo de despesas não disponível"}), 503
+    try:
+        result = svc.create_payables_from_transactions(
+            request.user_id, request.tenant_id, ids
+        )
+        return jsonify(result), 201
+    except ValidationException as e:
         return jsonify(e.to_dict()), e.status_code
 
 

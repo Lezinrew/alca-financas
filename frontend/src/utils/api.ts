@@ -230,6 +230,8 @@ export const accountsAPI = {
 };
 
 // Transaction types
+export type TransactionEntrySource = 'manual' | 'csv' | 'ofx';
+
 export interface Transaction {
   id: string;
   description: string;
@@ -241,6 +243,10 @@ export interface Transaction {
   responsiblePerson?: string;
   is_recurring?: boolean;
   account_id?: string;
+  /** Origem do registo: manual (UI/API), csv ou ofx (importação). */
+  entry_source?: TransactionEntrySource;
+  /** ID OFX (FITID), quando aplicável. */
+  fitid?: string | null;
   installment_info?: {
     current: number;
     total: number;
@@ -492,6 +498,8 @@ export interface FinancialExpense {
   installment_total?: number | null;
   payment_method?: string | null;
   source_type?: string | null;
+  /** Transação de origem (fluxo a partir do livro). */
+  source_transaction_id?: string | null;
   responsible_person?: string | null;
   vehicle_name?: string | null;
   notes?: string | null;
@@ -525,6 +533,12 @@ export const financialExpensesAPI = {
   delete: (id: string) => api.delete(`/financial-expenses/${id}`),
   markPaid: (id: string, body?: { amount_paid?: number; paid_at?: string }) =>
     api.post<FinancialExpense>(`/financial-expenses/${id}/mark-paid`, body ?? {}),
+  createFromTransactions: (transaction_ids: string[]) =>
+    api.post<{
+      created: FinancialExpense[];
+      skipped: { id: string; reason: string }[];
+      errors: { id: string; error: string }[];
+    }>('/financial-expenses/from-transactions', { transaction_ids }),
 };
 
 // Funções do dashboard

@@ -5,6 +5,7 @@
 
 ### Concluído recentemente (código na `main`)
 
+- **Transações ↔ contas a pagar (2026-04-17):** migration `20260417120001_transactions_entry_source_and_payable_source_tx.sql` (`entry_source`, `fitid`, `source_transaction_id`); import CSV/OFX define `entry_source`; criação manual define `manual`; `POST /api/financial-expenses/from-transactions`; UI em Contas a pagar (colar UUIDs + coluna Origem) e Transações (etiqueta CSV/OFX). Runbook: `EXECUTION_RUNBOOK.md` §6, `supabase/DEPLOY_RUNBOOK.md`, `skills/transactions/runbooks/observability.md`.
 - **Módulo administrativo (2026-04-17):** API `/api/admin/*` (stats, utilizadores, papel/estado, avisos inatividade, export CSV), auditoria em `admin_audit_logs`, notificações; **`POST /api/admin/users/<id>/purge`** (exclusão total: Auth + `public.users` com confirmação por e-mail; requer **`SUPABASE_SERVICE_ROLE_KEY`**).
 - **UI admin modo escuro:** `AdminDashboard`, `UserManagement`, `UserDetail`, `AdminLogs` com tokens Tailwind `dark-surface` / `dark-border` / `dark-text-*`; modal de purge; ação `purge_user` nos logs.
 - **429 em `GET /api/auth/me`:** rota isenta do limiter global no Flask + throttle no `AuthContext` ao sincronizar perfil com o backend.
