@@ -98,12 +98,16 @@
     color: rgb(var(--text-muted)) !important;
   }
 
+  /* Só tabelas Bootstrap (.table): evita !important em todo th/td e quebrar Tailwind noutras páginas. */
   .dark .text-dark,
   .dark .text-body,
   .dark .dropdown-item,
-  .dark .table,
-  .dark th,
-  .dark td {
+  .dark .table {
+    color: rgb(var(--text-secondary)) !important;
+  }
+
+  .dark .table th,
+  .dark .table td {
     color: rgb(var(--text-secondary)) !important;
   }
 

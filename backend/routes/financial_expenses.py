@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request, current_app
 
 from utils.auth_utils import require_auth
 from utils.tenant_context import require_tenant
+from extensions import limiter
 from services.financial_expense_service import FinancialExpenseService
 from utils.exceptions import ValidationException, NotFoundException
 
@@ -22,6 +23,7 @@ def _service() -> Optional[FinancialExpenseService]:
 
 @bp.route("", methods=["GET"])
 @require_auth
+@limiter.limit("200 per hour")  # alinhado a /api/accounts — listagens + HMR dev
 @require_tenant
 def list_expenses():
     page = request.args.get("page", default=1, type=int)

@@ -306,84 +306,112 @@ const FinancialExpensesPage: React.FC = () => {
         </div>
       )}
 
-      <section className="card-base p-4 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-[#1a1d29]">
+      <section className="card-base p-4 md:p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">O que falta pagar</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
           Itens com status pendente ou parcial, ordenados por vencimento. Destaque vermelho = vencido.
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300">
-                <th className="py-2 pr-2">Descrição</th>
-                <th className="py-2 pr-2">Categoria</th>
-                <th className="py-2 pr-2 text-right">Previsto</th>
-                <th className="py-2 pr-2 text-right">Pago</th>
-                <th className="py-2 pr-2">Vencimento</th>
-                <th className="py-2 pr-2">Responsável</th>
-                <th className="py-2 pr-2">Status</th>
-                <th className="py-2">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {outstanding.length === 0 ? (
+        <div className="table-container">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="table-header">
                 <tr>
-                  <td colSpan={8} className="py-6 text-center text-slate-500 dark:text-slate-400">
-                    Nada pendente neste momento.
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Descrição
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Categoria
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Previsto
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Pago
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Vencimento
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Responsável
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Ações
+                  </th>
                 </tr>
-              ) : (
-                outstanding.map((row) => {
-                  const display = row.display_status || row.status;
-                  const overdue = row.is_overdue || display === 'overdue';
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-slate-100 dark:border-slate-700/80 ${
-                        overdue ? 'bg-red-50/80 dark:bg-red-950/20' : ''
-                      }`}
-                    >
-                      <td className="py-2 pr-2 font-medium text-slate-900 dark:text-white">{row.title}</td>
-                      <td className="py-2 pr-2 text-slate-700 dark:text-slate-300">{row.category}</td>
-                      <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(num(row.amount_expected))}</td>
-                      <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(num(row.amount_paid))}</td>
-                      <td className="py-2 pr-2">{row.due_date ? formatDate(row.due_date) : '—'}</td>
-                      <td className="py-2 pr-2">{row.responsible_person || '—'}</td>
-                      <td className="py-2 pr-2">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(display)}`}>
-                          {statusLabel(display)}
-                        </span>
-                      </td>
-                      <td className="py-2 whitespace-nowrap">
-                        <button type="button" className="text-indigo-600 dark:text-indigo-400 mr-2" onClick={() => openEdit(row)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="text-emerald-600 dark:text-emerald-400"
-                          onClick={() => void handleMarkPaid(row)}
-                          disabled={row.status === 'paid'}
-                        >
-                          Marcar pago
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                {outstanding.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-6 text-center text-slate-600 dark:text-slate-300">
+                      Nada pendente neste momento.
+                    </td>
+                  </tr>
+                ) : (
+                  outstanding.map((row) => {
+                    const display = row.display_status || row.status;
+                    const overdue = row.is_overdue || display === 'overdue';
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`table-row border-b border-slate-100 dark:border-slate-700/80 ${
+                          overdue ? 'bg-red-50/80 dark:bg-red-950/20' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{row.title}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.category}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {formatCurrency(num(row.amount_expected))}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {formatCurrency(num(row.amount_paid))}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                          {row.due_date ? formatDate(row.due_date) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.responsible_person || '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(display)}`}>
+                            {statusLabel(display)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button type="button" className="text-indigo-600 dark:text-indigo-400 mr-2" onClick={() => openEdit(row)}>
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="text-emerald-600 dark:text-emerald-400"
+                            onClick={() => void handleMarkPaid(row)}
+                            disabled={row.status === 'paid'}
+                          >
+                            Marcar pago
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
-      <section className="card-base p-4 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-[#1a1d29]">
+      <section className="card-base p-4 md:p-6 shadow-sm">
         <div className="flex flex-wrap gap-3 items-end mb-4">
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Mês</label>
+            <label htmlFor="fe-filter-month" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+              Mês
+            </label>
             <select
+              id="fe-filter-month"
+              name="expense_filter_month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+              className="native-select-themed text-sm min-w-[4.5rem]"
             >
               {Array.from({ length: 12 }, (_, i) => (
                 <option key={i + 1} value={String(i + 1)}>
@@ -393,8 +421,12 @@ const FinancialExpensesPage: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ano</label>
+            <label htmlFor="fe-filter-year" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+              Ano
+            </label>
             <input
+              id="fe-filter-year"
+              name="expense_filter_year"
               type="number"
               value={year}
               onChange={(e) => setYear(e.target.value)}
@@ -402,11 +434,15 @@ const FinancialExpensesPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Status</label>
+            <label htmlFor="fe-filter-status" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+              Status
+            </label>
             <select
+              id="fe-filter-status"
+              name="expense_filter_status"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm min-w-[200px]"
+              className="native-select-themed text-sm min-w-[200px]"
             >
               {STATUS_FILTER_OPTIONS.map((o) => (
                 <option key={o.value || 'all'} value={o.value}>
@@ -416,11 +452,15 @@ const FinancialExpensesPage: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
+            <label htmlFor="fe-filter-category" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+              Categoria
+            </label>
             <select
+              id="fe-filter-category"
+              name="expense_filter_category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm min-w-[160px]"
+              className="native-select-themed text-sm min-w-[160px]"
             >
               <option value="">Todas</option>
               {CATEGORY_OPTIONS.map((c) => (
@@ -431,8 +471,12 @@ const FinancialExpensesPage: React.FC = () => {
             </select>
           </div>
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Responsável</label>
+            <label htmlFor="fe-filter-responsible" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+              Responsável
+            </label>
             <input
+              id="fe-filter-responsible"
+              name="expense_filter_responsible"
               type="text"
               value={responsible}
               onChange={(e) => setResponsible(e.target.value)}
@@ -441,11 +485,15 @@ const FinancialExpensesPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Recorrência</label>
+            <label htmlFor="fe-filter-recurring" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+              Recorrência
+            </label>
             <select
+              id="fe-filter-recurring"
+              name="expense_filter_recurring"
               value={recurringFilter}
               onChange={(e) => setRecurringFilter(e.target.value as 'all' | 'yes' | 'no')}
-              className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+              className="native-select-themed text-sm min-w-[10rem]"
             >
               <option value="all">Todas</option>
               <option value="yes">Só recorrentes</option>
@@ -454,78 +502,106 @@ const FinancialExpensesPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300">
-                <th className="py-2 pr-2">Descrição</th>
-                <th className="py-2 pr-2">Categoria</th>
-                <th className="py-2 pr-2 text-right">Previsto</th>
-                <th className="py-2 pr-2 text-right">Pago</th>
-                <th className="py-2 pr-2">Vencimento</th>
-                <th className="py-2 pr-2">Pago em</th>
-                <th className="py-2 pr-2">Responsável</th>
-                <th className="py-2 pr-2">Status</th>
-                <th className="py-2">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
+        <div className="table-container">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="table-header">
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500 dark:text-slate-400">
-                    Nenhuma despesa neste filtro.
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Descrição
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Categoria
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Previsto
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Pago
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Vencimento
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Pago em
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Responsável
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Ações
+                  </th>
                 </tr>
-              ) : (
-                rows.map((row) => {
-                  const display = row.display_status || row.status;
-                  const overdue = row.is_overdue || display === 'overdue';
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-slate-100 dark:border-slate-700/80 ${
-                        overdue ? 'bg-red-50/50 dark:bg-red-950/15' : ''
-                      }`}
-                    >
-                      <td className="py-2 pr-2">
-                        <div className="font-medium text-slate-900 dark:text-white">{row.title}</div>
-                        {row.description ? (
-                          <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">{row.description}</div>
-                        ) : null}
-                      </td>
-                      <td className="py-2 pr-2 text-slate-700 dark:text-slate-300">{row.category}</td>
-                      <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(num(row.amount_expected))}</td>
-                      <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(num(row.amount_paid))}</td>
-                      <td className="py-2 pr-2">{row.due_date ? formatDate(row.due_date) : '—'}</td>
-                      <td className="py-2 pr-2">{row.paid_at ? formatDateTime(row.paid_at) : '—'}</td>
-                      <td className="py-2 pr-2">{row.responsible_person || '—'}</td>
-                      <td className="py-2 pr-2">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(display)}`}>
-                          {statusLabel(display)}
-                        </span>
-                      </td>
-                      <td className="py-2 whitespace-nowrap">
-                        <button type="button" className="text-indigo-600 dark:text-indigo-400 mr-2" onClick={() => openEdit(row)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="text-emerald-600 dark:text-emerald-400 mr-2"
-                          onClick={() => void handleMarkPaid(row)}
-                          disabled={row.status === 'paid' || row.status === 'canceled'}
-                        >
-                          Pagar
-                        </button>
-                        <button type="button" className="text-red-600 dark:text-red-400" onClick={() => void handleDelete(row)}>
-                          Excluir
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-600 dark:text-slate-300">
+                      Nenhuma despesa neste filtro.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => {
+                    const display = row.display_status || row.status;
+                    const overdue = row.is_overdue || display === 'overdue';
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`table-row border-b border-slate-100 dark:border-slate-700/80 ${
+                          overdue ? 'bg-red-50/50 dark:bg-red-950/15' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900 dark:text-white">{row.title}</div>
+                          {row.description ? (
+                            <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">{row.description}</div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.category}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {formatCurrency(num(row.amount_expected))}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {formatCurrency(num(row.amount_paid))}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                          {row.due_date ? formatDate(row.due_date) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                          {row.paid_at ? formatDateTime(row.paid_at) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.responsible_person || '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(display)}`}>
+                            {statusLabel(display)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button type="button" className="text-indigo-600 dark:text-indigo-400 mr-2" onClick={() => openEdit(row)}>
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="text-emerald-600 dark:text-emerald-400 mr-2"
+                            onClick={() => void handleMarkPaid(row)}
+                            disabled={row.status === 'paid' || row.status === 'canceled'}
+                          >
+                            Pagar
+                          </button>
+                          <button type="button" className="text-red-600 dark:text-red-400" onClick={() => void handleDelete(row)}>
+                            Excluir
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
         {pagination.total > 0 && (
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
@@ -535,8 +611,8 @@ const FinancialExpensesPage: React.FC = () => {
       </section>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true">
-          <div className="bg-white dark:bg-[#1a1d29] rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/60" role="dialog" aria-modal="true">
+          <div className="modal-content max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-slate-200 dark:border-slate-600 flex justify-between items-center">
               <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
                 {editingId ? 'Editar despesa' : 'Nova despesa'}
@@ -552,16 +628,24 @@ const FinancialExpensesPage: React.FC = () => {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Título *</label>
+                <label htmlFor="fe-modal-title" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Título *
+                </label>
                 <input
+                  id="fe-modal-title"
+                  name="title"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                   value={String(form.title || '')}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Descrição</label>
+                <label htmlFor="fe-modal-description" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Descrição
+                </label>
                 <textarea
+                  id="fe-modal-description"
+                  name="description"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                   rows={2}
                   value={String(form.description || '')}
@@ -570,9 +654,13 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Categoria *</label>
+                  <label htmlFor="fe-modal-category" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Categoria *
+                  </label>
                   <select
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    id="fe-modal-category"
+                    name="category"
+                    className="native-select-themed w-full text-sm"
                     value={String(form.category || 'moradia')}
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                   >
@@ -584,8 +672,12 @@ const FinancialExpensesPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Subcategoria</label>
+                  <label htmlFor="fe-modal-subcategory" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Subcategoria
+                  </label>
                   <input
+                    id="fe-modal-subcategory"
+                    name="subcategory"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.subcategory || '')}
                     onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
@@ -594,8 +686,12 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Valor previsto *</label>
+                  <label htmlFor="fe-modal-amount-expected" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Valor previsto *
+                  </label>
                   <input
+                    id="fe-modal-amount-expected"
+                    name="amount_expected"
                     type="number"
                     step="0.01"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
@@ -604,8 +700,12 @@ const FinancialExpensesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Valor pago</label>
+                  <label htmlFor="fe-modal-amount-paid" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Valor pago
+                  </label>
                   <input
+                    id="fe-modal-amount-paid"
+                    name="amount_paid"
                     type="number"
                     step="0.01"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
@@ -616,8 +716,12 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Vencimento</label>
+                  <label htmlFor="fe-modal-due-date" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Vencimento
+                  </label>
                   <input
+                    id="fe-modal-due-date"
+                    name="due_date"
                     type="date"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.due_date || '')}
@@ -625,8 +729,12 @@ const FinancialExpensesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Pago em (opcional)</label>
+                  <label htmlFor="fe-modal-paid-at" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Pago em (opcional)
+                  </label>
                   <input
+                    id="fe-modal-paid-at"
+                    name="paid_at"
                     type="datetime-local"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.paid_at || '')}
@@ -636,8 +744,12 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Competência (mês)</label>
+                  <label htmlFor="fe-modal-competency-month" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Competência (mês)
+                  </label>
                   <input
+                    id="fe-modal-competency-month"
+                    name="competency_month"
                     type="number"
                     min={1}
                     max={12}
@@ -647,8 +759,12 @@ const FinancialExpensesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Competência (ano)</label>
+                  <label htmlFor="fe-modal-competency-year" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Competência (ano)
+                  </label>
                   <input
+                    id="fe-modal-competency-year"
+                    name="competency_year"
                     type="number"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.competency_year ?? '')}
@@ -658,18 +774,24 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <input
-                  id="rec"
+                  id="fe-modal-is-recurring"
+                  name="is_recurring"
                   type="checkbox"
                   checked={!!form.is_recurring}
                   onChange={(e) => setForm((f) => ({ ...f, is_recurring: e.target.checked }))}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
                 />
-                <label htmlFor="rec" className="text-sm text-slate-700 dark:text-slate-300">
+                <label htmlFor="fe-modal-is-recurring" className="text-sm text-slate-700 dark:text-slate-300">
                   Recorrente
                 </label>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Tipo de recorrência</label>
+                <label htmlFor="fe-modal-recurrence-type" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Tipo de recorrência
+                </label>
                 <input
+                  id="fe-modal-recurrence-type"
+                  name="recurrence_type"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                   placeholder="mensal, anual…"
                   value={String(form.recurrence_type || '')}
@@ -678,8 +800,12 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Parcela atual</label>
+                  <label htmlFor="fe-modal-installment-current" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Parcela atual
+                  </label>
                   <input
+                    id="fe-modal-installment-current"
+                    name="installment_current"
                     type="number"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.installment_current ?? '')}
@@ -687,8 +813,12 @@ const FinancialExpensesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Parcelas total</label>
+                  <label htmlFor="fe-modal-installment-total" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Parcelas total
+                  </label>
                   <input
+                    id="fe-modal-installment-total"
+                    name="installment_total"
                     type="number"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.installment_total ?? '')}
@@ -698,16 +828,24 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Meio de pagamento</label>
+                  <label htmlFor="fe-modal-payment-method" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Meio de pagamento
+                  </label>
                   <input
+                    id="fe-modal-payment-method"
+                    name="payment_method"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.payment_method || '')}
                     onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Origem</label>
+                  <label htmlFor="fe-modal-source-type" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Origem
+                  </label>
                   <input
+                    id="fe-modal-source-type"
+                    name="source_type"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.source_type || '')}
                     onChange={(e) => setForm((f) => ({ ...f, source_type: e.target.value }))}
@@ -716,16 +854,24 @@ const FinancialExpensesPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Responsável</label>
+                  <label htmlFor="fe-modal-responsible" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Responsável
+                  </label>
                   <input
+                    id="fe-modal-responsible"
+                    name="responsible_person"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.responsible_person || '')}
                     onChange={(e) => setForm((f) => ({ ...f, responsible_person: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Veículo</label>
+                  <label htmlFor="fe-modal-vehicle" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    Veículo
+                  </label>
                   <input
+                    id="fe-modal-vehicle"
+                    name="vehicle_name"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                     value={String(form.vehicle_name || '')}
                     onChange={(e) => setForm((f) => ({ ...f, vehicle_name: e.target.value }))}
@@ -733,8 +879,12 @@ const FinancialExpensesPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Observações</label>
+                <label htmlFor="fe-modal-notes" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Observações
+                </label>
                 <textarea
+                  id="fe-modal-notes"
+                  name="notes"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                   rows={2}
                   value={String(form.notes || '')}
@@ -742,9 +892,13 @@ const FinancialExpensesPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Status armazenado</label>
+                <label htmlFor="fe-modal-status" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Status armazenado
+                </label>
                 <select
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                  id="fe-modal-status"
+                  name="status"
+                  className="native-select-themed w-full text-sm"
                   value={String(form.status || 'pending')}
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                 >
@@ -753,7 +907,7 @@ const FinancialExpensesPage: React.FC = () => {
                   <option value="paid">paid</option>
                   <option value="canceled">canceled</option>
                 </select>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Ao salvar, o servidor recalcula a partir dos valores exceto se cancelado.
                 </p>
               </div>
