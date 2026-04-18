@@ -197,7 +197,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       <CurrencyInput
                         id="expense-amount"
                         name="amount"
-                        className="w-full h-14 pl-12 pr-4 text-2xl font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                        className="native-input-themed w-full h-14 py-0 pl-12 pr-4 text-2xl font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                         value={formData.amount}
                         onValueChange={handleAmountChange}
                         placeholder="0,00"
@@ -243,7 +243,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       <input
                         type="date"
                         name="date"
-                        className="mt-2 w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                        className="native-input-themed mt-2 w-full"
                         value={formData.date === 'other' ? '' : formData.date}
                         onChange={handleChange}
                         disabled={loading}
@@ -263,7 +263,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                         type="text"
                         id="expense-description"
                         name="description"
-                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                        className="native-input-themed w-full h-11 pl-10 pr-4 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                         value={formData.description}
                         onChange={handleChange}
                         placeholder="Digite a descrição"
@@ -283,7 +283,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       <select
                         id="expense-category"
                         name="category_id"
-                        className="w-full h-11 pl-10 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all appearance-none"
+                        className="native-select-themed !w-full min-h-[2.75rem] py-2 pl-10 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400"
                         value={formData.category_id}
                         onChange={handleChange}
                         required
@@ -296,7 +296,6 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                           </option>
                         ))}
                       </select>
-                      <i className="bi bi-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                     </div>
                   </div>
 
@@ -334,12 +333,11 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                       <i className="bi bi-calendar-check absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                       <select
                         id="expense-due-date"
-                        className="w-full h-11 pl-10 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all appearance-none"
+                        className="native-select-themed !w-full min-h-[2.75rem] py-2 pl-10 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400"
                         disabled={loading}
                       >
                         <option>15 de dez de 2025</option>
                       </select>
-                      <i className="bi bi-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                     </div>
                   </div>
 
@@ -385,7 +383,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                           type="text"
                           id="expense-tags"
                           name="tags"
-                          className="w-full h-11 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                          className="native-input-themed w-full h-11 px-4 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                           value={formData.tags}
                           onChange={handleChange}
                           placeholder="Digite as tags"
@@ -402,7 +400,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                         <textarea
                           id="expense-observation"
                           name="observation"
-                          className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all resize-none"
+                          className="native-input-themed w-full px-4 py-3 resize-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                           rows={3}
                           value={formData.observation}
                           onChange={handleChange}
@@ -458,7 +456,7 @@ const CreditCardExpenseForm: React.FC<CreditCardExpenseFormProps> = ({
                               type="number"
                               id="expense-installments"
                               name="installments"
-                              className="flex-1 h-11 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+                              className="native-input-themed flex-1 h-11 px-4 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
                               value={formData.installments}
                               onChange={handleChange}
                               min="2"

@@ -10,48 +10,35 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/** Sincroniza Tailwind (.dark) e color mode do Bootstrap 5.3 (data-bs-theme). */
+function applyThemeToDocument(theme: Theme) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.setAttribute('data-bs-theme', theme);
+  if (theme === 'dark') {
+    root.classList.add('dark');
+    document.body?.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+    document.body?.classList.remove('dark');
+  }
+}
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
-    // Verifica se há tema salvo no localStorage
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
-      // Aplica imediatamente na inicialização
-      const root = document.documentElement;
-      if (savedTheme === 'dark') {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
+      applyThemeToDocument(savedTheme);
       return savedTheme;
     }
-    // Verifica preferência do sistema
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const initialTheme = prefersDark ? 'dark' : 'light';
-    
-    // Aplica imediatamente na inicialização
-    const root = document.documentElement;
-    if (initialTheme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    
+    applyThemeToDocument(initialTheme);
     return initialTheme;
   });
 
   useEffect(() => {
-    // Aplica o tema ao documento
-    const root = document.documentElement;
-    const body = document.body;
-    
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      body.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-      body.classList.remove('dark');
-    }
-    // Salva no localStorage
+    applyThemeToDocument(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
@@ -60,7 +47,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleTheme = () => {
-    setThemeState(prev => prev === 'light' ? 'dark' : 'light');
+    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
   return (
@@ -77,4 +64,3 @@ export const useTheme = () => {
   }
   return context;
 };
-

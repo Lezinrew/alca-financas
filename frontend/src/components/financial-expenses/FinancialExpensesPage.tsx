@@ -271,6 +271,47 @@ const FinancialExpensesPage: React.FC = () => {
     }
   };
 
+  /** Totais da tabela principal (respeita mês/ano e filtros; canceladas excluídas). */
+  const filteredListAggregates = useMemo(() => {
+    let expected = 0;
+    let remaining = 0;
+    for (const r of rows) {
+      if (r.status === 'canceled') continue;
+      const exp = num(r.amount_expected);
+      const paid = num(r.amount_paid);
+      expected += exp;
+      if (r.status === 'pending' || r.status === 'partial') {
+        remaining += Math.max(0, exp - paid);
+      }
+    }
+    return {
+      expected,
+      remaining,
+      listed: rows.length,
+      total: pagination.total,
+      truncated: pagination.total > rows.length,
+    };
+  }, [rows, pagination.total]);
+
+  /** Totais da lista “o que falta pagar” (até 100 pendentes globais). */
+  const outstandingAggregates = useMemo(() => {
+    let remaining = 0;
+    let expected = 0;
+    for (const r of outstanding) {
+      if (r.status === 'canceled') continue;
+      const exp = num(r.amount_expected);
+      const paid = num(r.amount_paid);
+      expected += exp;
+      remaining += Math.max(0, exp - paid);
+    }
+    return {
+      remaining,
+      expected,
+      count: outstanding.length,
+      capped: outstanding.length >= 100,
+    };
+  }, [outstanding]);
+
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -311,6 +352,27 @@ const FinancialExpensesPage: React.FC = () => {
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
           Itens com status pendente ou parcial, ordenados por vencimento. Destaque vermelho = vencido.
         </p>
+        {outstanding.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-3">
+            <div className="min-w-[10rem] flex-1 rounded-lg border border-amber-200/90 bg-amber-50/80 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/25">
+              <p className="text-xs font-medium text-amber-900/80 dark:text-amber-200/90">Soma em falta (lista)</p>
+              <p className="text-lg font-bold tabular-nums text-amber-950 dark:text-amber-100">
+                {formatCurrency(outstandingAggregates.remaining)}
+              </p>
+            </div>
+            <div className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Previsto total (lista)</p>
+              <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+                {formatCurrency(outstandingAggregates.expected)}
+              </p>
+            </div>
+          </div>
+        )}
+        {outstandingAggregates.capped && (
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-500">
+            Lista limitada a 100 itens em aberto no sistema; os totais refletem só estes.
+          </p>
+        )}
         <div className="table-container">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -430,7 +492,7 @@ const FinancialExpensesPage: React.FC = () => {
               type="number"
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              className="w-28 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+              className="native-input-themed w-28"
             />
           </div>
           <div>
@@ -481,7 +543,7 @@ const FinancialExpensesPage: React.FC = () => {
               value={responsible}
               onChange={(e) => setResponsible(e.target.value)}
               placeholder="contém…"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+              className="native-input-themed w-full"
             />
           </div>
           <div>
@@ -501,6 +563,27 @@ const FinancialExpensesPage: React.FC = () => {
             </select>
           </div>
         </div>
+
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Total previsto (filtro)</p>
+            <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+              {formatCurrency(filteredListAggregates.expected)}
+            </p>
+          </div>
+          <div className="min-w-[10rem] flex-1 rounded-lg border border-amber-200/90 bg-amber-50/80 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/25">
+            <p className="text-xs font-medium text-amber-900/80 dark:text-amber-200/90">Em falta (abertos no filtro)</p>
+            <p className="text-lg font-bold tabular-nums text-amber-950 dark:text-amber-100">
+              {formatCurrency(filteredListAggregates.remaining)}
+            </p>
+          </div>
+        </div>
+        {filteredListAggregates.truncated && (
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-500">
+            Totais calculados sobre {filteredListAggregates.listed} de {filteredListAggregates.total} despesas neste
+            filtro (limite de carregamento).
+          </p>
+        )}
 
         <div className="table-container">
           <div className="overflow-x-auto">
@@ -634,7 +717,7 @@ const FinancialExpensesPage: React.FC = () => {
                 <input
                   id="fe-modal-title"
                   name="title"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                  className="native-input-themed w-full"
                   value={String(form.title || '')}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 />
@@ -646,7 +729,7 @@ const FinancialExpensesPage: React.FC = () => {
                 <textarea
                   id="fe-modal-description"
                   name="description"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                  className="native-input-themed w-full"
                   rows={2}
                   value={String(form.description || '')}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -678,7 +761,7 @@ const FinancialExpensesPage: React.FC = () => {
                   <input
                     id="fe-modal-subcategory"
                     name="subcategory"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.subcategory || '')}
                     onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
                   />
@@ -694,7 +777,7 @@ const FinancialExpensesPage: React.FC = () => {
                     name="amount_expected"
                     type="number"
                     step="0.01"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.amount_expected ?? '')}
                     onChange={(e) => setForm((f) => ({ ...f, amount_expected: e.target.value }))}
                   />
@@ -708,7 +791,7 @@ const FinancialExpensesPage: React.FC = () => {
                     name="amount_paid"
                     type="number"
                     step="0.01"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.amount_paid ?? '')}
                     onChange={(e) => setForm((f) => ({ ...f, amount_paid: e.target.value }))}
                   />
@@ -723,7 +806,7 @@ const FinancialExpensesPage: React.FC = () => {
                     id="fe-modal-due-date"
                     name="due_date"
                     type="date"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.due_date || '')}
                     onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
                   />
@@ -736,7 +819,7 @@ const FinancialExpensesPage: React.FC = () => {
                     id="fe-modal-paid-at"
                     name="paid_at"
                     type="datetime-local"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.paid_at || '')}
                     onChange={(e) => setForm((f) => ({ ...f, paid_at: e.target.value }))}
                   />
@@ -753,7 +836,7 @@ const FinancialExpensesPage: React.FC = () => {
                     type="number"
                     min={1}
                     max={12}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.competency_month ?? '')}
                     onChange={(e) => setForm((f) => ({ ...f, competency_month: e.target.value }))}
                   />
@@ -766,7 +849,7 @@ const FinancialExpensesPage: React.FC = () => {
                     id="fe-modal-competency-year"
                     name="competency_year"
                     type="number"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.competency_year ?? '')}
                     onChange={(e) => setForm((f) => ({ ...f, competency_year: e.target.value }))}
                   />
@@ -792,7 +875,7 @@ const FinancialExpensesPage: React.FC = () => {
                 <input
                   id="fe-modal-recurrence-type"
                   name="recurrence_type"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                  className="native-input-themed w-full"
                   placeholder="mensal, anual…"
                   value={String(form.recurrence_type || '')}
                   onChange={(e) => setForm((f) => ({ ...f, recurrence_type: e.target.value }))}
@@ -807,7 +890,7 @@ const FinancialExpensesPage: React.FC = () => {
                     id="fe-modal-installment-current"
                     name="installment_current"
                     type="number"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.installment_current ?? '')}
                     onChange={(e) => setForm((f) => ({ ...f, installment_current: e.target.value }))}
                   />
@@ -820,7 +903,7 @@ const FinancialExpensesPage: React.FC = () => {
                     id="fe-modal-installment-total"
                     name="installment_total"
                     type="number"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.installment_total ?? '')}
                     onChange={(e) => setForm((f) => ({ ...f, installment_total: e.target.value }))}
                   />
@@ -834,7 +917,7 @@ const FinancialExpensesPage: React.FC = () => {
                   <input
                     id="fe-modal-payment-method"
                     name="payment_method"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.payment_method || '')}
                     onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}
                   />
@@ -846,7 +929,7 @@ const FinancialExpensesPage: React.FC = () => {
                   <input
                     id="fe-modal-source-type"
                     name="source_type"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.source_type || '')}
                     onChange={(e) => setForm((f) => ({ ...f, source_type: e.target.value }))}
                   />
@@ -860,7 +943,7 @@ const FinancialExpensesPage: React.FC = () => {
                   <input
                     id="fe-modal-responsible"
                     name="responsible_person"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.responsible_person || '')}
                     onChange={(e) => setForm((f) => ({ ...f, responsible_person: e.target.value }))}
                   />
@@ -872,7 +955,7 @@ const FinancialExpensesPage: React.FC = () => {
                   <input
                     id="fe-modal-vehicle"
                     name="vehicle_name"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="native-input-themed w-full"
                     value={String(form.vehicle_name || '')}
                     onChange={(e) => setForm((f) => ({ ...f, vehicle_name: e.target.value }))}
                   />
@@ -885,7 +968,7 @@ const FinancialExpensesPage: React.FC = () => {
                 <textarea
                   id="fe-modal-notes"
                   name="notes"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                  className="native-input-themed w-full"
                   rows={2}
                   value={String(form.notes || '')}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}

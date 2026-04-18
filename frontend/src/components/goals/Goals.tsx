@@ -70,7 +70,7 @@ const Goals: React.FC = () => {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white text-sm"
+            className="native-select-themed !w-auto min-w-[10rem] py-2 px-3 text-sm"
           >
             <option value="">Todas</option>
             <option value="active">Em andamento</option>

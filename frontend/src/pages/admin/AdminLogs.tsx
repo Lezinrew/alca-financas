@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
 import { Shield, User, Ban, Trash2, Clock, Mail, Download, Skull } from 'lucide-react';
 
-const ADMIN_CARD =
-    'rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-dark-border dark:bg-dark-surface dark:shadow-none';
+const ADMIN_CARD = 'admin-card-shell';
 
 interface AdminLog {
     id: string;
@@ -176,7 +175,7 @@ const AdminLogs: React.FC = () => {
                     <button
                         onClick={() => setPage(page - 1)}
                         disabled={page === 1}
-                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+                        className="admin-outline-btn rounded-lg text-slate-600 hover:bg-slate-50 dark:text-dark-text-secondary"
                     >
                         Anterior
                     </button>
@@ -184,7 +183,7 @@ const AdminLogs: React.FC = () => {
                     <button
                         onClick={() => setPage(page + 1)}
                         disabled={logs.length < 50}
-                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+                        className="admin-outline-btn rounded-lg text-slate-600 hover:bg-slate-50 dark:text-dark-text-secondary"
                     >
                         Próxima
                     </button>

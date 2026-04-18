@@ -5,8 +5,7 @@ import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Mail, Calendar, Shield, Ban, Trash2, Download, Skull } from 'lucide-react';
 
-const ADMIN_CARD =
-    'rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-surface dark:shadow-none';
+const ADMIN_CARD = 'admin-card-shell p-6';
 
 interface UserDetails {
     user: {
@@ -328,8 +327,8 @@ const UserDetail: React.FC = () => {
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Transações Recentes</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-700">
+                            <thead className="table-header">
+                                <tr>
                                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">Data</th>
                                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">Descrição</th>
                                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400">Tipo</th>
@@ -338,7 +337,7 @@ const UserDetail: React.FC = () => {
                             </thead>
                             <tbody>
                                 {userDetails.recent_transactions.map((trans) => (
-                                    <tr key={trans.id} className="border-b border-slate-100 dark:border-slate-800">
+                                    <tr key={trans.id} className="table-row border-b border-slate-100 dark:border-slate-800">
                                         <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-300">
                                             {new Date(trans.date).toLocaleDateString('pt-BR')}
                                         </td>
@@ -391,7 +390,7 @@ const UserDetail: React.FC = () => {
                     aria-modal="true"
                     aria-labelledby="user-detail-purge-title"
                 >
-                    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-dark-border dark:bg-dark-surface">
+                    <div className="admin-modal-panel">
                         <h2 id="user-detail-purge-title" className="text-lg font-bold text-slate-900 dark:text-white">
                             Exclusão total da conta
                         </h2>
@@ -417,7 +416,7 @@ const UserDetail: React.FC = () => {
                             autoComplete="off"
                             value={purgeEmail}
                             onChange={(e) => setPurgeEmail(e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-surface-elevated dark:text-white"
+                            className="native-input-themed mt-1 w-full rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                             placeholder={userDetails.user.email}
                         />
                         <div className="mt-6 flex justify-end gap-2">
@@ -429,7 +428,7 @@ const UserDetail: React.FC = () => {
                                     setPurgeEmail('');
                                 }}
                                 disabled={purging}
-                                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-dark-border dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+                                className="admin-outline-btn rounded-xl font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-dark-text-secondary"
                             >
                                 Cancelar
                             </button>
