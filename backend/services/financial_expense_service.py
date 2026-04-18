@@ -7,9 +7,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from utils.exceptions import NotFoundException, ValidationException
+from utils.financial_expense_category_map import map_category_name_to_payable
+from services.transaction_service import _category_for
 
 ALLOWED_CATEGORIES = frozenset(
     {
@@ -75,8 +77,10 @@ def enrich_expense(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class FinancialExpenseService:
-    def __init__(self, repo):
+    def __init__(self, repo, transaction_repo=None, categories_repo=None):
         self.repo = repo
+        self.transaction_repo = transaction_repo
+        self.categories_repo = categories_repo
 
     def list_expenses(
         self,
@@ -205,6 +209,9 @@ class FinancialExpenseService:
         return out
 
     def create_expense(self, user_id: str, tenant_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        data = dict(data or {})
+        # Origem transação só via create_payables_from_transactions (evita forjar vínculo).
+        data.pop("source_transaction_id", None)
         payload = self._normalize_write_payload(data, partial=False)
         payload["user_id"] = user_id
         payload["tenant_id"] = tenant_id
@@ -220,6 +227,8 @@ class FinancialExpenseService:
         existing = self.repo.find_by_id_for_tenant(expense_id, user_id, tenant_id)
         if not existing:
             raise NotFoundException("Despesa não encontrada")
+        data = dict(data or {})
+        data.pop("source_transaction_id", None)
         merged = {**existing, **data}
         payload = self._normalize_write_payload(merged, partial=False)
         payload.pop("user_id", None)
@@ -276,3 +285,99 @@ class FinancialExpenseService:
         self.repo.update_row(expense_id, update_payload)
         row = self.repo.find_by_id_for_tenant(expense_id, user_id, tenant_id)
         return enrich_expense(row or existing)
+
+    def create_payables_from_transactions(
+        self,
+        user_id: str,
+        tenant_id: str,
+        transaction_ids: List[str],
+    ) -> Dict[str, Any]:
+        """
+        Cria contas a pagar a partir de transações de despesa do mesmo utilizador/tenant.
+        Idempotente: ignora transações que já tenham financial_expense com o mesmo source_transaction_id.
+        """
+        if not self.transaction_repo:
+            raise ValidationException("Repositório de transações indisponível")
+        raw_ids = [str(x).strip() for x in (transaction_ids or []) if str(x).strip()]
+        if not raw_ids:
+            raise ValidationException("Informe transaction_ids (lista de UUIDs)")
+
+        claimed = set(
+            self.repo.find_existing_source_transaction_ids(user_id, tenant_id, raw_ids)
+        )
+        created: List[Dict[str, Any]] = []
+        skipped: List[Dict[str, str]] = []
+        errors: List[Dict[str, str]] = []
+
+        for tid in raw_ids:
+            if tid in claimed:
+                skipped.append({"id": tid, "reason": "already_linked"})
+                continue
+            tx = self.transaction_repo.find_by_id(tid)
+            if (
+                not tx
+                or str(tx.get("user_id")) != str(user_id)
+                or str(tx.get("tenant_id") or "") != str(tenant_id)
+            ):
+                errors.append({"id": tid, "error": "transação não encontrada"})
+                continue
+            if tx.get("type") != "expense":
+                skipped.append({"id": tid, "reason": "not_expense"})
+                continue
+
+            cat_name = None
+            cid = tx.get("category_id")
+            if cid and self.categories_repo:
+                c = _category_for(self.categories_repo, cid)
+                if c:
+                    cat_name = c.get("name")
+            payable_cat = map_category_name_to_payable(cat_name)
+
+            try:
+                amt = abs(float(tx.get("amount") or 0))
+            except (TypeError, ValueError):
+                amt = 0.0
+            if amt <= 0:
+                errors.append({"id": tid, "error": "valor inválido"})
+                continue
+
+            date_val = tx.get("date")
+            if hasattr(date_val, "strftime"):
+                date_val = date_val.strftime("%Y-%m-%d")
+            date_str = str(date_val) if date_val else None
+
+            title = (tx.get("description") or "Despesa").strip() or "Despesa"
+            if len(title) > 500:
+                title = title[:500]
+
+            payload_in: Dict[str, Any] = {
+                "title": title,
+                "category": payable_cat,
+                "amount_expected": amt,
+                "amount_paid": 0,
+                "due_date": date_str,
+                "is_recurring": bool(tx.get("is_recurring")),
+                "responsible_person": tx.get("responsible_person"),
+                "source_type": "transaction",
+                "status": "pending",
+            }
+            if date_str and len(date_str) >= 7:
+                try:
+                    y, m, *_ = date_str.split("-")
+                    payload_in["competency_year"] = int(y)
+                    payload_in["competency_month"] = int(m)
+                except (ValueError, TypeError):
+                    pass
+
+            normalized = self._normalize_write_payload(payload_in, partial=False)
+            normalized["user_id"] = user_id
+            normalized["tenant_id"] = tenant_id
+            normalized["source_transaction_id"] = tid
+
+            new_id = self.repo.create_row(normalized)
+            claimed.add(tid)
+            row = self.repo.find_by_id_for_tenant(new_id, user_id, tenant_id)
+            if row:
+                created.append(enrich_expense(row))
+
+        return {"created": created, "skipped": skipped, "errors": errors}

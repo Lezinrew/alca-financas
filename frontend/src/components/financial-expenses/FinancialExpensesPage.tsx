@@ -68,6 +68,15 @@ function statusBadgeClass(s: FinancialExpenseDisplayStatus | undefined): string 
   }
 }
 
+const TX_UUID_RE =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi;
+
+function parseTransactionIdsFromText(raw: string): string[] {
+  const m = raw.match(TX_UUID_RE);
+  if (!m?.length) return [];
+  return [...new Set(m.map((s) => s.toLowerCase()))];
+}
+
 const emptyForm = (): Record<string, unknown> => ({
   title: '',
   description: '',
@@ -111,6 +120,8 @@ const FinancialExpensesPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, unknown>>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [fromTxText, setFromTxText] = useState('');
+  const [fromTxBusy, setFromTxBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -154,6 +165,32 @@ const FinancialExpensesPage: React.FC = () => {
       setLoading(false);
     }
   }, [month, year, status, category, responsible, recurringFilter]);
+
+  const handleCreateFromTransactions = useCallback(async () => {
+    const ids = parseTransactionIdsFromText(fromTxText);
+    if (!ids.length) {
+      toast.error('Cole pelo menos um UUID de transação (despesa).');
+      return;
+    }
+    setFromTxBusy(true);
+    try {
+      const res = await financialExpensesAPI.createFromTransactions(ids);
+      const body = res.data;
+      const nCreated = body.created?.length ?? 0;
+      const nSkipped = body.skipped?.length ?? 0;
+      const nErrors = body.errors?.length ?? 0;
+      toast.success(`Criadas: ${nCreated}. Ignoradas: ${nSkipped}. Erros: ${nErrors}.`);
+      if (nCreated > 0) {
+        setFromTxText('');
+        await load();
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(err.response?.data?.error || err.message || 'Erro ao gerar contas a partir das transações');
+    } finally {
+      setFromTxBusy(false);
+    }
+  }, [fromTxText, load]);
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
@@ -348,6 +385,32 @@ const FinancialExpensesPage: React.FC = () => {
       )}
 
       <section className="card-base p-4 md:p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">A partir do livro (transações)</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+          Cole um ou mais UUIDs de transações de <span className="font-medium text-slate-800 dark:text-slate-100">despesa</span>{' '}
+          (página Transações).
+          Cada transação gera no máximo uma conta a pagar; repetições e receitas são ignoradas.
+        </p>
+        <textarea
+          name="from_transactions_ids"
+          value={fromTxText}
+          onChange={(e) => setFromTxText(e.target.value)}
+          rows={3}
+          placeholder="ex.: 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          className="native-input-themed w-full text-sm font-mono mb-3"
+          disabled={fromTxBusy}
+        />
+        <button
+          type="button"
+          onClick={() => void handleCreateFromTransactions()}
+          disabled={fromTxBusy}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60 dark:bg-slate-600 dark:hover:bg-slate-500"
+        >
+          {fromTxBusy ? 'A gerar…' : 'Gerar contas a pagar'}
+        </button>
+      </section>
+
+      <section className="card-base p-4 md:p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">O que falta pagar</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
           Itens com status pendente ou parcial, ordenados por vencimento. Destaque vermelho = vencido.
@@ -382,6 +445,9 @@ const FinancialExpensesPage: React.FC = () => {
                     Descrição
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Origem
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
                     Categoria
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
@@ -407,7 +473,7 @@ const FinancialExpensesPage: React.FC = () => {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                 {outstanding.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-slate-600 dark:text-slate-300">
+                    <td colSpan={9} className="px-4 py-6 text-center text-slate-600 dark:text-slate-300">
                       Nada pendente neste momento.
                     </td>
                   </tr>
@@ -423,6 +489,15 @@ const FinancialExpensesPage: React.FC = () => {
                         }`}
                       >
                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{row.title}</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
+                          {row.source_transaction_id || row.source_type === 'transaction' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-100">
+                              Livro
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.category}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
                           {formatCurrency(num(row.amount_expected))}
@@ -594,6 +669,9 @@ const FinancialExpensesPage: React.FC = () => {
                     Descrição
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                    Origem
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
                     Categoria
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">
@@ -622,7 +700,7 @@ const FinancialExpensesPage: React.FC = () => {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-600 dark:text-slate-300">
+                    <td colSpan={10} className="px-4 py-8 text-center text-slate-600 dark:text-slate-300">
                       Nenhuma despesa neste filtro.
                     </td>
                   </tr>
@@ -642,6 +720,15 @@ const FinancialExpensesPage: React.FC = () => {
                           {row.description ? (
                             <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">{row.description}</div>
                           ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
+                          {row.source_transaction_id || row.source_type === 'transaction' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-100">
+                              Livro
+                            </span>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.category}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">

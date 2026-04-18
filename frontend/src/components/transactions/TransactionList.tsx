@@ -77,6 +77,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">Responsável</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">{t('transactions.amount')}</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">{t('transactions.date')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">Origem</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">{t('common.actions')}</th>
             </tr>
           </thead>
@@ -107,6 +108,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </td>
                   <td className="px-6 py-4">
                     <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12" />
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-8 ml-auto" />
@@ -178,6 +182,19 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
                   <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                     {formatDate(transaction.date)}
+                  </td>
+
+                  <td className="px-6 py-4 text-sm">
+                    {transaction.entry_source && transaction.entry_source !== 'manual' ? (
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                        title={transaction.fitid ? `FITID: ${transaction.fitid}` : undefined}
+                      >
+                        {transaction.entry_source === 'ofx' ? 'OFX' : 'CSV'}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500">—</span>
+                    )}
                   </td>
 
                   <td className="px-6 py-4 text-right">

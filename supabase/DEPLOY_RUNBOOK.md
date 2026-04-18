@@ -42,6 +42,7 @@ O repositório inclui alterações datadas **após** o pacote inicial (reconcile
 1. Listar `supabase/migrations/*.sql` e ordenar pelo prefixo `YYYYMMDDHHMMSS` ou `YYYYMMDD…`.
 2. Aplicar todas as pendentes no projeto Supabase alvo (dev/staging/prod), **sem saltar** dependências.
 3. Referência de produto recente: `20260417000002_admin_users_audit_notifications.sql` (papéis/estado de utilizadores, auditoria admin, entregas de notificação). Sem esta migration, o backend admin que lê/escreve essas colunas/tabelas falha ou fica inconsistente.
+4. **Transações / contas a pagar (2026-04-17):** `20260417120001_transactions_entry_source_and_payable_source_tx.sql` — adiciona `transactions.entry_source`, `transactions.fitid` e `financial_expenses.source_transaction_id` (FK + índice único parcial). Obrigatória antes de usar `POST /api/financial-expenses/from-transactions` ou os novos campos na API.
 
 ### Dependências
 

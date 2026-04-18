@@ -345,6 +345,7 @@ def import_transactions():
                 if not tenant_id:
                     errors.append('Importação exige workspace. Recarregue a página ou faça login novamente.')
                     continue
+                entry_src = 'ofx' if file_format == 'ofx' else 'csv'
                 transaction_data = {
                     'id': str(uuid.uuid4()),
                     'user_id': request.user_id,
@@ -360,6 +361,7 @@ def import_transactions():
                     'status': 'paid',
                     'responsible_person': 'Leandro',
                     'installment_info': None,
+                    'entry_source': entry_src,
                     # Propaga FITID (quando disponível) para deduplicação e rastreio
                     'fitid': (tx.get('raw_data') or {}).get('fitid'),
                 }
