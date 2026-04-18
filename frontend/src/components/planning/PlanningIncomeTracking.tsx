@@ -48,7 +48,7 @@ export const PlanningIncomeTracking: React.FC<PlanningIncomeTrackingProps> = ({ 
       </div>
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 dark:bg-slate-800/50">
+          <thead className="table-header">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Categoria</th>
               <th className="px-6 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Meta</th>
@@ -63,7 +63,7 @@ export const PlanningIncomeTracking: React.FC<PlanningIncomeTrackingProps> = ({ 
               const config = STATUS_CONFIG[cat.status];
               const progressPct = Math.min(cat.progress_percent, 100);
               return (
-                <tr key={cat.category_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                <tr key={cat.category_id} className="table-row">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div

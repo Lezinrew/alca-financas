@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CategoryNameSuggestions, CategoryRelatedExamples } from './CategoryAssist';
+import { getTemplateForSuggestionText } from '../../utils/categoryAssist';
 
 type CategoryType = 'income' | 'expense';
 
@@ -42,6 +44,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Lista de ícones disponíveis
   const availableIcons: string[] = [
@@ -94,6 +97,48 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
 
     setError('');
   };
+
+  const applyNameSuggestion = useCallback(
+    (text: string) => {
+      const isCreate = !category;
+      setFormData((prev) => {
+        const template = getTemplateForSuggestionText(prev.type, text);
+        const next: FormData = { ...prev, name: text };
+        if (isCreate && template) {
+          next.color = template.color ?? prev.color;
+          next.icon = template.icon ?? prev.icon;
+          if (!prev.description.trim() && template.descriptionHint) {
+            next.description = template.descriptionHint;
+          }
+        }
+        return next;
+      });
+      setError('');
+      requestAnimationFrame(() => {
+        const el = nameInputRef.current;
+        if (!el) return;
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      });
+    },
+    [category],
+  );
+
+  const appendExampleToDescription = useCallback((tag: string) => {
+    const piece = tag.trim();
+    if (!piece) return;
+    setFormData((prev) => {
+      const d = prev.description.trim();
+      if (!d) {
+        return { ...prev, description: piece };
+      }
+      if (d.toLowerCase().includes(piece.toLowerCase())) {
+        return prev;
+      }
+      return { ...prev, description: `${d}; ${piece}` };
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -194,6 +239,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
                   <div className="col-12">
                     <label htmlFor="category-name" className="form-label">{t('categories.name')}</label>
                     <input
+                      ref={nameInputRef}
                       type="text"
                       id="category-name"
                       name="name"
@@ -204,6 +250,14 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
                       disabled={loading}
                       placeholder="Ex: Alimentação, Salário, etc."
                       autoComplete="category-name"
+                    />
+                    <CategoryNameSuggestions
+                      className="mt-2"
+                      kind={formData.type}
+                      nameQuery={formData.name}
+                      currentName={formData.name}
+                      disabled={loading}
+                      onSelect={applyNameSuggestion}
                     />
                   </div>
 
@@ -219,6 +273,13 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, cat
                       disabled={loading}
                       placeholder="Ex: Doações recebidas, contribuições, etc."
                       rows={3}
+                    />
+                    <CategoryRelatedExamples
+                      className="mt-2"
+                      kind={formData.type}
+                      currentName={formData.name}
+                      disabled={loading}
+                      onExampleTagClick={appendExampleToDescription}
                     />
                   </div>
 

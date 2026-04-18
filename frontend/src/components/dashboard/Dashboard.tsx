@@ -22,6 +22,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatCurrency, dashboardAPI, accountsAPI } from '../../utils/api';
+import { fetchPayablesSummary, type PayablesSummary } from '../../utils/payablesSummary';
+import { PayablesSummaryBlock } from '../shared/PayablesSummaryBlock';
 
 // Custom tooltip for line chart
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -113,6 +115,7 @@ const Dashboard: React.FC = () => {
     categories: CategoryExpense[];
     recentTransactions: any[];
   } | null>(null);
+  const [payablesSummary, setPayablesSummary] = useState<PayablesSummary | null>(null);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -125,7 +128,13 @@ const Dashboard: React.FC = () => {
     // Usa cache se tiver dados recentes (evita duplicar requisições no Strict Mode / navegação)
     const cached = getCachedDashboard(month, year);
     if (cached) {
-      setFinanceData(cached);
+      if (cached.financeData) {
+        setFinanceData(cached.financeData);
+        setPayablesSummary(cached.payablesSummary ?? null);
+      } else {
+        setFinanceData(cached);
+        setPayablesSummary(null);
+      }
       setLoading(false);
       setError('');
       return;
@@ -150,13 +159,15 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       setError('');
 
-      // Busca dados do dashboard avançado (inclui evolução mensal); signal cancela se sair da tela
-      const [dashboardRes, accountsRes] = await Promise.all([
+      // Dashboard + contas + resumo contas a pagar (competência do mês)
+      const [dashboardRes, accountsRes, payablesSnap] = await Promise.all([
         dashboardAPI.getAdvanced(month.toString(), year.toString(), true, { signal }),
-        accountsAPI.getAll({ signal }).then(res => res.data).catch(() => [])
+        accountsAPI.getAll({ signal }).then((res) => res.data).catch(() => []),
+        fetchPayablesSummary(month, year),
       ]);
 
       if (isCancelled()) return;
+      setPayablesSummary(payablesSnap);
 
       const dashboardData = dashboardRes.data;
       const accounts = Array.isArray(accountsRes) ? accountsRes : [];
@@ -250,7 +261,7 @@ const Dashboard: React.FC = () => {
 
       const nextData = { kpis, monthlyData, categories, recentTransactions };
       if (isCancelled()) return;
-      setCachedDashboard(month, year, nextData);
+      setCachedDashboard(month, year, { financeData: nextData, payablesSummary: payablesSnap });
       setFinanceData(nextData);
     } catch (err: any) {
       if (isCancelled()) return;
@@ -263,6 +274,7 @@ const Dashboard: React.FC = () => {
       setError('Erro ao carregar dados do dashboard');
 
       // Define dados vazios em caso de erro
+      setPayablesSummary(null);
       setFinanceData({
         kpis: [
           { title: 'Saldo atual (contas)', value: 0, change: 0, changeType: 'increase', icon: 'wallet' },
@@ -479,8 +491,10 @@ const Dashboard: React.FC = () => {
               onClick={onClickHandler}
             />
           );
-        })}
+        }        )}
       </div>
+
+      <PayablesSummaryBlock summary={payablesSummary} titleId="dashboard-payables-title" />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

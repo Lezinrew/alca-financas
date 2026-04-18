@@ -108,7 +108,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Ex: Viagem para Porto de Galinhas"
-            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+            className="native-input-themed w-full h-11 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
             required
           />
         </div>
@@ -124,7 +124,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Descreva sua meta..."
-            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all resize-none"
+            className="native-input-themed w-full pl-10 pr-4 py-3 resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
           />
         </div>
       </div>
@@ -139,7 +139,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
             value={targetAmount}
             onChange={(e) => setTargetAmount(e.target.value)}
             placeholder="0,00"
-            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+            className="native-input-themed w-full h-11 pl-10 pr-4 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
             required
           />
         </div>
@@ -154,7 +154,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
             type="date"
             value={targetDate}
             onChange={(e) => setTargetDate(e.target.value)}
-            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+            className="native-input-themed w-full h-11 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
           />
         </div>
       </div>
@@ -169,7 +169,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://..."
-            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
+            className="native-input-themed w-full h-11 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
           />
         </div>
       </div>
@@ -183,13 +183,12 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as GoalStatus)}
-              className="w-full h-11 pl-10 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all appearance-none"
+              className="native-select-themed !w-full py-2.5 pl-10 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400"
             >
               <option value="active">Em andamento</option>
               <option value="paused">Pausada</option>
               <option value="completed">Concluída</option>
             </select>
-            <i className="bi bi-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
           </div>
         </div>
       )}

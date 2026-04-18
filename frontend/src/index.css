@@ -126,6 +126,27 @@
     --bs-table-border-color: rgba(148, 163, 184, 0.2);
   }
 
+  /*
+   * Bootstrap form-control / form-select: WebKit pode ignorar dark:bg-* aplicados no próprio controlo.
+   * Forçamos fundo/cor com ancestral .dark (complementa data-bs-theme).
+   */
+  .dark .form-control:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  .dark .form-select {
+    background-color: rgb(var(--surface)) !important;
+    color: rgb(var(--text-primary)) !important;
+    border-color: rgba(148, 163, 184, 0.45) !important;
+    color-scheme: dark;
+  }
+
+  .dark .form-control::placeholder {
+    color: rgb(var(--text-muted));
+  }
+
+  .dark .form-select option {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text-primary));
+  }
+
   /* Typography hierarchy - Consistent dark mode */
   h1 {
     @apply text-page-title text-slate-900 dark:text-white;
@@ -198,19 +219,57 @@
      INPUT COMPONENTS - Consistent Dark Mode
      ============================================ */
   .input-base {
-    @apply flex h-10 w-full rounded-input border border-slate-300 dark:border-slate-700;
-    @apply bg-white dark:bg-[#1a1d29] text-slate-900 dark:text-white;
-    @apply px-3 py-2 placeholder:text-slate-400 dark:placeholder:text-slate-500;
+    @apply flex h-10 w-full rounded-input border border-slate-300 px-3 py-2;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:border-transparent;
     @apply disabled:cursor-not-allowed disabled:opacity-50 transition-colors;
+    background-color: #fff;
+    color: #0f172a;
+    color-scheme: light;
+  }
+
+  .input-base::placeholder {
+    color: #64748b;
+  }
+
+  .dark .input-base {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text-primary));
+    border-color: rgba(148, 163, 184, 0.45);
+    color-scheme: dark;
+  }
+
+  .dark .input-base::placeholder {
+    color: rgb(var(--text-muted));
   }
 
   .select-base {
-    @apply flex h-10 w-full rounded-input border border-slate-300 dark:border-slate-700;
-    @apply bg-white dark:bg-[#1a1d29] text-slate-900 dark:text-white;
-    @apply px-3 py-2;
+    @apply h-10 w-full rounded-input border px-3 py-2 text-sm;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:border-transparent;
     @apply disabled:cursor-not-allowed disabled:opacity-50 transition-colors;
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: #fff;
+    color: #0f172a;
+    border-color: rgb(203 213 225);
+    color-scheme: light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 1.15rem;
+    padding-right: 2.25rem;
+  }
+
+  .dark .select-base {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text-primary));
+    border-color: rgba(148, 163, 184, 0.45);
+    color-scheme: dark;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  }
+
+  .dark .select-base option {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text-primary));
   }
 
   /*
@@ -247,6 +306,35 @@
     color: rgb(var(--text-primary));
   }
 
+  /*
+   * Input/textarea nativos (sobretudo type="number"): WebKit pode ignorar dark:bg-* no controlo,
+   * igual ao select — forçamos fundo/cor com ancestral .dark.
+   * Usar também em <textarea>.
+   */
+  .native-input-themed {
+    @apply rounded-lg border border-slate-300 px-3 py-2 text-sm;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    background-color: #fff;
+    color: #0f172a;
+    color-scheme: light;
+  }
+
+  .native-input-themed::placeholder {
+    color: #64748b;
+  }
+
+  .dark .native-input-themed {
+    background-color: rgb(var(--surface-elevated));
+    color: rgb(var(--text-primary));
+    border-color: rgba(148, 163, 184, 0.45);
+    color-scheme: dark;
+  }
+
+  .dark .native-input-themed::placeholder {
+    color: rgb(var(--text-muted));
+  }
+
   .settings-theme-card {
     @apply p-6 rounded-xl border-2 transition-all text-center;
   }
@@ -271,6 +359,48 @@
 
   .dark .settings-theme-card--idle:hover {
     border-color: rgba(148, 163, 184, 0.55);
+  }
+
+  /*
+   * Área administrativa: cartões, modais e botões outline com fundo/cor explícitos em .dark
+   * (alinha ao resto da app e evita superfícies claras fantasma).
+   */
+  .admin-card-shell {
+    @apply rounded-2xl border border-slate-200/90 shadow-sm transition-colors duration-200;
+    @apply dark:border-slate-700/50 dark:shadow-none;
+    background-color: #fff;
+  }
+
+  .dark .admin-card-shell {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text-primary));
+  }
+
+  .admin-modal-panel {
+    @apply w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-xl transition-colors duration-200;
+    @apply dark:border-slate-700/50;
+    background-color: #fff;
+  }
+
+  .dark .admin-modal-panel {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text-primary));
+  }
+
+  .admin-outline-btn {
+    @apply border border-slate-200 px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    background-color: #fff;
+    color: rgb(71 85 105);
+  }
+
+  .dark .admin-outline-btn {
+    background-color: rgb(var(--surface-elevated));
+    color: rgb(var(--text-secondary));
+    border-color: rgba(148, 163, 184, 0.35);
+  }
+
+  .dark .admin-outline-btn:hover:not(:disabled) {
+    background-color: rgb(var(--surface-hover));
   }
 
   /* ============================================
@@ -328,6 +458,27 @@
   .modal-content {
     @apply bg-white dark:bg-[#1a1d29] rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xl;
     @apply transition-colors duration-200;
+  }
+
+  /*
+   * Chips de sugestão de categoria: Bootstrap / data-bs-theme podem forçar fundo claro em <button>.
+   * Garante contraste no dark dentro do modal (alinhado aos chips de “Exemplos relacionados”).
+   */
+  .dark .modal-content button.category-name-suggestion[aria-current='true'] {
+    background-color: rgba(59, 130, 246, 0.22) !important;
+    color: #dbeafe !important;
+    border-color: rgba(96, 165, 250, 0.55) !important;
+  }
+
+  .dark .modal-content button.category-name-suggestion:not([aria-current='true']) {
+    background-color: #252836 !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(148, 163, 184, 0.45) !important;
+  }
+
+  .dark .modal-content button.category-name-suggestion:not([aria-current='true']):hover:not(:disabled) {
+    background-color: #2d3142 !important;
+    border-color: rgba(148, 163, 184, 0.55) !important;
   }
 
   .dropdown-menu {

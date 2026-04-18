@@ -436,7 +436,7 @@ const Settings = () => {
                     type="text"
                     id="settings-name"
                     name="name"
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-dark-surface-elevated border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-dark-text-muted"
+                    className="native-input-themed w-full px-4 py-2.5 opacity-75"
                     value={user?.name || ''}
                     disabled
                   />
@@ -448,7 +448,7 @@ const Settings = () => {
                     type="email"
                     id="settings-email"
                     name="email"
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-dark-surface-elevated border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-dark-text-muted"
+                    className="native-input-themed w-full px-4 py-2.5 opacity-75"
                     value={user?.email || ''}
                     disabled
                   />

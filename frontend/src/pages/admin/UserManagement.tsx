@@ -19,8 +19,7 @@ interface AdminUserRow {
   auth_providers?: { provider?: string }[];
 }
 
-const ADMIN_CARD =
-  'rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-dark-border dark:bg-dark-surface dark:shadow-none';
+const ADMIN_CARD = 'admin-card-shell';
 const ADMIN_TABLE_SHELL = `${ADMIN_CARD} overflow-hidden`;
 
 const statusLabel: Record<string, string> = {
@@ -202,7 +201,7 @@ const UserManagement: React.FC = () => {
             void fetchUsers();
             void fetchStats();
           }}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+          className="admin-outline-btn rounded-xl text-slate-600 hover:bg-slate-50 dark:text-dark-text-secondary"
         >
           Atualizar
         </button>
@@ -238,7 +237,7 @@ const UserManagement: React.FC = () => {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && applySearch()}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-24 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-surface dark:text-white"
+            className="native-input-themed w-full rounded-xl py-2 pl-10 pr-24 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <svg
             className="absolute left-3 top-2.5 h-5 w-5 text-slate-400"
@@ -295,8 +294,8 @@ const UserManagement: React.FC = () => {
       <div className={ADMIN_TABLE_SHELL}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-dark-border dark:bg-dark-surface-elevated dark:text-dark-text-muted">
+            <thead className="table-header">
+              <tr className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-dark-text-muted">
                 <th className="px-4 py-3">Utilizador</th>
                 <th className="px-4 py-3">Papel</th>
                 <th className="px-4 py-3">Estado</th>
@@ -323,7 +322,7 @@ const UserManagement: React.FC = () => {
                 </tr>
               ) : (
                 users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-dark-surface-hover/40">
+                  <tr key={u.id} className="table-row">
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900 dark:text-white">{u.name}</div>
                       <div className="text-xs text-slate-600 dark:text-dark-text-secondary">{u.email}</div>
@@ -446,7 +445,7 @@ const UserManagement: React.FC = () => {
             type="button"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="admin-outline-btn rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300"
           >
             Anterior
           </button>
@@ -457,7 +456,7 @@ const UserManagement: React.FC = () => {
             type="button"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="admin-outline-btn rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300"
           >
             Seguinte
           </button>
@@ -471,7 +470,7 @@ const UserManagement: React.FC = () => {
           aria-modal="true"
           aria-labelledby="purge-dialog-title"
         >
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-dark-border dark:bg-dark-surface">
+          <div className="admin-modal-panel">
             <h2 id="purge-dialog-title" className="text-lg font-bold text-slate-900 dark:text-white">
               Exclusão total da conta
             </h2>
@@ -493,7 +492,7 @@ const UserManagement: React.FC = () => {
               autoComplete="off"
               value={purgeEmail}
               onChange={(e) => setPurgeEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-surface-elevated dark:text-white"
+              className="native-input-themed mt-1 w-full rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               placeholder={purgeTarget.email}
             />
             <div className="mt-6 flex justify-end gap-2">
@@ -501,7 +500,7 @@ const UserManagement: React.FC = () => {
                 type="button"
                 onClick={closePurge}
                 disabled={purging}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-dark-border dark:text-dark-text-secondary dark:hover:bg-dark-surface-hover"
+                className="admin-outline-btn rounded-xl font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-dark-text-secondary"
               >
                 Cancelar
               </button>

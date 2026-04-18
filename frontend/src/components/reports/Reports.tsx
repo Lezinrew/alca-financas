@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, reportsAPI, ReportOverviewResponse, accountsAPI } from '../../utils/api';
+import { fetchPayablesSummary, type PayablesSummary } from '../../utils/payablesSummary';
+import { PayablesSummaryBlock } from '../shared/PayablesSummaryBlock';
 import ReportChart, { ChartDisplayType } from './ReportChart';
 import ReportFilters from './ReportFilters';
 
@@ -36,6 +38,7 @@ const Reports = () => {
   });
 
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [payablesSummary, setPayablesSummary] = useState<PayablesSummary | null>(null);
 
   const reportTypes: Array<{ value: ReportTypeOption; label: string; icon: string }> = [
     { value: 'expenses_by_category', label: 'Despesas por categorias', icon: 'bi-arrow-down-circle' },
@@ -65,6 +68,18 @@ const Reports = () => {
       loadReportData();
     }
   }, [filters, isAuthenticated, authLoading]);
+
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    setPayablesSummary(null);
+    let cancelled = false;
+    void fetchPayablesSummary(filters.month, filters.year).then((s) => {
+      if (!cancelled) setPayablesSummary(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authLoading, filters.month, filters.year]);
 
   const loadAccounts = async () => {
     try {
@@ -268,7 +283,7 @@ const Reports = () => {
               </label>
               <select
                 id="report-account-filter"
-                className="w-full px-4 py-2.5 bg-white dark:bg-[#1a1d29] border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                className="native-select-themed !w-full py-2.5 text-sm"
                 value={filters.account_id}
                 onChange={(e) => handleFilterChange('account_id', e.target.value)}
                 disabled={loading}
@@ -290,6 +305,10 @@ const Reports = () => {
                   Mostrando apenas transações da conta selecionada
                 </p>
               )}
+            </div>
+
+            <div className="mb-6">
+              <PayablesSummaryBlock summary={payablesSummary} titleId="reports-payables-title" />
             </div>
 
             {/* Chart and Legend */}

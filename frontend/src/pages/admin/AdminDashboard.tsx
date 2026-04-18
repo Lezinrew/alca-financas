@@ -3,8 +3,7 @@ import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const ADMIN_CARD =
-    'rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-surface dark:shadow-none';
+const ADMIN_CARD = 'admin-card-shell p-6';
 
 interface Stats {
     users: {
@@ -216,8 +215,8 @@ const AdminDashboard: React.FC = () => {
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">🏆 Top 10 Categorias Mais Usadas</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-slate-200 dark:border-dark-border">
+                            <thead className="table-header">
+                                <tr>
                                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">#</th>
                                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">Categoria</th>
                                     <th className="text-right py-3 px-4 text-sm font-medium text-slate-500 dark:text-dark-text-muted">Transações</th>
@@ -226,7 +225,7 @@ const AdminDashboard: React.FC = () => {
                             </thead>
                             <tbody>
                                 {stats.financial.top_categories.map((cat, idx) => (
-                                    <tr key={cat.id} className="border-b border-slate-100 dark:border-dark-border hover:bg-slate-50 dark:hover:bg-dark-surface-hover/35">
+                                    <tr key={cat.id} className="table-row border-b border-slate-100 dark:border-dark-border">
                                         <td className="py-3 px-4 text-sm text-slate-600 dark:text-dark-text-secondary">{idx + 1}</td>
                                         <td className="py-3 px-4 text-sm font-medium text-slate-900 dark:text-white">{cat.name}</td>
                                         <td className="py-3 px-4 text-sm text-right text-slate-600 dark:text-dark-text-secondary">{cat.count}</td>

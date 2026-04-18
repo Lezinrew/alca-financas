@@ -463,7 +463,7 @@ const CreditCardDetail: React.FC = () => {
           <div className="card-base overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                <thead className="table-header">
                   <tr>
                     <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Situação
@@ -528,7 +528,7 @@ const CreditCardDetail: React.FC = () => {
                     sortedExpenses
                       .filter((expense) => expense && expense.id) // Filtra itens inválidos
                       .map((expense) => (
-                        <tr key={expense.id} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <tr key={expense.id} className="table-row border-b border-slate-200 dark:border-slate-700">
                           <td className="px-4 py-4 whitespace-nowrap">
                             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
                               {expense.status === 'paid' ? 'Pago' : 'Pendente'}
