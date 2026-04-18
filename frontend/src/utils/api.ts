@@ -32,6 +32,9 @@ const api = axios.create({
   },
 });
 
+// POST com FormData: se Content-Type for application/json, o transformRequest do axios converte o corpo para JSON e o backend deixa de receber ficheiros em multipart.
+const formDataPostConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
+
 type LookupCacheEntry<T> = {
   ts: number;
   data: T;
@@ -175,8 +178,9 @@ export const categoriesAPI = {
   import: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    // Não definir Content-Type: o browser/axios define multipart com boundary.
-    return api.post('/categories/import', formData).finally(() => invalidateLookupCache('categories'));
+    return api
+      .post('/categories/import', formData, formDataPostConfig)
+      .finally(() => invalidateLookupCache('categories'));
   },
 };
 
@@ -225,7 +229,9 @@ export const accountsAPI = {
   import: (cardId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post(`/accounts/${cardId}/import`, formData).finally(() => invalidateLookupCache('accounts'));
+    return api
+      .post(`/accounts/${cardId}/import`, formData, formDataPostConfig)
+      .finally(() => invalidateLookupCache('accounts'));
   },
 };
 
@@ -313,7 +319,7 @@ export const transactionsAPI = {
     if (accountId) {
       formData.append('account_id', accountId);
     }
-    return api.post('/transactions/import', formData);
+    return api.post('/transactions/import', formData, formDataPostConfig);
   },
 };
 

@@ -159,8 +159,19 @@ const FinancialExpensesPage: React.FC = () => {
       });
       setOutstanding(sorted);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || err.message || 'Erro ao carregar despesas');
+      const err = e as {
+        response?: { status?: number; data?: { error?: string } };
+        message?: string;
+      };
+      const status = err.response?.status;
+      const apiMsg = err.response?.data?.error;
+      let msg = apiMsg || err.message || 'Erro ao carregar despesas';
+      if (status === 404 && !apiMsg) {
+        msg =
+          'Contas a pagar: a API respondeu 404 (rota em falta ou URL errada). ' +
+          'Em produção, redeploy do backend com o blueprint atual e confirme VITE_API_URL (ex.: https://api.seu-dominio).';
+      }
+      setError(msg);
       setRows([]);
       setOutstanding([]);
     } finally {
