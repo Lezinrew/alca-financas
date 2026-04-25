@@ -596,8 +596,10 @@ def overview_report_supabase(
 
     if report_type == 'expenses_by_category':
         # Agrupa despesas por categoria
+        # Filtra apenas transações pagas para consistência com saldo das contas
+        paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
         by_category: Dict[str, Dict[str, Any]] = {}
-        for t in transactions_list:
+        for t in paid_transactions:
             if t.get('type') != 'expense':
                 continue
             cat_id = t.get('category_id') or ''
@@ -630,8 +632,10 @@ def overview_report_supabase(
 
     elif report_type == 'income_by_category':
         # Agrupa receitas por categoria
+        # Filtra apenas transações pagas para consistência com saldo das contas
+        paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
         by_category: Dict[str, Dict[str, Any]] = {}
-        for t in transactions_list:
+        for t in paid_transactions:
             if t.get('type') != 'income':
                 continue
             cat_id = t.get('category_id') or ''
@@ -662,8 +666,10 @@ def overview_report_supabase(
 
     elif report_type == 'expenses_by_account':
         # Agrupa despesas por conta
+        # Filtra apenas transações pagas para consistência com saldo das contas
+        paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
         by_account: Dict[str, Dict[str, Any]] = {}
-        for t in transactions_list:
+        for t in paid_transactions:
             if t.get('type') != 'expense':
                 continue
             acc_id = t.get('account_id') or ''
@@ -694,8 +700,10 @@ def overview_report_supabase(
 
     elif report_type == 'income_by_account':
         # Agrupa receitas por conta
+        # Filtra apenas transações pagas para consistência com saldo das contas
+        paid_transactions = [t for t in transactions_list if t.get('status') == 'paid']
         by_account: Dict[str, Dict[str, Any]] = {}
-        for t in transactions_list:
+        for t in paid_transactions:
             if t.get('type') != 'income':
                 continue
             acc_id = t.get('account_id') or ''
