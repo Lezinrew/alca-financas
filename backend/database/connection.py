@@ -32,62 +32,133 @@ def _jwt_payload_unverified(token: str) -> Dict[str, Any]:
         return {}
 
 
-def _log_supabase_jwt_key_role(api_key: str) -> None:
+def _is_production_env() -> bool:
     """
-    Avisa se a chave JWT não é service_role. PostgREST aplica RLS para anon/authenticated;
-    inserts em tabelas protegidas falham com 42501 se policies não baterem com o contexto.
+    Detecta se backend está em ambiente de produção.
+
+    Critérios (ordem de precedência):
+    1. REQUIRE_SERVICE_ROLE_KEY=true (forma explícita, override)
+    2. FLASK_ENV=production (padrão Flask)
+    3. APP_ENV=production (alternativa genérica)
+
+    Retorna True se qualquer critério for atendido.
+    """
+    # 1. Forma explícita (máxima prioridade)
+    require_service_role = os.getenv('REQUIRE_SERVICE_ROLE_KEY', '').strip().lower()
+    if require_service_role in ('true', '1', 'yes'):
+        return True
+
+    # 2. FLASK_ENV (padrão do projeto)
+    flask_env = os.getenv('FLASK_ENV', '').strip().lower()
+    if flask_env == 'production':
+        return True
+
+    # 3. APP_ENV (fallback genérico)
+    app_env = os.getenv('APP_ENV', '').strip().lower()
+    if app_env == 'production':
+        return True
+
+    return False
+
+
+def _log_supabase_jwt_key_role(api_key: str, is_production: bool = False) -> None:
+    """
+    Valida role do JWT como camada adicional de segurança.
+
+    IMPORTANTE: Esta é validação COMPLEMENTAR, não substitui
+    a exigência de SUPABASE_SERVICE_ROLE_KEY em produção.
+
+    Em produção: Se role != service_role → RuntimeError
+    Em dev: Se role != service_role → WARNING
     """
     if not api_key.startswith("eyJ"):
-        return
+        return  # Não é JWT (ex: sb_secret_*), skip
+
     payload = _jwt_payload_unverified(api_key)
     role = payload.get("role")
+
+    env_label = "PRODUÇÃO" if is_production else "DEV"
+
     if role == "service_role":
+        logger.info(f"✅ JWT role=service_role ({env_label})")
         return
-    logger.warning(
-        "Chave Supabase em formato JWT com role=%r. O backend em produção deve usar "
-        "SUPABASE_SERVICE_ROLE_KEY (role service_role) para bypass de RLS no PostgREST; "
-        "com anon/authenticated, erros 42501 em INSERT/UPDATE são comuns.",
-        role,
+
+    error_msg = (
+        f"JWT com role={role!r}. Backend em produção deve usar "
+        "SUPABASE_SERVICE_ROLE_KEY (role=service_role) para bypass de RLS; "
+        "com anon/authenticated, erros 42501 em INSERT/UPDATE são comuns."
     )
+
+    if is_production:
+        logger.error(f"❌ {env_label}: {error_msg}")
+        raise RuntimeError(
+            f"AMBIENTE PRODUÇÃO: JWT com role={role!r} não é permitido.\n"
+            "Configure SUPABASE_SERVICE_ROLE_KEY (role=service_role).\n"
+            "Obtenha em: Project Settings > API > service_role key"
+        )
+    else:
+        logger.warning(f"⚠️  {env_label}: {error_msg}")
 
 
 def _resolve_supabase_key() -> str:
     """
-    Resolve a chave Supabase seguindo prioridade padrão:
-    1. SUPABASE_SERVICE_ROLE_KEY (padrão oficial, backend apenas)
-    2. SUPABASE_ANON_KEY (fallback dev, frontend safe)
-    3. Legacy: SUPABASE_KEY, SUPABASE_LEGACY_JWT (compatibilidade)
+    Resolve a chave Supabase seguindo prioridade:
+    1. SUPABASE_SERVICE_ROLE_KEY (backend produção)
+    2. SUPABASE_ANON_KEY (dev/frontend)
+    3. Legacy keys (dev apenas)
 
-    IMPORTANTE:
-    - SUPABASE_SERVICE_ROLE_KEY: Backend apenas, bypassa RLS (admin)
-    - SUPABASE_ANON_KEY: Seguro para frontend, respeita RLS
+    Em produção (detectado via _is_production_env()):
+    - Exige SUPABASE_SERVICE_ROLE_KEY obrigatoriamente
+    - Falha imediatamente se ausente (RuntimeError)
     """
+    is_production = _is_production_env()
+
     # Padrão oficial (backend)
     service_role = (os.getenv('SUPABASE_SERVICE_ROLE_KEY') or '').strip()
     if service_role:
+        env_label = "PRODUÇÃO" if is_production else "DEV"
+        logger.info(f"✅ Usando SUPABASE_SERVICE_ROLE_KEY ({env_label})")
         return service_role
 
-    # Fallback para dev (anon key é segura mas limitada)
+    # PRODUÇÃO: Falha imediatamente se SERVICE_ROLE_KEY ausente
+    if is_production:
+        logger.error("❌ PRODUÇÃO: SUPABASE_SERVICE_ROLE_KEY não configurada")
+        raise RuntimeError(
+            "❌ AMBIENTE PRODUÇÃO: SUPABASE_SERVICE_ROLE_KEY é OBRIGATÓRIO.\n"
+            "\n"
+            "Detecção de produção via:\n"
+            "  - REQUIRE_SERVICE_ROLE_KEY=true (forma explícita), OU\n"
+            "  - FLASK_ENV=production, OU\n"
+            "  - APP_ENV=production\n"
+            "\n"
+            "Backend em produção não pode usar SUPABASE_ANON_KEY (limitações de RLS).\n"
+            "Configure: SUPABASE_SERVICE_ROLE_KEY=<sua-chave-service-role>\n"
+            "Obtenha em: Project Settings > API > service_role key\n"
+            "⚠️  NUNCA exponha ao frontend!"
+        )
+
+    # DEV: Fallback para ANON_KEY
     anon_key = (os.getenv('SUPABASE_ANON_KEY') or '').strip()
     if anon_key:
         logger.warning(
-            "⚠️  Usando SUPABASE_ANON_KEY. Para operações admin, use SUPABASE_SERVICE_ROLE_KEY"
+            "⚠️  DEV: Usando SUPABASE_ANON_KEY. "
+            "Para operações admin, configure SUPABASE_SERVICE_ROLE_KEY"
         )
         return anon_key
 
-    # Legacy: compatibilidade retroativa
+    # Legacy: compatibilidade retroativa (dev apenas)
     legacy_jwt = (os.getenv('SUPABASE_LEGACY_JWT') or '').strip()
     if legacy_jwt and legacy_jwt.startswith('eyJ'):
         logger.warning(
-            "⚠️  SUPABASE_LEGACY_JWT está deprecated. Use SUPABASE_SERVICE_ROLE_KEY"
+            "⚠️  DEV: SUPABASE_LEGACY_JWT está deprecated. Use SUPABASE_SERVICE_ROLE_KEY"
         )
         return legacy_jwt
 
-    # Fallback final: SUPABASE_KEY (ambíguo, deprecated)
+    # Fallback final: SUPABASE_KEY (ambíguo, deprecated, dev apenas)
     supabase_key = (os.getenv('SUPABASE_KEY') or '').strip()
     if supabase_key:
         logger.warning(
-            "⚠️  SUPABASE_KEY está deprecated. Use SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_ANON_KEY"
+            "⚠️  DEV: SUPABASE_KEY está deprecated. Use SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_ANON_KEY"
         )
         return supabase_key
 
@@ -96,25 +167,31 @@ def _resolve_supabase_key() -> str:
 
 def init_db():
     """Inicializa conexão com o Supabase."""
+    is_production = _is_production_env()
     supabase_url = (os.getenv('SUPABASE_URL') or '').strip()
+
+    # _resolve_supabase_key() já lança RuntimeError se produção sem SERVICE_ROLE_KEY
     supabase_key = _resolve_supabase_key()
 
     if not SUPABASE_AVAILABLE:
         raise RuntimeError(
             "Pacote 'supabase' não instalado. Execute: pip install supabase"
         )
+
     if not supabase_url:
         raise RuntimeError(
             "SUPABASE_URL não configurado.\n"
             "Defina no .env: SUPABASE_URL=https://your-project.supabase.co\n"
             "Obtenha em: Project Settings > API no Supabase Dashboard"
         )
+
+    # Validação genérica (produção já validada em _resolve_supabase_key)
     if not supabase_key:
         raise RuntimeError(
             "Nenhuma chave Supabase configurada.\n"
-            "Para backend: SUPABASE_SERVICE_ROLE_KEY (Project Settings > API > service_role key)\n"
-            "Para dev/frontend: SUPABASE_ANON_KEY (Project Settings > API > anon key)\n"
-            "NUNCA exponha service_role_key ao frontend!"
+            "Para backend: SUPABASE_SERVICE_ROLE_KEY\n"
+            "Para dev/frontend: SUPABASE_ANON_KEY\n"
+            "Obtenha em: Project Settings > API"
         )
 
     # Validar formato da chave
@@ -122,21 +199,23 @@ def init_db():
         raise RuntimeError(
             f"Chave Supabase inválida.\n"
             f"Deve começar com 'eyJ' (JWT) ou 'sb_secret_' (nova API key).\n"
-            f"Chave atual começa com: {supabase_key[:10]}...\n"
-            f"Obtenha a chave correta em: Project Settings > API"
+            f"Chave atual: {supabase_key[:10]}..."
         )
 
-    logger.info("📡 Inicializando Supabase...")
-    _init_supabase(supabase_url, supabase_key)
+    env_label = "PRODUÇÃO" if is_production else "DEV"
+    logger.info(f"📡 Inicializando Supabase ({env_label})...")
+    _init_supabase(supabase_url, supabase_key, is_production=is_production)
 
 
-def _init_supabase(url: str, key: str):
+def _init_supabase(url: str, key: str, is_production: bool = False):
     """Inicializa cliente Supabase."""
     global _supabase_client, _db_pool
 
     db_url = os.getenv('SUPABASE_DB_URL')  # Opcional: conexão direta PostgreSQL
 
     from supabase import create_client
+
+    env_label = "PRODUÇÃO" if is_production else "DEV"
 
     # Nova API key format (sb_secret_*)
     if key.startswith('sb_secret_'):
@@ -147,16 +226,16 @@ def _init_supabase(url: str, key: str):
             _supabase_client.supabase_key = key
             _supabase_client.options.headers.update(_supabase_client._get_auth_headers())
             _supabase_client._postgrest = None
-            logger.info("✅ Cliente Supabase inicializado (sb_secret_ key)")
+            logger.info(f"✅ Cliente Supabase inicializado (sb_secret_, {env_label})")
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar Supabase: {e}")
             raise
     else:
-        # JWT format (eyJ*): formato nativo
+        # JWT format: validar role como camada adicional
         try:
-            _log_supabase_jwt_key_role(key)
+            _log_supabase_jwt_key_role(key, is_production=is_production)
             _supabase_client = create_client(url, key)
-            logger.info("✅ Cliente Supabase inicializado com sucesso (JWT key)")
+            logger.info(f"✅ Cliente Supabase inicializado (JWT, {env_label})")
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar Supabase: {e}")
             raise
