@@ -199,7 +199,10 @@ def import_transactions():
         try:
             file_format, parsed_transactions = parse_import_file(file.filename, file_content)
         except Exception as e:
-            return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 400
+            current_app.logger.error(f'Erro ao processar arquivo: {str(e)}', exc_info=True)
+            return jsonify({
+                'error': 'Não foi possível processar o arquivo. Verifique o formato e tente novamente.'
+            }), 400
         
         if not parsed_transactions:
             return jsonify({'error': 'Nenhuma transação encontrada no arquivo'}), 400
@@ -221,12 +224,12 @@ def import_transactions():
         )
         default_income_category = income_cats[0] if income_cats else None
         default_expense_category = expense_cats[0] if expense_cats else None
-        
+
         imported_transactions = []
         errors = []
         created_categories = []  # Para rastrear categorias criadas
-        
-        tenant_id = getattr(request, 'tenant_id', None)
+
+        tenant_id = request.tenant_id  # Garantido por @require_tenant
 
         for idx, tx in enumerate(parsed_transactions):
             try:
@@ -249,8 +252,20 @@ def import_transactions():
                             user_categories[tx['category_name']] = category_id
                             created_categories.append(tx['category_name'])
                         except Exception as e:
-                            errors.append(f'Linha {idx + 2}: Erro ao criar categoria "{tx["category_name"]}": {str(e)}')
-                            continue
+                            current_app.logger.warning(
+                                f'Erro ao criar categoria "{tx["category_name"]}" para linha {idx + 2}: {str(e)}',
+                                exc_info=True
+                            )
+                            # Fallback para categoria padrão ao invés de descartar transação
+                            if tx['type'] == 'income' and default_income_category:
+                                category_id = default_income_category.get('id') or default_income_category.get('_id')
+                                errors.append(f'Linha {idx + 2}: Categoria "{tx["category_name"]}" não criada; usando categoria padrão.')
+                            elif tx['type'] == 'expense' and default_expense_category:
+                                category_id = default_expense_category.get('id') or default_expense_category.get('_id')
+                                errors.append(f'Linha {idx + 2}: Categoria "{tx["category_name"]}" não criada; usando categoria padrão.')
+                            else:
+                                errors.append(f'Linha {idx + 2}: Categoria "{tx["category_name"]}" não criada e nenhuma categoria padrão disponível.')
+                                continue  # Só descarta se realmente não houver fallback
                 else:
                     # Para Nubank/OFX, primeiro tenta resolver via aliases persistentes
                     detected = None
@@ -341,17 +356,17 @@ def import_transactions():
                 date_val = tx['date']
                 if hasattr(date_val, 'strftime'):
                     date_val = date_val.strftime('%Y-%m-%d')
-                tenant_id = getattr(request, 'tenant_id', None)
-                if not tenant_id:
+                # tenant_id já garantido por @require_tenant
+                if not request.tenant_id:
                     errors.append('Importação exige workspace. Recarregue a página ou faça login novamente.')
                     continue
                 entry_src = 'ofx' if file_format == 'ofx' else 'csv'
                 transaction_data = {
                     'id': str(uuid.uuid4()),
                     'user_id': request.user_id,
-                    'tenant_id': tenant_id,
-                    'account_tenant_id': tenant_id,
-                    'category_tenant_id': tenant_id,
+                    'tenant_id': request.tenant_id,
+                    'account_tenant_id': request.tenant_id,
+                    'category_tenant_id': request.tenant_id,
                     'description': tx['description'],
                     'amount': tx['amount'],
                     'type': tx['type'],
@@ -369,12 +384,19 @@ def import_transactions():
                 transaction_data['account_id'] = account_id
                 imported_transactions.append(transaction_data)
             except Exception as e:
-                errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
+                current_app.logger.error(
+                    f'Erro inesperado ao processar transação {idx + 1}: {str(e)}',
+                    exc_info=True,
+                    extra={'transaction_index': idx + 1, 'transaction_type': tx.get('type')}
+                )
+                errors.append(f'Transação {idx + 1}: Erro inesperado ao processar. Verifique os logs para detalhes.')
 
         duplicates_skipped = 0
 
         if imported_transactions:
-            # Deduplicação básica por FITID (quando disponível)
+            # Deduplicação por FITID (Financial Institution Transaction ID)
+            # Escopo: (user_id, account_id, fitid, tenant_id)
+            # Transações OFX com mesmo FITID na mesma conta são consideradas duplicatas
             fitids = sorted(
                 {tx.get('fitid') for tx in imported_transactions if tx.get('fitid')}
             )
@@ -385,7 +407,7 @@ def import_transactions():
                         request.user_id,
                         account_id,
                         fitids,
-                        tenant_id=tenant_id,
+                        tenant_id=request.tenant_id,
                     )
                 )
 
@@ -433,7 +455,10 @@ def import_transactions():
     except ValidationException as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
+        current_app.logger.error(f'Erro inesperado na importação: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': 'Erro inesperado ao processar a importação. Tente novamente mais tarde.'
+        }), 500
 
 
 @bp.route('/facets', methods=['GET'])
