@@ -14,8 +14,9 @@ Antes de iniciar qualquer tarefa:
 2. **Ler USER.md** — quem é o usuário, preferências
 3. **Ler MEMORY.md** — contexto de longo prazo do projeto
 4. **Ler TODO.md** — prioridades e gargalos atuais
-5. **Validar git status** — verificar mudanças pendentes
-6. **Checar logs recentes** — `backend.log`, `frontend.log`
+5. **Ler `docs/runbooks/runbook.md`** — estado operacional, pendências e premissas (fonte única)
+6. **Validar git status** — verificar mudanças pendentes
+7. **Checar logs recentes** — `backend.log`, `frontend.log`
 
 Não pergunte permissão. Apenas faça.
 

@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 import uuid
 import logging
 from utils.exceptions import ValidationException, NotFoundException
+from utils.category_name import collapse_whitespace_display
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class CategoryService:
         return categories
 
     def create_category(self, user_id: str, data: Dict[str, Any], tenant_id: Optional[str] = None) -> Dict[str, Any]:
-        name = data.get('name', '').strip() if data.get('name') else ''
+        name = collapse_whitespace_display(data.get('name', '') or '')
         category_type = data.get('type', '').strip() if data.get('type') else ''
 
         if not name:
@@ -31,7 +32,14 @@ class CategoryService:
         if not tenant_id:
             raise ValidationException('Workspace não identificado. Por favor, recarregue a página ou faça login novamente.')
 
-        existing = self.category_repo.find_by_name_and_type(user_id, name, category_type, tenant_id=tenant_id)
+        if hasattr(self.category_repo, 'find_equivalent_category'):
+            existing = self.category_repo.find_equivalent_category(
+                user_id, name, category_type, tenant_id=tenant_id
+            )
+        else:
+            existing = self.category_repo.find_by_name_and_type(
+                user_id, name, category_type, tenant_id=tenant_id
+            )
         if existing:
             raise ValidationException(f'Categoria "{name}" já existe para este tipo')
 
@@ -78,14 +86,25 @@ class CategoryService:
 
         # Valida e aplica nome (verifica duplicatas se nome mudou)
         if 'name' in data:
-            new_name = data['name'].strip() if data['name'] else ''
+            new_name = collapse_whitespace_display(data['name'] or '')
             if not new_name:
                 raise ValidationException('Nome da categoria não pode ser vazio')
             if new_name != category.get('name'):
                 # Verifica se já existe outra categoria com mesmo nome e tipo
                 tenant_id = category.get('tenant_id')
                 category_type = category.get('type')
-                existing = self.category_repo.find_by_name_and_type(user_id, new_name, category_type, tenant_id=tenant_id)
+                if hasattr(self.category_repo, 'find_equivalent_category'):
+                    existing = self.category_repo.find_equivalent_category(
+                        user_id,
+                        new_name,
+                        category_type,
+                        tenant_id=tenant_id,
+                        exclude_category_id=category_id,
+                    )
+                else:
+                    existing = self.category_repo.find_by_name_and_type(
+                        user_id, new_name, category_type, tenant_id=tenant_id
+                    )
                 if existing and (existing.get('id') or existing.get('_id')) != category_id:
                     raise ValidationException(f'Categoria "{new_name}" já existe para este tipo')
             update_data['name'] = new_name

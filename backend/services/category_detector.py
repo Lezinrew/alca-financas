@@ -1,8 +1,13 @@
 """
 Serviço para detectar e criar categorias automaticamente baseado em palavras-chave
 """
+import logging
 import re
 from typing import Dict, Any, Optional, Tuple
+
+from utils.category_name import collapse_whitespace_display
+
+logger = logging.getLogger(__name__)
 
 # Mapeamento de palavras-chave para categorias
 CATEGORY_KEYWORDS = {
@@ -225,32 +230,45 @@ def get_or_create_category(
     tenant_id: Optional[str] = None,
 ) -> str:
     """
-    Busca uma categoria pelo nome ou cria uma nova se não existir.
+    Busca uma categoria pelo nome (normalizado) ou cria uma nova se não existir.
+    Reutiliza legado com tenant_id NULL e associa ao tenant actual quando aplicável.
     Retorna o ID da categoria.
     """
-    # Busca categoria existente usando o repositório do serviço
-    # O serviço não tem find_by_name exposto publicamente que retorna o objeto completo com _id
-    # Mas podemos usar o repositório acessível via serviço
-    
-    existing = category_service.category_repo.find_by_name(
-        user_id,
-        category_name,
-        category_type,
-        tenant_id=tenant_id,
-    )
-    
+    display_name = collapse_whitespace_display(category_name or "")
+    repo = category_service.category_repo
+
+    if hasattr(repo, "find_equivalent_category"):
+        existing = repo.find_equivalent_category(
+            user_id, display_name, category_type, tenant_id=tenant_id
+        )
+    else:
+        existing = repo.find_by_name(
+            user_id,
+            display_name,
+            category_type,
+            tenant_id=tenant_id,
+        )
+
     if existing:
-        # Suporta tanto documentos antigos (_id) quanto registros SQL (id)
-        return existing.get('id') or existing.get('_id')
-    
-    # Cria nova categoria
+        eid = existing.get("id") or existing.get("_id")
+        if tenant_id and existing.get("tenant_id") in (None, ""):
+            try:
+                repo.update(str(eid), {"tenant_id": tenant_id})
+            except Exception as exc:
+                logger.warning(
+                    "Não foi possível associar tenant à categoria legada %s: %s",
+                    eid,
+                    exc,
+                )
+        return str(eid)
+
     category_data = {
-        'name': category_name,
-        'type': category_type,
-        'color': color or '#6C757D',
-        'icon': icon or 'circle'
+        "name": display_name,
+        "type": category_type,
+        "color": color or "#6C757D",
+        "icon": icon or "circle",
     }
-    
+
     new_category = category_service.create_category(user_id, category_data, tenant_id=tenant_id)
-    return new_category['id']
+    return str(new_category["id"])
 

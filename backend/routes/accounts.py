@@ -147,12 +147,17 @@ def import_credit_card_statement(account_id: str):
         
         # Importa serviço de detecção de categorias
         from services.category_detector import detect_category_from_description, get_or_create_category
-        
-        # Busca categorias do usuário no tenant atual
-        user_categories = {
-            cat['name']: (cat.get('id') or cat.get('_id'))
-            for cat in categories_repo.find_all({'user_id': request.user_id, 'tenant_id': request.tenant_id})
-        }
+        from utils.category_name import build_import_category_cache, import_category_cache_key
+
+        if hasattr(categories_repo, "find_by_user_including_legacy_null_tenant"):
+            _cats = categories_repo.find_by_user_including_legacy_null_tenant(
+                request.user_id, request.tenant_id
+            )
+        else:
+            _cats = categories_repo.find_all(
+                {"user_id": request.user_id, "tenant_id": request.tenant_id}
+            )
+        user_categories = build_import_category_cache(_cats, request.tenant_id or "")
         
         imported_transactions = []
         errors = []
@@ -168,7 +173,8 @@ def import_credit_card_statement(account_id: str):
                 
                 # Para CSV padrão, usa category_name se disponível
                 if file_format == 'csv' and 'category_name' in tx and tx['category_name']:
-                    category_id = user_categories.get(tx['category_name'])
+                    _ck = import_category_cache_key(tx['category_name'], 'expense', request.tenant_id or '')
+                    category_id = user_categories.get(_ck)
                     if not category_id:
                         # Tenta criar a categoria se não existir
                         try:
@@ -179,8 +185,11 @@ def import_credit_card_statement(account_id: str):
                                 'expense',
                                 tenant_id=request.tenant_id,
                             )
-                            # Atualiza o dicionário de categorias
-                            user_categories[tx['category_name']] = category_id
+                            user_categories[
+                                import_category_cache_key(
+                                    tx['category_name'], 'expense', request.tenant_id or ''
+                                )
+                            ] = category_id
                             created_categories.append(tx['category_name'])
                         except Exception as e:
                             errors.append(f'Linha {idx + 2}: Erro ao criar categoria "{tx["category_name"]}": {str(e)}')
@@ -201,10 +210,12 @@ def import_credit_card_statement(account_id: str):
                                 icon,
                                 tenant_id=request.tenant_id,
                             )
-                            # Atualiza o dicionário de categorias
-                            if category_name not in user_categories:
-                                user_categories[category_name] = category_id
+                            _ck = import_category_cache_key(
+                                category_name, 'expense', request.tenant_id or ''
+                            )
+                            if _ck not in user_categories:
                                 created_categories.append(category_name)
+                            user_categories[_ck] = category_id
                         except Exception as e:
                             errors.append(f'Transação {idx + 1}: Erro ao criar categoria "{category_name}": {str(e)}')
                             continue
