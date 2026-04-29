@@ -2,7 +2,7 @@
 
 **Fonte única de verdade** para estado do sistema, pendências e próximos passos operacionais. Deve ser atualizado quando se fechar tarefas P0, após deploys relevantes, ou mudança de premissas (auth, banco, URLs).
 
-**Última revisão do documento de estrutura:** 2026-04-23
+**Última revisão do documento de estrutura:** 2026-04-29
 
 ---
 
@@ -28,6 +28,7 @@
 
 | Data | Evento |
 |------|--------|
+| 2026-04-29 | Correção de duplicidade de categorias na importação OFX/CSV: normalização de nomes no backend, reutilização tenant/legado, script `scripts/sql/deduplicate_categories.sql`, query de inspeção `scripts/sql/inspect_duplicate_categories.sql` e migration `backend/database/migrations/016_unique_category_normalized.sql` para índice único funcional. |
 | 2026-04-23 | Adição da camada de **governança** na raiz e em `docs/` (README, `system-design.md`, runbook, ADRs, guia de agente, `infra/`, `n8n/`) para recuperabilidade humana e por agentes. |
 
 (Atualize esta tabela após deploys, cortes de release ou mudanças de auth/banco.)
@@ -37,22 +38,25 @@
 Itens a validar com o **estado real** de cada ambiente; prioridades históricas do projeto constam de `AGENTS.md` (secção *Current Priorities*):
 
 - Garantir que **migrations pendentes** do repositório estão **aplicadas** em **cada** projeto Supabase (dev/prod) — especialmente ficheiros `20260416*`, `20260417*`, RLS.
+- Executar `scripts/sql/deduplicate_categories.sql` em cada ambiente antes de aplicar a migration `016_unique_category_normalized.sql`.
+- Validar no produto (dropdown de categorias em Transações) que não há equivalentes duplicadas por nome/normalização após import OFX.
 - Alinhar **segredos** (`SUPABASE_JWT_SECRET`, chaves, `SECRET_KEY`) entre o que o Auth emite e o que o backend valida; evitar 401 inesperados em `/api/*`.
 - Onde o **OpenClaw** for usado: confirmar `OPENCLAW_GATEWAY_TOKEN` e rede entre bridge e gateway (`docker-compose.yml`).
 - **n8n** no VPS: confirmar `WEBHOOK_URL` / `N8N_HOST` e TLS apontando para o n8n escutando em `127.0.0.1:5678` por trás do Nginx (ver `docs/N8N-VPS-SETUP.md`).
 
 ## 5. Próximos passos (sugestão)
 
-1. Revisar `supabase/migrations/` e listar, por ambiente, o que falta aplicar.  
-2. Após aplicar RLS, fazer **smoke test**: login, listagem de contas/categorias/transações, uma escrita.  
-3. Atualizar este runbook com **data** e **resultado** do smoke.  
-4. Se alterar variáveis de produção, documentar em `docs/ENVIRONMENTS.md` ou anexo (sem expor valores).  
-5. Manter `AGENTS.md` e este ficheiro **coerentes** nas secções de prioridade.
+1. Executar `scripts/sql/inspect_duplicate_categories.sql` (baseline) e guardar evidência por ambiente.  
+2. Executar `scripts/sql/deduplicate_categories.sql` e revalidar inspeção sem duplicados elegíveis.  
+3. Aplicar `backend/database/migrations/016_unique_category_normalized.sql` após limpeza concluída.  
+4. Fazer **smoke test**: login, import OFX, dropdown de categorias sem duplicadas visuais, criação manual de categoria (variação de caixa/espaços) bloqueando duplicata.  
+5. Atualizar este runbook com **data** e **resultado** do smoke; manter `AGENTS.md` e este ficheiro coerentes.
 
 ## 6. Histórico resumido
 
 | Período | Notas |
 |--------|--------|
+| 2026-04-29 | Hardening de categorias: deduplicação SQL + normalização no backend + índice único funcional para evitar regressão de duplicatas na importação. |
 | 2026-03 a 2026-04 | Consolidação do schema Supabase: init, funções, RLS, hardening, `financial_expenses`, admin/audit, ajustes em transações. |
 | Migração legado | Dados e docs antigos (Mongo, etc.) em `legacy/`; runtime atual é Supabase. |
 | Sempre | CI em GitHub; deploy documentado em vários `docs/DEPLOY*.md` e scripts em `scripts/`. |
