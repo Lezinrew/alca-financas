@@ -24,6 +24,7 @@ ENV/
 # Logs
 logs/
 *.log
+*.h2d
 
 # Database
 mongo_data/
@@ -63,6 +64,7 @@ build/
 __pycache__/
 *.tar.gz
 alca-financas-*.tar.gz
+*~
 
 # Cursor MCP (contém API keys locais)
 .cursor/mcp.json
@@ -81,6 +83,15 @@ mongo_data/
 
 # DB operational exports
 scripts/db/_exports/
+backup*.sql
+prod_schema.sql
+staging_schema.sql
+
+# Local SSH keys / workstation-only files
+alca_financas_deploy
+alca_financas_deploy.pub
+.gitconfig
+1cd
 
 # Security: Scripts with hardcoded credentials
 scripts/insecure-legacy/

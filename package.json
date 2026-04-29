@@ -27,8 +27,26 @@
     "controle-financeiro",
     "react",
     "flask",
-    "mongodb"
+    "supabase",
+    "postgresql"
   ],
+  "projectStatus": {
+    "updatedAt": "2026-04-29",
+    "phase": "ativo-em-producao",
+    "stack": {
+      "frontend": "React + TypeScript + Vite",
+      "backend": "Flask/Python",
+      "database": "Supabase Postgres",
+      "auth": "Supabase Auth",
+      "multiTenant": true
+    },
+    "highlights": [
+      "Deduplicacao de categorias aplicada (scripts/sql/deduplicate_categories.sql)",
+      "Indice unico funcional de categorias aplicado (migration 016_unique_category_normalized.sql)",
+      "Pipeline CI/CD Supabase ativo",
+      "Gitleaks verde no commit mais recente"
+    ]
+  },
   "author": "Alça Finanças Team",
   "license": "MIT"
 }
