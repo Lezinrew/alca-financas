@@ -101,6 +101,41 @@ def create_from_transactions():
         return jsonify(e.to_dict()), e.status_code
 
 
+@bp.route("/summary", methods=["GET"])
+@require_auth
+@limiter.limit("200 per hour")
+@require_tenant
+def get_summary():
+    """
+    GET /api/financial-expenses/summary?month=X&year=Y
+
+    OTIMIZAÇÃO: Retorna resumo consolidado (contadores + somas) em 1 única resposta,
+    substituindo 5 requisições separadas do frontend.
+
+    Retorna:
+    - paid_count, open_count, overdue_count, canceled_count
+    - paid_sum_expected, open_remaining_sum
+    - total_in_month, sample_size, sums_partial
+    """
+    month = request.args.get("month", type=int)
+    year = request.args.get("year", type=int)
+
+    if not month or not year:
+        return jsonify({"error": "month e year são obrigatórios"}), 400
+    if not (1 <= month <= 12):
+        return jsonify({"error": "month deve estar entre 1 e 12"}), 400
+
+    svc = _service()
+    if not svc:
+        return jsonify({"error": "Módulo de despesas não disponível"}), 503
+
+    try:
+        summary = svc.get_summary(request.user_id, request.tenant_id, month, year)
+        return jsonify(summary)
+    except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
+
+
 @bp.route("/<expense_id>", methods=["GET"])
 @require_auth
 @require_tenant

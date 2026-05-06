@@ -380,6 +380,39 @@ class TransactionRepository(BaseRepository):
             logging.error(f"Erro ao buscar FITIDs existentes: {e}")
             return []
 
+    def find_monthly_aggregated(
+        self,
+        user_id: str,
+        start_date: str,
+        end_date: str,
+        tenant_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Busca transações agregadas por mês/ano em um período.
+        Retorna dados pré-agregados para otimizar evolução mensal.
+
+        OTIMIZAÇÃO: Faz 1 query única ao invés de N queries (uma por mês).
+        """
+        try:
+            query = (
+                get_supabase()
+                .table(self.table_name)
+                .select("date, type, amount, status")
+                .eq("user_id", user_id)
+                .gte("date", start_date)
+                .lt("date", end_date)
+                .order("date", desc=False)
+            )
+            if tenant_id:
+                query = query.eq("tenant_id", tenant_id)
+
+            response = query.execute()
+            return response.data if response.data else []
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao buscar transações agregadas: {e}")
+            return []
+
     def create_many(self, transactions: List[Dict[str, Any]]) -> List[str]:
         """
         Cria múltiplas transações. Garante account_tenant_id e category_tenant_id = tenant_id.
@@ -406,7 +439,7 @@ class TransactionRepository(BaseRepository):
                     tx["category_tenant_id"] = t_tenant_id
             supabase = get_supabase()
             response = supabase.table(self.table_name).insert(transactions).execute()
-            
+
             if response.data:
                 return [item['id'] for item in response.data]
             return []

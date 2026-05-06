@@ -121,6 +121,73 @@ class FinancialExpenseService:
         data = [enrich_expense(r) for r in result.get("data") or []]
         return {"data": data, "pagination": result.get("pagination") or {}}
 
+    def get_summary(
+        self,
+        user_id: str,
+        tenant_id: str,
+        month: int,
+        year: int,
+    ) -> Dict[str, Any]:
+        """
+        Retorna resumo consolidado de contas a pagar para um mês/ano específico.
+
+        OTIMIZAÇÃO: Faz 1 query única ao invés de 5 queries separadas.
+        Retorna contadores (paid, open, overdue, canceled) e somas agregadas.
+        """
+        # Busca todas as despesas do mês/ano (limite alto para pegar tudo)
+        filters = {"month": str(month), "year": str(year)}
+        result = self.repo.list_for_tenant(
+            user_id, tenant_id, filters, page=1, per_page=1000
+        )
+        rows = [enrich_expense(r) for r in result.get("data") or []]
+        total_count = result.get("pagination", {}).get("total", len(rows))
+
+        # Agregar contadores e somas em memória
+        paid_count = 0
+        open_count = 0
+        overdue_count = 0
+        canceled_count = 0
+        paid_sum = Decimal("0")
+        open_remaining_sum = Decimal("0")
+
+        for r in rows:
+            status = r.get("status", "pending")
+            is_overdue = r.get("is_overdue", False)
+
+            if status == "paid":
+                paid_count += 1
+                paid_sum += _to_decimal(r.get("amount_expected"), "amount_expected")
+            elif status == "canceled":
+                canceled_count += 1
+            else:
+                # pending ou partial
+                if is_overdue:
+                    overdue_count += 1
+                else:
+                    open_count += 1
+
+                expected = _to_decimal(r.get("amount_expected"), "amount_expected")
+                paid = _to_decimal(r.get("amount_paid"), "amount_paid")
+                remaining = max(Decimal("0"), expected - paid)
+                open_remaining_sum += remaining
+
+        month_label = datetime(year, month, 1).strftime("%B/%Y")
+
+        return {
+            "month": month,
+            "year": year,
+            "month_label": month_label,
+            "paid_count": paid_count,
+            "open_count": open_count,
+            "overdue_count": overdue_count,
+            "canceled_count": canceled_count,
+            "paid_sum_expected": float(paid_sum),
+            "open_remaining_sum": float(open_remaining_sum),
+            "total_in_month": total_count,
+            "sample_size": len(rows),
+            "sums_partial": len(rows) < total_count,
+        }
+
     def get_expense(self, user_id: str, tenant_id: str, expense_id: str) -> Dict[str, Any]:
         row = self.repo.find_by_id_for_tenant(expense_id, user_id, tenant_id)
         if not row:

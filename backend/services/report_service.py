@@ -155,39 +155,88 @@ def monthly_evolution_supabase(
 
     IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
     garantindo consistência com o saldo real das contas (current_balance).
+
+    OTIMIZAÇÃO: Faz 1 única query agregada ao invés de N queries separadas (uma por mês).
     """
-    evolution_data: List[Dict[str, Any]] = []
     current_date = datetime.now()
-    for i in range(months_back - 1, -1, -1):
-        target_date = current_date - timedelta(days=30 * i)
-        month_start = target_date.replace(day=1)
-        if target_date.month == 12:
-            month_end = target_date.replace(year=target_date.year + 1, month=1, day=1)
-        else:
-            month_end = target_date.replace(month=target_date.month + 1, day=1)
-        start_iso = month_start.strftime('%Y-%m-%d')
-        end_iso = month_end.strftime('%Y-%m-%d')
-        month_transactions = transactions_repo.find_by_user_and_date_range(
+
+    # Calcula data de início (N meses atrás)
+    oldest_target = current_date - timedelta(days=30 * (months_back - 1))
+    month_start = oldest_target.replace(day=1)
+    start_iso = month_start.strftime('%Y-%m-%d')
+
+    # Data de fim (primeiro dia do próximo mês)
+    if current_date.month == 12:
+        month_end = current_date.replace(year=current_date.year + 1, month=1, day=1)
+    else:
+        month_end = current_date.replace(month=current_date.month + 1, day=1)
+    end_iso = month_end.strftime('%Y-%m-%d')
+
+    # OTIMIZAÇÃO: 1 query única pegando todos os meses de uma vez
+    if hasattr(transactions_repo, 'find_monthly_aggregated'):
+        all_transactions = transactions_repo.find_monthly_aggregated(
+            user_id,
+            start_iso,
+            end_iso,
+            tenant_id=tenant_id,
+        )
+    else:
+        # Fallback para método antigo (caso repositório não tenha o novo método)
+        all_transactions = transactions_repo.find_by_user_and_date_range(
             user_id,
             start_iso,
             end_iso,
             tenant_id=tenant_id,
         )
 
-        # Filtra apenas transações pagas para consistência com saldo das contas
-        paid_month_transactions = [t for t in month_transactions if t.get('status') == 'paid']
+    # Filtra apenas transações pagas
+    paid_transactions = [t for t in all_transactions if t.get('status') == 'paid']
 
-        month_income = sum(float(t.get('amount', 0)) for t in paid_month_transactions if t.get('type') == 'income')
-        month_expense = sum(float(t.get('amount', 0)) for t in paid_month_transactions if t.get('type') == 'expense')
+    # Agrupa por mês/ano em memória (Python dict)
+    from collections import defaultdict
+    monthly_groups: Dict[tuple, Dict[str, Any]] = defaultdict(
+        lambda: {'income': 0.0, 'expense': 0.0, 'count': 0}
+    )
+
+    for t in paid_transactions:
+        date_str = t.get('date')
+        if not date_str:
+            continue
+
+        # Parse da data (pode ser string ISO ou objeto date)
+        if isinstance(date_str, str):
+            tx_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        else:
+            tx_date = datetime.combine(date_str, datetime.min.time())
+
+        key = (tx_date.year, tx_date.month)
+        amount = float(t.get('amount', 0))
+        tx_type = t.get('type', 'expense')
+
+        if tx_type == 'income':
+            monthly_groups[key]['income'] += amount
+        elif tx_type == 'expense':
+            monthly_groups[key]['expense'] += amount
+
+        monthly_groups[key]['count'] += 1
+
+    # Monta lista de evolução ordenada (últimos N meses)
+    evolution_data: List[Dict[str, Any]] = []
+    for i in range(months_back - 1, -1, -1):
+        target_date = current_date - timedelta(days=30 * i)
+        key = (target_date.year, target_date.month)
+        data = monthly_groups.get(key, {'income': 0.0, 'expense': 0.0, 'count': 0})
+
         evolution_data.append({
             'period': target_date.strftime('%m/%Y'),
             'month': target_date.month,
             'year': target_date.year,
-            'income': month_income,
-            'expense': month_expense,
-            'balance': month_income - month_expense,
-            'transactions_count': len(paid_month_transactions)
+            'income': data['income'],
+            'expense': data['expense'],
+            'balance': data['income'] - data['expense'],
+            'transactions_count': data['count']
         })
+
     return evolution_data
 
 
