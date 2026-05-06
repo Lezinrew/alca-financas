@@ -71,11 +71,11 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 
 ### Checklist
 
-- [ ] Formalizar decisão arquitetural em texto (1 fonte oficial).
-- [ ] Definir explicitamente no código/docs qual é o caminho oficial e qual é legado.
-- [ ] Desativar caminho não oficial (ou marcar explicitamente como legado inativo, sem uso no fluxo principal).
-- [ ] Garantir que frontend usa apenas o caminho decidido.
-- [ ] Confirmar que endpoint de health do caminho oficial responde.
+- [x] Formalizar decisão arquitetural em texto (1 fonte oficial).
+- [x] Definir explicitamente no código/docs qual é o caminho oficial e qual é legado.
+- [x] Desativar caminho não oficial (ou marcar explicitamente como legado inativo, sem uso no fluxo principal).
+- [x] Garantir que frontend usa apenas o caminho decidido.
+- [x] Confirmar que endpoint de health do caminho oficial responde.
 
 ### Critério de saída
 

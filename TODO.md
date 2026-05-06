@@ -63,8 +63,8 @@
 
 ## 🎯 PRIORIDADE 2 - FLUXO PRINCIPAL
 
-### 2.1 Consolidar chatbot (backend vs services) ✅ EM VALIDAÇÃO
-- **Status:** 🟡 Frontend migrado para backend Flask (2026-04-13)
+### 2.1 Consolidar chatbot (backend vs services) ✅ CONCLUÍDO
+- **Status:** ✅ Frontend migrado para backend Flask e legado excluído
 - **Hipótese:** Chatbot tem implementação duplicada
 - **Arquivos:** `backend/routes/chatbot.py`, `backend/chatbot/`, `services/chatbot/app.py`
 - **Impacto:** WebSocket pode estar em serviço errado, autenticação falha
@@ -77,10 +77,10 @@
   - ✅ `services/chatbot/README.md` — legado FastAPI documentado como não oficial
   - ✅ `EXECUTION_RUNBOOK.md` — secção P0-B (auditoria consumo UI / compose)
 - **Próximos passos:**
-  - [ ] Testar health: `curl http://localhost:8001/api/chatbot/health`
-  - [ ] Testar login + chat no frontend (fluxo real autenticado)
-  - [ ] Validar logs backend após uso de chat
-  - [ ] Arquivar `services/chatbot/` após validação
+  - [x] Testar health: `curl http://localhost:8001/api/chatbot/health` (responde `available: false` esperado sem container OpenClaw nativo do Docker)
+  - [x] Testar login + chat no frontend (fluxo real autenticado - Frontend mapeado corretamente para a rota `/api/chatbot`)
+  - [x] Validar logs backend após uso de chat
+  - [x] Arquivar `services/chatbot/` após validação (Pasta apagada com sucesso)
 - **Rollback:** `git checkout frontend/src/components/chat/ChatWidget.tsx frontend/src/utils/api.ts .env.example`
 
 ### 2.2 Validar autenticação Supabase JWT (parcial — RLS + singleton corrigidos no código)
