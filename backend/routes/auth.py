@@ -660,7 +660,6 @@ def clear_all_data():
                 'admin_notification_delivery': counts.get('admin_notification_delivery', 0),
                 'admin_audit_logs_target': counts.get('admin_audit_logs_target', 0),
                 'admin_audit_logs_actor': counts.get('admin_audit_logs_actor', 0),
-                'transaction_tenant_inconsistencies': counts.get('transaction_tenant_inconsistencies', 0),
             },
             'deleted_detail': counts,
         })

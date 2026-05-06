@@ -47,6 +47,7 @@ Itens a validar com o **estado real** de cada ambiente; prioridades históricas 
 - Alinhar **segredos** (`SUPABASE_JWT_SECRET`, chaves, `SECRET_KEY`) entre o que o Auth emite e o que o backend valida; evitar 401 inesperados em `/api/`*.
 - Onde o **OpenClaw** for usado: confirmar `OPENCLAW_GATEWAY_TOKEN` e rede entre bridge e gateway (`docker-compose.yml`).
 - **n8n** no VPS: confirmar `WEBHOOK_URL` / `N8N_HOST` e TLS apontando para o n8n escutando em `127.0.0.1:5678` por trás do Nginx (ver `docs/N8N-VPS-SETUP.md`).
+- `public.transaction_tenant_inconsistencies` é tabela **diagnóstica/backend-only**; não é `user-scoped` (sem `user_id`) e não deve entrar em wipe de dados por utilizador.
 
 ## 5. Próximos passos (sugestão)
 

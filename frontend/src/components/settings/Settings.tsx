@@ -224,7 +224,6 @@ const Settings = () => {
       const audit =
         (deleted.admin_audit_logs_target ?? 0) + (deleted.admin_audit_logs_actor ?? 0);
       push(audit > 0 ? audit : undefined, 'linhas de auditoria admin associadas');
-      push(deleted.transaction_tenant_inconsistencies, 'inconsistências de tenant (se existirem)');
 
       setSuccess(
         parts.length > 0

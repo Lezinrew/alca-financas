@@ -7,7 +7,7 @@ Regras:
 - budget_plans: por user_id.
 - budget_monthly: só em tenants onde o utilizador é o único membro (evita apagar planeamento partilhado).
 - merchant_category_aliases: por user_id; + por tenant_id nos mesmos tenants “só membros”.
-- Tabelas opcionais (ex.: transaction_tenant_inconsistencies): ignoradas se não existirem.
+- Tabelas diagnósticas backend-only (ex.: transaction_tenant_inconsistencies) não entram no wipe por user_id.
 """
 from __future__ import annotations
 
@@ -51,10 +51,8 @@ def wipe_user_business_data(user_id: str, config: Dict[str, Any]) -> Dict[str, i
     counts: Dict[str, int] = {}
     sole_tenants = _sole_tenant_ids(user_id)
 
-    # Opcional / legado
-    counts["transaction_tenant_inconsistencies"] = _try_delete_many(
-        "transaction_tenant_inconsistencies", {"user_id": user_id}
-    )
+    # Tabela diagnóstica backend-only (sem user_id): não é user-scoped.
+    counts["transaction_tenant_inconsistencies"] = 0
 
     tx_repo = config["TRANSACTIONS"]
     counts["transactions"] = tx_repo.delete_many({"user_id": user_id})
