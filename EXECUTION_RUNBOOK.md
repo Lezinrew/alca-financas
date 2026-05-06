@@ -141,11 +141,11 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 
 ### Checklist
 
-- [ ] Padronizar backend para `:8001`.
-- [ ] Padronizar chat para `/api/chatbot/*` (se essa for a decisão do bloco P0-B).
-- [ ] Padronizar política de segredo para estratégia vigente.
-- [ ] Inserir referência explícita ao `EXECUTION_BASELINE.md`.
-- [ ] Evitar expandir escopo para documentação histórica ampla nesta fase.
+- [x] Padronizar backend para `:8001`.
+- [x] Padronizar chat para `/api/chatbot/*` (se essa for a decisão do bloco P0-B).
+- [x] Padronizar política de segredo para estratégia vigente.
+- [x] Inserir referência explícita ao `EXECUTION_BASELINE.md`.
+- [x] Evitar expandir escopo para documentação histórica ampla nesta fase.
 
 ### Critério de saída
 

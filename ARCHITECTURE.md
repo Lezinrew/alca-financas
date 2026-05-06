@@ -1,7 +1,9 @@
 # ARCHITECTURE.md - Alça Finanças
 
-**Última atualização:** 2026-04-13  
-**Status:** P0 #1 em validação — Frontend migrado para Flask
+**Última atualização:** 2026-05-06
+**Status:** P0-A, P0-B e P0-C concluídos.
+
+> **Nota:** As definições operacionais canônicas estão em `EXECUTION_BASELINE.md` e `EXECUTION_RUNBOOK.md`.
 
 ---
 
@@ -13,30 +15,15 @@
 |------------|------------|-------|--------|
 | Frontend | React + Vite | 3000 | ✅ Estável |
 | Backend API | Flask + Supabase | 8001 | ✅ Estável |
-| Chatbot | Flask (backend) | 8001 | 🟡 Migrando (P0 #1) |
-| Chatbot (FastAPI) | FastAPI | 8100 | ⚠️ Arquivar após validação |
+| Chatbot | Flask (backend) | 8001 | ✅ Produção |
 | Mobile | React Native + Expo | 1900/8081 | 📋 Secundário |
 | Nginx | Reverse Proxy + SSL | 80/443 | ✅ Produção |
 | Supabase | PostgreSQL (cloud) | — | ✅ Produção |
 
 ---
 
-### ⚠️ P0 #1 — Migração do Chatbot (2026-04-13)
-
-**Status:** Frontend migrado para backend Flask, aguardando validação.
-
-**Mudanças:**
-- Frontend agora usa `/api/chatbot/chat` (Flask) em vez de `/api/chat` (FastAPI)
-- WebSocket desativado temporariamente (Flask ainda não implementou)
-- `services/chatbot/` será arquivado após testes
-
-**Próximos passos:**
-1. Testar health: `curl http://localhost:8001/api/chatbot/health`
-2. Testar login + chat no frontend
-3. Validar logs do backend
-4. Arquivar `services/chatbot/`
-
-**Rollback:** `git checkout frontend/src/components/chat/ChatWidget.tsx frontend/src/utils/api.ts .env.example`
+### Integração Chatbot Oficial
+O serviço de Chatbot utiliza a rota `/api/chatbot/*` nativa no Flask, sem dependência de serviços externos FastAPI.
 
 ---
 
@@ -51,15 +38,15 @@
                               │   SSL + Reverse     │
                               └─────────────────────┘
                     ┌─────────────┼─────────────┐
-                    │             │             │
-                    ▼             ▼             ▼
-          ┌─────────────┐ ┌───────────┐ ┌─────────────┐
-          │  Frontend   │ │  Backend  │ │   Chatbot   │
-          │  React/Vite │ │   Flask   │ │   FastAPI   │
-          │   :3000     │ │   :8001   │ │    :8100    │
-          └─────────────┘ └─────┬─────┘ └──────┬──────┘
-                                │              │
-                                ▼              ▼
+                    │             │             
+                    ▼             ▼             
+          ┌─────────────┐ ┌───────────┐ 
+          │  Frontend   │ │  Backend  │ 
+          │  React/Vite │ │   Flask   │ 
+          │   :3000     │ │   :8001   │ 
+          └─────────────┘ └─────┬─────┘ 
+                                │              
+                                ▼              
                          ┌──────────┐   ┌────────────┐
                          │ Supabase │   │ OpenClaw   │
                          │ Postgres │   │   (LLM)    │
@@ -148,24 +135,7 @@ mobile/src/
 
 ---
 
-### Chatbot (FastAPI)
 
-**Entrypoint:** `services/chatbot/app.py`
-
-```
-services/chatbot/
-├── app.py              # FastAPI + WebSocket
-├── requirements.txt
-└── __init__.py
-```
-
-**Protocolos:**
-- HTTP: `POST /api/chat`
-- WebSocket: `WS /api/chat/ws?token=<JWT>`
-
-**⚠️ P0:** Duplicado com `backend/routes/chatbot.py`
-
----
 
 ### Integrações
 
@@ -192,12 +162,10 @@ services/chatbot/
 services:
   backend:    # Flask + Gunicorn :8001
   frontend:   # React + Vite :3000 (dev) ou Nginx (prod)
-  chatbot:    # FastAPI :8100 (⚠️ ausente em prod)
   nginx:      # Reverse proxy 80/443
   openclaw-gateway:  # Bridge OpenClaw
 ```
 
-**⚠️ P0:** `docker-compose.prod.yml` não define serviço `chatbot`
 
 ---
 
@@ -226,7 +194,6 @@ server {
         proxy_pass http://backend;
     }
     
-    # ⚠️ P0: Falta location para /api/chat/ws (WebSocket)
 }
 ```
 
@@ -234,12 +201,12 @@ server {
 
 ### Ambientes
 
-| Ambiente | Backend | Frontend | Chatbot | Docker |
-|----------|---------|----------|---------|--------|
-| Dev Local | Flask debug :8001 | Vite :3000 | FastAPI :8100 | docker-compose.yml |
-| Produção | Gunicorn :8001 | Nginx (build) | ❌ Ausente | docker-compose.prod.yml |
+| Ambiente | Backend | Frontend | Docker |
+|----------|---------|----------|--------|
+| Dev Local | Flask debug :8001 | Vite :3000 | docker-compose.yml |
+| Produção | Gunicorn :8001 | Nginx (build) | docker-compose.prod.yml |
 
-**⚠️ P0:** Inconsistência dev vs prod (chatbot, build path)
+**⚠️ P0:** Inconsistência dev vs prod (build path)
 
 ---
 
@@ -263,12 +230,6 @@ npm run dev
 npm run build
 
 # Produção (Nginx serve build/)
-```
-
-**Chatbot:**
-```bash
-# Dev e Prod (mesmo comando)
-uvicorn app:app --host 0.0.0.0 --port 8100
 ```
 
 ---
@@ -300,9 +261,6 @@ curl https://api.alcahub.cloud/health
 
 | Risco | Impacto | Probabilidade | Mitigação |
 |-------|---------|---------------|-----------|
-| Chatbot duplicado | Confusão, manutenção 2x | Alta | Consolidar em 1 implementação |
-| JWT secrets diferentes | Auth falha em prod | Alta | Unificar variáveis de ambiente |
-| Chatbot ausente em prod | Feature indisponível | Certa | Adicionar serviço ao compose |
 | Build path inexistente | Frontend 404 em prod | Certa | Script de build pré-deploy |
 | Dev ≠ Prod | Bugs só aparecem em prod | Média | Alinhar configs, testar em staging |
 
@@ -310,27 +268,12 @@ curl https://api.alcahub.cloud/health
 
 ### Gargalos Confirmados (P0)
 
-1. **Chatbot Duplicado**
-   - `backend/routes/chatbot.py` (Flask)
-   - `services/chatbot/app.py` (FastAPI)
-   - **Ação:** Escolher 1, remover outro
-
-2. **JWT Secrets Dessincronizados**
-   - Backend: `SUPABASE_JWT_SECRET`
-   - Chatbot: `JWT_SECRET` ou `SECRET_KEY`
-   - **Ação:** Unificar para `SUPABASE_JWT_SECRET`
-
-3. **Chatbot Ausente em Produção**
-   - Serviço não definido em `docker-compose.prod.yml`
-   - Nginx sem rota WebSocket
-   - **Ação:** Adicionar serviço + config nginx
-
-4. **Frontend Build Path Inexistente**
+1. **Frontend Build Path Inexistente**
    - `build/frontend/` não existe
    - Nginx monta volume vazio
    - **Ação:** Executar `npm run build` antes de deploy
 
-5. **Docker Mismatch Backend**
+2. **Docker Mismatch Backend**
    - Dev: `python app.py` (Flask debug)
    - Prod: `gunicorn` (4 workers)
    - **Ação:** Documentar diferença ou alinhar
@@ -341,7 +284,7 @@ curl https://api.alcahub.cloud/health
 
 **Curto Prazo (30 dias):**
 - [ ] Corrigir todos os P0s antes de próximo deploy
-- [ ] Unificar chatbot (recomendado: Flask `backend/routes/chatbot.py`)
+- [x] Unificar chatbot (Flask `backend/routes/chatbot.py`)
 - [ ] Adicionar health checks em todos os serviços
 - [ ] Criar script `scripts/prod/deploy.sh` automatizado
 
