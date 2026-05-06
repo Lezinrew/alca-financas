@@ -1,2 +1,0 @@
-# Chatbot service package
-
