@@ -101,6 +101,8 @@ def create_from_transactions():
         return jsonify(e.to_dict()), e.status_code
 
 
+# IMPORTANTE: Rotas específicas devem vir ANTES de rotas com parâmetros variáveis
+# para evitar conflitos de roteamento (ex: /summary seria capturado por /<expense_id>)
 @bp.route("/summary", methods=["GET"])
 @require_auth
 @limiter.limit("200 per hour")
