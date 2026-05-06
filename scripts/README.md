@@ -233,7 +233,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Backend
 SECRET_KEY=<random_32_chars>
-JWT_SECRET=<random_32_chars>
+SUPABASE_JWT_SECRET=<jwt_secret_do_supabase>
 BACKEND_PORT=8001
 FLASK_ENV=production
 

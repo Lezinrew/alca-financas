@@ -105,15 +105,15 @@ Objetivo: executar P0 -> P1 -> P2 com menor risco de regressão e sem retrabalho
 
 ### Checklist
 
-- [ ] Mapear exatamente onde `JWT_SECRET` ainda influencia runtime.
-- [ ] Migrar scripts para `SUPABASE_JWT_SECRET` + `SECRET_KEY`.
-- [ ] Ajustar validações para falhar com mensagem clara quando env crítica faltar.
-- [ ] Validar login autenticado com token válido.
-- [ ] Validar bootstrap após login.
-- [ ] Validar carregamento do dashboard autenticado.
-- [ ] Validar acesso de contas (`accounts`) com autenticação.
-- [ ] Regressão **42501:** após `GET /api/auth/me`, `POST /api/accounts` (criar conta) deve responder **201** — confirma que o singleton não ficou com `set_session` do utilizador.
-- [ ] Validar chat autenticado no caminho oficial.
+- [x] Mapear exatamente onde `JWT_SECRET` ainda influencia runtime.
+- [x] Migrar scripts para `SUPABASE_JWT_SECRET` + `SECRET_KEY`.
+- [x] Ajustar validações para falhar com mensagem clara quando env crítica faltar.
+- [x] Validar login autenticado com token válido.
+- [x] Validar bootstrap após login.
+- [x] Validar carregamento do dashboard autenticado.
+- [x] Validar acesso de contas (`accounts`) com autenticação.
+- [x] Regressão **42501:** após `GET /api/auth/me`, `POST /api/accounts` (criar conta) deve responder **201** — confirma que o singleton não ficou com `set_session` do utilizador.
+- [x] Validar chat autenticado no caminho oficial.
 
 ### Critério de saída
 

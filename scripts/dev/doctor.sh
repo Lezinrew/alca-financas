@@ -61,7 +61,7 @@ else
     done
 
     # Check optional but recommended
-    RECOMMENDED_VARS=("JWT_SECRET" "CORS_ORIGINS")
+    RECOMMENDED_VARS=("SUPABASE_JWT_SECRET" "CORS_ORIGINS")
     for var in "${RECOMMENDED_VARS[@]}"; do
         if [ -z "${!var:-}" ]; then
             echo -e "  ${YELLOW}⚠️  $var not set (will use default)${NC}"
