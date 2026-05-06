@@ -367,10 +367,16 @@ def monthly_evolution(transactions_collection, user_id: str, months_back: int):
 
 
 def overview_report(transactions_collection, categories_collection, accounts_collection, user_id: str, month: int, year: int, report_type: str, account_id: str = None) -> Dict[str, Any]:
+    """
+    Relatório de visão geral usando MongoDB.
+
+    IMPORTANTE: Apenas transações com status='paid' são incluídas nos totais,
+    garantindo consistência com o saldo real das contas (current_balance).
+    """
     start_date = datetime(year, month, 1)
     end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     period_filter = {'user_id': user_id, 'date': {'$gte': start_date, '$lt': end_date}}
-    
+
     # Adiciona filtro por conta se fornecido
     if account_id:
         period_filter['account_id'] = account_id
@@ -387,7 +393,7 @@ def overview_report(transactions_collection, categories_collection, accounts_col
 
     if report_type == 'expenses_by_category':
         pipeline = [
-            {'$match': {**period_filter, 'type': 'expense'}},
+            {'$match': {**period_filter, 'type': 'expense', 'status': 'paid'}},
             {'$group': {'_id': '$category_id', 'total': {'$sum': '$amount'}, 'count': {'$sum': 1}}},
             {'$sort': {'total': -1}}
         ]
@@ -412,7 +418,7 @@ def overview_report(transactions_collection, categories_collection, accounts_col
 
     elif report_type == 'income_by_category':
         pipeline = [
-            {'$match': {**period_filter, 'type': 'income'}},
+            {'$match': {**period_filter, 'type': 'income', 'status': 'paid'}},
             {'$group': {'_id': '$category_id', 'total': {'$sum': '$amount'}, 'count': {'$sum': 1}}},
             {'$sort': {'total': -1}}
         ]
@@ -437,7 +443,7 @@ def overview_report(transactions_collection, categories_collection, accounts_col
 
     elif report_type == 'expenses_by_account':
         pipeline = [
-            {'$match': {**period_filter, 'type': 'expense'}},
+            {'$match': {**period_filter, 'type': 'expense', 'status': 'paid'}},
             {'$group': {'_id': '$account_id', 'total': {'$sum': '$amount'}, 'count': {'$sum': 1}}},
             {'$sort': {'total': -1}}
         ]
@@ -465,7 +471,7 @@ def overview_report(transactions_collection, categories_collection, accounts_col
 
     elif report_type == 'income_by_account':
         pipeline = [
-            {'$match': {**period_filter, 'type': 'income'}},
+            {'$match': {**period_filter, 'type': 'income', 'status': 'paid'}},
             {'$group': {'_id': '$account_id', 'total': {'$sum': '$amount'}, 'count': {'$sum': 1}}},
             {'$sort': {'total': -1}}
         ]
