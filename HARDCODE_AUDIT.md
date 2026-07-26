@@ -11,27 +11,18 @@ Escopo: varredura de hardcodes de CORS, `localhost`/`127.0.0.1`, JWT/secrets, po
 
 ## Prioridade P0 (Crítico - corrigir imediatamente)
 
-### 1) Secret/token real versionado em arquivo de configuração recomendado
+### 1) ✅ RESOLVIDO — Secret/token real versionado em arquivo de configuração recomendado
 - **Arquivo:** `.cursor/mcp.json.recommended`
-- **Evidência:**
-  - `API_TOKEN` preenchido com valor real em `hostinger-mcp`.
-- **Risco:** comprometimento de infraestrutura externa (Hostinger MCP/API).
-- **Ação recomendada:**
-  - Revogar/rotacionar token imediatamente.
-  - Substituir no repositório por placeholder.
-  - Garantir que arquivo final com segredo real fique fora de versionamento.
+- **Evidência histórica:** `API_TOKEN` preenchido com valor real em `hostinger-mcp` (commit `c8164f9`).
+- **Correção aplicada:** placeholder `<HOSTINGER_API_TOKEN>` desde o commit `920fedd` (2026-04-16). O arquivo real com segredo (`.cursor/mcp.json`) está fora de versionamento (`.gitignore`).
+- **Remediação adicional (2026-07-26):** o valor real ainda estava recuperável no histórico do Git — purgado via `git filter-repo --replace-text` + force-push, verificado com re-clone independente.
+- **Pendente (fora do escopo deste repositório):** rotacionar o token no painel da Hostinger, já que ele foi exposto publicamente por um período.
 
-### 2) Chave Supabase (anon) hardcoded em script de hotfix
+### 2) ✅ RESOLVIDO — Chave Supabase (anon) hardcoded em script de hotfix
 - **Arquivo:** `scripts/hotfix-supabase-prod-simple.sh`
-- **Evidência:**
-  - `SUPABASE_URL="https://blutjlzyvhdvnkvrzdcm.supabase.co"`
-  - `SUPABASE_KEY="eyJ..."`
-  - `VITE_API_URL="http://localhost:8001"` em contexto de rebuild remoto.
-- **Risco:** vazamento de credencial e deploy com endpoint incorreto para produção.
-- **Ação recomendada:**
-  - Remover chave hardcoded e ler de variáveis de ambiente/secrets manager.
-  - Bloquear execução sem variáveis obrigatórias.
-  - Ajustar `VITE_API_URL` para domínio/API de produção no pipeline de produção.
+- **Evidência histórica:** `SUPABASE_URL`/`SUPABASE_KEY` (anon) hardcoded (commit `0aae601`); `VITE_API_URL="http://localhost:8001"` em contexto de rebuild remoto era intencional (script roda via SSH no próprio servidor de destino).
+- **Correção aplicada:** desde o commit `920fedd` (2026-04-16), o script exige `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` como variáveis de ambiente obrigatórias e aborta se ausentes.
+- **Remediação adicional (2026-07-26):** valor real da chave anon purgado do histórico do Git (mesmo processo do item 1). Risco residual é baixo — é uma chave `anon`, protegida por RLS, não `service_role` — mas rotacionar no painel do Supabase continua recomendado por higiene.
 
 ## Prioridade P1 (Alta - segurança e confiabilidade)
 
