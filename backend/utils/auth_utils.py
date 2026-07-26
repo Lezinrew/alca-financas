@@ -1,23 +1,9 @@
-from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify, current_app
-from typing import Optional
 import bcrypt
 import jwt
-import os
 
 from utils.supabase_jwt import verify_supabase_jwt
-
-
-JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", 24))
-
-
-def _app_jwt_signing_secret() -> str:
-    """
-    Segredo HS256 apenas para JWTs legados da app (generate_jwt / reset), não para Supabase.
-    Ordem: JWT_SECRET (legado, evitar) → SECRET_KEY (Flask). Fluxo principal da API: verify_supabase_jwt.
-    """
-    return (os.getenv("JWT_SECRET", "").strip() or os.getenv("SECRET_KEY", "").strip())
 
 
 def hash_password(password: str) -> str:
@@ -76,64 +62,6 @@ def check_password(password: str, hashed) -> bool:
         import logging
         logging.error(f"Erro ao verificar senha: {e}, tipo do hash: {type(hashed)}")
         return False
-
-
-import uuid
-
-def generate_jwt(user_id: str, tenant_id: Optional[str] = None) -> dict:
-    access_payload = {
-        'user_id': str(user_id),
-        'type': 'access',
-        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRES_HOURS),
-        'jti': str(uuid.uuid4())
-    }
-    if tenant_id:
-        access_payload['tenant_id'] = str(tenant_id)
-    refresh_payload = {
-        'user_id': str(user_id),
-        'type': 'refresh',
-        'exp': datetime.utcnow() + timedelta(days=7),
-        'jti': str(uuid.uuid4())
-    }
-    
-    secret = _app_jwt_signing_secret()
-    return {
-        'access_token': jwt.encode(access_payload, secret, algorithm='HS256'),
-        'refresh_token': jwt.encode(refresh_payload, secret, algorithm='HS256')
-    }
-
-
-def decode_token(token: str, type_required: str = 'access'):
-    try:
-        payload = jwt.decode(token, _app_jwt_signing_secret(), algorithms=['HS256'])
-        if payload.get('type') != type_required:
-            return None
-        return payload['user_id']
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-        return None
-
-
-RESET_TOKEN_EXPIRES_HOURS = 1
-
-
-def generate_reset_token(user_id: str) -> str:
-    payload = {
-        'user_id': str(user_id),
-        'type': 'reset',
-        'exp': datetime.utcnow() + timedelta(hours=RESET_TOKEN_EXPIRES_HOURS),
-        'jti': str(uuid.uuid4()),
-    }
-    token = jwt.encode(payload, _app_jwt_signing_secret(), algorithm='HS256')
-    return token.decode('utf-8') if isinstance(token, bytes) else token
-
-
-def decode_reset_token(token: str):
-    """Returns user_id if token is valid, else None."""
-    return decode_token(token, 'reset')
-
-
-def verify_jwt(token: str):
-    return decode_token(token, 'access')
 
 
 def require_auth(f):

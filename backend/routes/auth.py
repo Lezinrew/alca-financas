@@ -1,8 +1,6 @@
 # backend/routes/auth.py
 
-from flask import Blueprint, request, jsonify, current_app, session
-from authlib.integrations.flask_client import OAuth
-from authlib.integrations.base_client.errors import MismatchingStateError
+from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 import uuid
 import os
@@ -11,7 +9,7 @@ import json
 import jwt
 import requests
 
-from utils.auth_utils import require_auth, generate_jwt
+from utils.auth_utils import require_auth
 from services.user_service import create_default_categories, get_user_public
 from services.bootstrap_service import AuthBootstrapService, TenantBootstrapError
 from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
@@ -271,252 +269,21 @@ def user_settings():
     return jsonify({'message': 'Configurações atualizadas com sucesso'})
 
 
-# OAuth Google endpoints (kept similar)
 @bp.route('/auth/google/login', methods=['GET'])
 def google_login():
-    oauth: OAuth = current_app.config['OAUTH']
-    google = oauth.create_client('google')
-    
-    # Usa a URL base da API para o callback (domínio principal + /api)
-    # Isso garante que o redirect_uri corresponda ao configurado no Google
-    api_base_url = os.getenv('API_BASE_URL', 'https://alcahub.cloud/api')
-    redirect_uri = f"{api_base_url}/auth/google/callback"
-    
-    import secrets
-    nonce = secrets.token_urlsafe(16)
-    session["__google_oidc_nonce__"] = nonce
-    session.permanent = True  # Torna a sessão permanente
-    session.modified = True  # Força o salvamento da sessão antes do redirect
-    return google.authorize_redirect(redirect_uri, nonce=nonce)
+    # Removido em 2026-07-26: callback usava MongoDB (find_one com $or/$push,
+    # insert_one) contra o repositório Supabase, que só suporta .eq() simples —
+    # a rota nunca funcionou em produção (sempre caía no except genérico) e
+    # não é oferecida por nenhum botão no frontend atual (Login.tsx). Também
+    # era o único chamador de generate_jwt (token legado da app, removido de
+    # auth_utils.py). Reimplementar exigiria reescrever o fluxo contra
+    # Supabase Auth (ou usar o provider OAuth nativo do Supabase).
+    return jsonify({'error': 'Login com Google não implementado ainda', 'message': 'Configure OAuth do Google via Supabase Auth'}), 501
 
 
 @bp.route('/auth/google/callback', methods=['GET'])
 def google_callback():
-    GOOGLE_CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
-    frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.cloud')
-    
-    if str(GOOGLE_CLIENT_ID).startswith('placeholder') or not GOOGLE_CLIENT_ID:
-        error_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Erro de Configuração</title>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
-        Erro: Configuração OAuth do Google não definida. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env
-    </p>
-    <script>
-        setTimeout(function() {{
-            window.location.href = {json.dumps(frontend_url + '/login?error=oauth_not_configured')};
-        }}, 3000);
-    </script>
-</body>
-</html>"""
-        return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
-    
-    try:
-        oauth: OAuth = current_app.config['OAUTH']
-        google = oauth.create_client('google')
-        api_base_url = os.getenv('API_BASE_URL', 'https://alcahub.cloud/api')
-        
-        # Verifica se há erro na requisição
-        error = request.args.get('error')
-        if error:
-            error_description = request.args.get('error_description', error)
-            error_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Erro de Autenticação</title>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
-        Erro na autenticação: {error_description}
-    </p>
-    <script>
-        setTimeout(function() {{
-            window.location.href = {json.dumps(frontend_url + '/login?error=' + error)};
-        }}, 3000);
-    </script>
-</body>
-</html>"""
-            return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
-        
-        # Tenta obter o token com verificação segura de state
-        token = None
-        nonce = None
-        try:
-            token = google.authorize_access_token()
-            nonce = session.get("__google_oidc_nonce__")
-        except MismatchingStateError as e:
-            # SEGURANÇA: NÃO fazer fallback - sessão OAuth expirou
-            error_msg = "Sessão OAuth expirou. Por favor, tente fazer login novamente."
-            current_app.logger.warning(f"OAuth state mismatch (security): {e}")
-
-            error_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Erro de Autenticação</title>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
-        {error_msg}
-    </p>
-    <script>
-        setTimeout(function() {{
-            window.location.href = {json.dumps(frontend_url + '/login?error=session_expired')};
-        }}, 3000);
-    </script>
-</body>
-</html>"""
-            return error_html, 401, {'Content-Type': 'text/html; charset=utf-8'}
-        
-        if not token:
-            raise Exception('Token de acesso não recebido do Google')
-
-        # SEGURANÇA: Sempre validar nonce e assinatura
-        if not nonce:
-            raise Exception('Nonce inválido - sessão OAuth expirada')
-
-        # Parse do ID token com verificação de assinatura (SEMPRE)
-        resp = google.parse_id_token(token, nonce=nonce)
-        session.pop("__google_oidc_nonce__", None)
-
-        # Validações adicionais de segurança
-        if resp.get('iss') not in ['https://accounts.google.com', 'accounts.google.com']:
-            raise Exception('Token issuer inválido')
-
-        GOOGLE_CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
-        if resp.get('aud') != GOOGLE_CLIENT_ID:
-            raise Exception('Token audience inválido')
-        google_user = {
-            'sub': resp['sub'],
-            'email': resp['email'],
-            'name': resp['name'],
-            'picture': resp.get('picture'),
-            'email_verified': resp.get('email_verified', False)
-        }
-        users_collection = current_app.config['USERS']
-        categories_collection = current_app.config['CATEGORIES']
-        user = users_collection.find_one({'$or': [
-            {'email': google_user['email']},
-            {'auth_providers.provider': 'google', 'auth_providers.sub': google_user['sub']}
-        ]})
-        if user:
-            provider_exists = any(p['provider'] == 'google' and p['sub'] == google_user['sub'] for p in user.get('auth_providers', []))
-            if not provider_exists:
-                users_collection.update_one({'_id': user['_id']}, {'$push': {'auth_providers': {'provider': 'google', 'sub': google_user['sub'], 'email_verified': google_user['email_verified']}}})
-        else:
-            user_data = {
-                '_id': str(uuid.uuid4()),
-                'name': google_user['name'],
-                'email': google_user['email'],
-                'password': None,
-                'settings': {'currency': 'BRL', 'theme': 'light', 'language': 'pt'},
-                'auth_providers': [{'provider': 'google', 'sub': google_user['sub'], 'email_verified': google_user['email_verified']}],
-                'profile_picture': google_user.get('picture'),
-                'created_at': datetime.utcnow()
-            }
-            users_collection.insert_one(user_data)
-            user = user_data
-            create_default_categories(categories_collection, user['_id'])
-        jwt_token = generate_jwt(_user_id(user))
-        user_data = get_user_public(user)
-        
-        # Redireciona para o frontend com o token e dados do usuário
-        # Usa uma página HTML intermediária que processa o token e redireciona
-        frontend_url = os.getenv('FRONTEND_URL', 'https://alcahub.cloud')
-        
-        # Prepara dados para o frontend
-        access_token = jwt_token['access_token']
-        refresh_token = jwt_token['refresh_token']
-        user_json_str = json.dumps(user_data)
-        
-        # Retorna HTML que processa o token e redireciona
-        html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Autenticando...</title>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <script>
-        // Salva token e dados do usuário no localStorage
-        try {{
-            localStorage.setItem('auth_token', {json.dumps(access_token)});
-            localStorage.setItem('refresh_token', {json.dumps(refresh_token)});
-            localStorage.setItem('user_data', {json.dumps(user_json_str)});
-            
-            // Redireciona para o dashboard
-            window.location.href = {json.dumps(frontend_url + '/dashboard')};
-        }} catch (e) {{
-            console.error('Erro ao salvar dados:', e);
-            window.location.href = {json.dumps(frontend_url + '/login?error=storage_error')};
-        }}
-    </script>
-    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
-        Autenticando... Aguarde.
-    </p>
-</body>
-</html>"""
-        return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
-    except MismatchingStateError as e:
-        # Erro específico de state mismatch (sessão expirada ou múltiplas tentativas)
-        error_msg = str(e)
-        print(f"Erro MismatchingStateError no callback OAuth: {error_msg}")
-        
-        user_message = "A sessão expirou. Por favor, tente fazer login novamente."
-        error_code = "session_expired"
-        
-        error_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Erro de Autenticação</title>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
-        {user_message}
-    </p>
-    <script>
-        setTimeout(function() {{
-            window.location.href = {json.dumps(frontend_url + '/login?error=' + error_code)};
-        }}, 3000);
-    </script>
-</body>
-</html>"""
-        return error_html, 400, {'Content-Type': 'text/html; charset=utf-8'}
-    except Exception as e:
-        import traceback
-        
-        error_msg = str(e)
-        error_trace = traceback.format_exc()
-        print(f"Erro no callback OAuth: {error_msg}")
-        print(error_trace)
-        
-        user_message = f"Erro no login com Google: {error_msg}"
-        error_code = "oauth_failed"
-        
-        error_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Erro de Autenticação</title>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <p style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif; color: red;">
-        {user_message}
-    </p>
-    <script>
-        setTimeout(function() {{
-            window.location.href = {json.dumps(frontend_url + '/login?error=' + error_code)};
-        }}, 3000);
-    </script>
-</body>
-</html>"""
-        return error_html, 500, {'Content-Type': 'text/html; charset=utf-8'}
+    return jsonify({'error': 'Login com Google não implementado ainda', 'message': 'Configure OAuth do Google via Supabase Auth'}), 501
 
 
 @bp.route('/auth/microsoft/login', methods=['GET'])
