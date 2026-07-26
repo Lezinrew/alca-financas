@@ -38,6 +38,7 @@ from routes.chatbot import bp as chatbot_bp
 from routes.planning import bp as planning_bp
 from routes.goals import bp as goals_bp
 from routes.financial_expenses import bp as financial_expenses_bp
+from routes.merchant_aliases import bp as merchant_aliases_bp
 
 # Permite subir o app (CI/testes/smoke) sem tentar conectar no Supabase
 SKIP_DB_INIT = os.getenv("SKIP_DB_INIT", "false").strip().lower() == "true"
@@ -216,6 +217,7 @@ if not SKIP_DB_INIT:
     app.register_blueprint(planning_bp)
     app.register_blueprint(goals_bp)
     app.register_blueprint(financial_expenses_bp)
+    app.register_blueprint(merchant_aliases_bp)
 else:
     logger.warning("⚠️  SKIP_DB_INIT=true: blueprints de dados NÃO registrados (somente /api/health disponível)")
 

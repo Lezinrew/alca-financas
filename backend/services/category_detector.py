@@ -18,10 +18,9 @@ CATEGORY_KEYWORDS = {
             'burger king', 'subway', 'pizza', 'pizzaria', 'café', 'cafeteria', 'starbucks',
             'bebida', 'bebidas', 'bar', 'boteco', 'cervejaria', 'churrascaria', 'sorveteria',
             'doceria', 'confeitaria', 'fast food', 'comida', 'alimento', 'alimentação',
-            'marukame', 'coco bambu', 'dona conce', 'pizza pazza', 'mi garba', 'estripulia',
-            'tradição da roca', 'patio', 'restaurante', 'rest', 'lanche', 'lanches',
+            'patio', 'restaurante', 'rest', 'lanche', 'lanches',
             # Nubank OFX / mercado
-            'produtos alimen', 'produtos alimem', 'jl produtos', 'lanchonete', 'restaurante '
+            'produtos alimen', 'produtos alimem', 'lanchonete', 'restaurante '
         ],
         'color': '#FF6B6B',
         'icon': 'basket'
@@ -32,10 +31,9 @@ CATEGORY_KEYWORDS = {
             'diesel', 'estacionamento', 'parking', 'pedágio', 'pedagio', 'metro', 'metrô',
             'ônibus', 'onibus', 'bilhete', 'passagem', 'transporte', 'viagem', 'viagens',
             'aéreo', 'aereo', 'aviao', 'avião', 'hotel', 'hospedagem', 'aluguel de carro',
-            'zeppelin', 'tereza cristina', 'quick', 'lagoa santa', 'auto bitts', 'direcao',
-            'direção', 'auto', 'carro', 'moto', 'bicicleta', 'bike',
+            'direcao', 'direção', 'auto', 'carro', 'moto', 'bicicleta', 'bike',
             # Nubank OFX: compra no débito em posto
-            'compra no débito - posto', 'compra no debito - posto', 'posto mineir'
+            'compra no débito - posto', 'compra no debito - posto'
         ],
         'color': '#4ECDC4',
         'icon': 'car-front'
@@ -90,8 +88,7 @@ CATEGORY_KEYWORDS = {
         'keywords': [
             'roupa', 'roupas', 'vestuário', 'vestuario', 'calçado', 'calcado', 'sapato',
             'sapatos', 'camisa', 'camisas', 'calça', 'calcas', 'moda', 'fashion',
-            'boutique', 'loja de roupas', 'zara', 'h&m', 'renner', 'c&a', 'riachuelo',
-            'slo silva lobo', 'borelli', 'lindt'
+            'boutique', 'loja de roupas', 'zara', 'h&m', 'renner', 'c&a', 'riachuelo'
         ],
         'color': '#E74C3C',
         'icon': 'shirt'
@@ -109,8 +106,7 @@ CATEGORY_KEYWORDS = {
     'Doações': {
         'keywords': [
             'doação', 'doacoes', 'doação', 'doar', 'caridade', 'ong', 'ong\'s',
-            'comunidade', 'igreja', 'templo', 'dízimo', 'dizimo', 'oferta', 'ofertas',
-            'comunidade crista luz', 'comun crist luz nacoes'
+            'comunidade', 'igreja', 'templo', 'dízimo', 'dizimo', 'oferta', 'ofertas'
         ],
         'color': '#E67E22',
         'icon': 'heart'
@@ -134,7 +130,7 @@ CATEGORY_KEYWORDS = {
     },
     'Filhos': {
         'keywords': [
-            'baby', 'bebê', 'bebe', 'luli baby', 'fralda', 'brinquedo infantil', 'bercinho'
+            'baby', 'bebê', 'bebe', 'fralda', 'brinquedo infantil', 'bercinho'
         ],
         'color': '#FD7E14',
         'icon': 'emoji-smile'

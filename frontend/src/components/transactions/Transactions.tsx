@@ -31,6 +31,7 @@ const Transactions = () => {
     categories: Array<{ id: string; name: string; count: number }>;
     accounts: Array<{ id: string; name: string; count: number }>;
     types: Array<{ type: string; count: number }>;
+    responsible_persons?: Array<{ name: string; count: number }>;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -419,6 +420,7 @@ const Transactions = () => {
           categories={categories}
           transaction={editingTransaction}
           defaultType={initialTransactionType ?? 'expense'}
+          responsiblePersons={facets?.responsible_persons ?? []}
         />
       )}
     </div>

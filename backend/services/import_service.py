@@ -1,9 +1,41 @@
 import csv
 import re
-from datetime import datetime
+import unicodedata
+from datetime import datetime, date as date_cls
 from typing import List, Dict, Any, Tuple
 from io import StringIO
 import xml.etree.ElementTree as ET
+
+
+def _strip_accents(value: str) -> str:
+    """Remove acentos para normalização de texto (chave de dedup)."""
+    normalized = unicodedata.normalize('NFKD', value)
+    return ''.join(c for c in normalized if not unicodedata.combining(c))
+
+
+def compute_dedup_key(tx_date: Any, amount: float, description: str, account_id: str, tx_type: str) -> str:
+    """
+    Chave de deduplicação universal para importação (csv e ofx).
+
+    Cobre a lacuna do fitid (só existe para OFX): reimportar o mesmo CSV
+    do Nubank sem esta chave duplicava todas as transações silenciosamente.
+
+    Fórmula: date | amount(2 casas) | DESCRICAO_SEM_ACENTO_UPPER | account_id | type
+    Mesmo espírito de NormalizarChave do FinanceOS (VBA), adaptado para usar
+    account_id (uuid) em vez de nome de banco em texto — mais preciso.
+    """
+    if hasattr(tx_date, 'strftime'):
+        date_str = tx_date.strftime('%Y-%m-%d')
+    elif isinstance(tx_date, (date_cls, datetime)):
+        date_str = tx_date.isoformat()[:10]
+    else:
+        date_str = str(tx_date)[:10]
+
+    desc_norm = _strip_accents(str(description or '')).strip().upper()
+    desc_norm = re.sub(r'\s+', ' ', desc_norm)
+
+    return f"{date_str}|{round(float(amount), 2):.2f}|{desc_norm}|{account_id}|{tx_type}"
+
 
 def _parse_signed_money_value(value: Any) -> float:
     """Parse monetário para importação bancária, preservando sinal."""

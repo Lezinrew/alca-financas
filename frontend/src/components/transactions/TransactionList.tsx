@@ -170,7 +170,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </td>
 
                   <td className="px-6 py-4">
-                    <span className="text-sm text-slate-600 dark:text-slate-300">{transaction.responsible_person || 'Leandro'}</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{transaction.responsible_person || '—'}</span>
                   </td>
 
                   <td className="px-6 py-4">

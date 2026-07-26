@@ -380,6 +380,37 @@ class TransactionRepository(BaseRepository):
             logging.error(f"Erro ao buscar FITIDs existentes: {e}")
             return []
 
+    def find_existing_dedup_keys(
+        self,
+        tenant_id: str,
+        dedup_keys: List[str],
+    ) -> List[str]:
+        """
+        Retorna a lista de dedup_keys já existentes para o tenant, dentre as fornecidas.
+        Usado para deduplicação universal na importação (csv e ofx) — cobre a
+        lacuna do fitid, que só existe para OFX.
+        """
+        from database.connection import get_supabase
+        import logging
+
+        if not dedup_keys:
+            return []
+
+        try:
+            supabase = get_supabase()
+            response = (
+                supabase.table(self.table_name)
+                .select("dedup_key")
+                .eq("tenant_id", tenant_id)
+                .in_("dedup_key", dedup_keys)
+                .execute()
+            )
+            rows = response.data or []
+            return [row.get("dedup_key") for row in rows if row.get("dedup_key")]
+        except Exception as e:
+            logging.error(f"Erro ao buscar dedup_keys existentes: {e}")
+            return []
+
     def find_monthly_aggregated(
         self,
         user_id: str,

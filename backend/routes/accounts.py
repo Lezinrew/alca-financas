@@ -96,15 +96,18 @@ def account_detail(account_id: str):
 @require_tenant
 def import_credit_card_statement(account_id: str):
     """Importa fatura de cartão de crédito via PDF, OFX ou CSV"""
-    from services.import_service import parse_import_file
-    
+    from services.import_service import parse_import_file, compute_dedup_key
+    from services.merchant_alias_service import MerchantAliasService
+
     account_repo = current_app.config['ACCOUNTS']
     categories_repo = current_app.config['CATEGORIES']
     transactions_repo = current_app.config['TRANSACTIONS']
-    
+
     account_service = AccountService(account_repo, transactions_repo)
     category_service = CategoryService(categories_repo, transactions_repo)
     transaction_service = TransactionService(transactions_repo, categories_repo, account_repo)
+    alias_repo = current_app.config.get('MERCHANT_ALIAS_REPO')
+    alias_service = MerchantAliasService(alias_repo) if alias_repo else None
     
     account = account_repo.find_by_id(account_id)
     if (
@@ -195,9 +198,27 @@ def import_credit_card_statement(account_id: str):
                             errors.append(f'Linha {idx + 2}: Erro ao criar categoria "{tx["category_name"]}": {str(e)}')
                             continue
                 else:
-                    # Para Nubank/OFX, detecta categoria automaticamente pela descrição
-                    detected = detect_category_from_description(tx['description'])
-                    
+                    # Para Nubank/OFX, primeiro tenta resolver via aliases persistentes
+                    # (mesmo mecanismo de backend/routes/transactions.py — antes desta
+                    # correção, o import de fatura de cartão pulava os aliases por
+                    # completo e ia direto para o dicionário genérico global).
+                    alias_category = None
+                    if alias_service:
+                        alias_result = alias_service.find_category_for_description(
+                            user_id=request.user_id,
+                            tenant_id=request.tenant_id,
+                            description=tx['description'],
+                            category_type='expense',
+                        )
+                        if alias_result:
+                            alias_category = alias_result
+
+                    if alias_category:
+                        alias_name, alias_type = alias_category
+                        detected = detect_category_from_description(alias_name) or (alias_name, None, None)
+                    else:
+                        detected = detect_category_from_description(tx['description'])
+
                     if detected:
                         category_name, color, icon = detected
                         try:
@@ -240,47 +261,90 @@ def import_credit_card_statement(account_id: str):
                 if tx['amount'] <= 0:
                     errors.append(f'Transação {idx + 1}: Valor deve ser positivo')
                     continue
-                
+
+                if not request.tenant_id:
+                    errors.append('Importação exige workspace. Recarregue a página ou faça login novamente.')
+                    continue
+
+                date_val = tx['date']
+                if hasattr(date_val, 'strftime'):
+                    date_val = date_val.strftime('%Y-%m-%d')
+
                 transaction_data = {
-                    '_id': str(uuid.uuid4()),
+                    'id': str(uuid.uuid4()),
                     'user_id': request.user_id,
+                    'tenant_id': request.tenant_id,
+                    'account_tenant_id': request.tenant_id,
+                    'category_tenant_id': request.tenant_id,
                     'description': tx['description'],
                     'amount': tx['amount'],
                     'type': 'expense',
                     'category_id': category_id,
                     'account_id': account_id,
-                    'date': tx['date'],
+                    'date': date_val,
                     'is_recurring': False,
                     'status': 'paid',  # Transações importadas de fatura geralmente são pagas
-                    'responsible_person': 'Leandro',
+                    'responsible_person': None,
                     'installment_info': None,
-                    'imported': True,
-                    'import_source': file_format,
-                    'created_at': datetime.utcnow()
+                    'entry_source': 'ofx' if file_format == 'ofx' else 'csv',
+                    'fitid': (tx.get('raw_data') or {}).get('fitid'),
                 }
+                transaction_data['dedup_key'] = compute_dedup_key(
+                    date_val, tx['amount'], tx['description'], account_id, 'expense'
+                )
                 imported_transactions.append(transaction_data)
             except Exception as e:
                 errors.append(f'Transação {idx + 1}: Erro inesperado - {str(e)}')
         
+        duplicates_skipped = 0
+        deduped_transactions = imported_transactions
+
         if imported_transactions:
-            transaction_service.create_many_transactions(imported_transactions)
-            
-            # Atualiza o saldo do cartão (diminui o current_balance)
-            # Calcula o total
-            total_amount = sum(t['amount'] for t in imported_transactions)
-            # Como são despesas, subtrai
-            account_service.update_balance(account_id, -total_amount)
-        
+            # Deduplicação universal por dedup_key (cobre csv e ofx; antes desta
+            # correção, esta rota não tinha NENHUMA deduplicação).
+            dedup_keys = sorted(
+                {tx.get('dedup_key') for tx in imported_transactions if tx.get('dedup_key')}
+            )
+            existing_dedup_keys = set()
+            if dedup_keys:
+                existing_dedup_keys = set(
+                    transactions_repo.find_existing_dedup_keys(request.tenant_id, dedup_keys)
+                )
+
+            deduped_transactions = []
+            seen_dedup_keys_in_batch = set()
+            for tx in imported_transactions:
+                tx_dedup_key = tx.get('dedup_key')
+                if tx_dedup_key and tx_dedup_key in existing_dedup_keys:
+                    duplicates_skipped += 1
+                    continue
+                if tx_dedup_key and tx_dedup_key in seen_dedup_keys_in_batch:
+                    duplicates_skipped += 1
+                    continue
+                if tx_dedup_key:
+                    seen_dedup_keys_in_batch.add(tx_dedup_key)
+                deduped_transactions.append(tx)
+
+            if deduped_transactions:
+                transaction_service.create_many_transactions(deduped_transactions)
+
+                # Atualiza o saldo do cartão (diminui o current_balance) apenas
+                # para transações realmente inseridas
+                total_amount = sum(t['amount'] for t in deduped_transactions)
+                # Como são despesas, subtrai
+                account_service.update_balance(account_id, -total_amount)
+
         result = {
-            'message': f'{len(imported_transactions)} transações importadas com sucesso',
-            'imported_count': len(imported_transactions),
+            'message': f'{len(deduped_transactions)} transações importadas com sucesso',
+            'imported_count': len(deduped_transactions),
             'error_count': len(errors),
             'file_format': file_format,
             'categories_created': len(created_categories),
-            'categories_created_list': list(set(created_categories))  # Remove duplicatas
+            'categories_created_list': list(set(created_categories)),  # Remove duplicatas
+            'duplicates_skipped': duplicates_skipped,
         }
         if errors:
             result['errors'] = errors
-        return jsonify(result), 201 if imported_transactions else 400
+        return jsonify(result), 201 if deduped_transactions else 400
     except Exception as e:
         return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500

@@ -31,6 +31,7 @@ interface TransactionFormProps {
   categories: TransactionCategory[];
   transaction?: TransactionRecord | null;
   defaultType?: TransactionType;
+  responsiblePersons?: Array<{ name: string; count: number }>;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({
@@ -40,6 +41,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   categories,
   transaction,
   defaultType = 'expense',
+  responsiblePersons = [],
 }) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<TransactionFormData>({
@@ -52,7 +54,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     is_recurring: false,
     installments: 1,
     status: 'pending',
-    responsible_person: 'Leandro'
+    responsible_person: ''
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -150,7 +152,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         is_recurring: transaction.is_recurring || false,
         installments: transaction.installment_info?.total || 1,
         status: transaction.status || 'pending',
-        responsible_person: transaction.responsible_person || 'Leandro',
+        responsible_person: transaction.responsible_person || '',
       });
     } else {
       setFormData({
@@ -163,7 +165,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         is_recurring: false,
         installments: 1,
         status: 'pending',
-        responsible_person: 'Leandro',
+        responsible_person: '',
       });
     }
   }, [transaction, defaultType]);
@@ -590,18 +592,21 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {/* Responsável */}
                 <div className="col-md-6">
                   <label htmlFor="transaction-responsible" className="form-label">Responsável</label>
-                  <select
+                  <input
                     id="transaction-responsible"
                     name="responsible_person"
-                    className="form-select"
+                    className="form-control"
+                    list="transaction-responsible-suggestions"
                     value={formData.responsible_person}
                     onChange={handleChange}
                     disabled={loading}
-                  >
-                    <option value="Leandro">Leandro</option>
-                    <option value="Glenda">Glenda</option>
-                    <option value="Ambos">Ambos</option>
-                  </select>
+                    placeholder="Quem é o responsável?"
+                  />
+                  <datalist id="transaction-responsible-suggestions">
+                    {responsiblePersons.map((rp) => (
+                      <option key={rp.name} value={rp.name} />
+                    ))}
+                  </datalist>
                 </div>
 
                 {/* Status (apenas visualização por enquanto) */}

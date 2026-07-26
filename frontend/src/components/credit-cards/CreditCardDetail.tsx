@@ -215,7 +215,6 @@ const CreditCardDetail: React.FC = () => {
         category_id: expenseData.category_id,
         account_id: cardId,
         status: 'paid',
-        responsible_person: 'Leandro',
       });
       setShowExpenseForm(false);
       await loadCardData();

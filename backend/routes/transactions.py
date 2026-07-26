@@ -111,7 +111,7 @@ def transaction_detail(transaction_id: str):
 @require_auth
 @require_tenant
 def import_transactions():
-    from services.import_service import parse_import_file
+    from services.import_service import parse_import_file, compute_dedup_key
     from services.account_service import AccountService
     from services.category_service import CategoryService
     from services.merchant_alias_service import MerchantAliasService
@@ -382,7 +382,7 @@ def import_transactions():
                     'date': date_val,
                     'is_recurring': False,
                     'status': 'paid',
-                    'responsible_person': 'Leandro',
+                    'responsible_person': None,
                     'installment_info': None,
                     'entry_source': entry_src,
                     # Propaga FITID (quando disponível) para deduplicação e rastreio
@@ -390,6 +390,11 @@ def import_transactions():
                 }
                 # account_id já foi garantido/validado anteriormente e é obrigatório
                 transaction_data['account_id'] = account_id
+                # Chave de deduplicação universal (csv + ofx) — cobre a lacuna do fitid,
+                # que só existe para OFX. Ver services.import_service.compute_dedup_key.
+                transaction_data['dedup_key'] = compute_dedup_key(
+                    date_val, tx['amount'], tx['description'], account_id, tx['type']
+                )
                 imported_transactions.append(transaction_data)
             except Exception as e:
                 current_app.logger.error(
@@ -419,12 +424,37 @@ def import_transactions():
                     )
                 )
 
+            # Deduplicação universal por dedup_key — cobre csv e ofx (fitid só existe
+            # para ofx). Sem isso, reimportar o mesmo CSV duplicava tudo silenciosamente.
+            dedup_keys = sorted(
+                {tx.get('dedup_key') for tx in imported_transactions if tx.get('dedup_key')}
+            )
+            existing_dedup_keys = set()
+            if dedup_keys:
+                existing_dedup_keys = set(
+                    transaction_repo.find_existing_dedup_keys(
+                        request.tenant_id,
+                        dedup_keys,
+                    )
+                )
+
             deduped_transactions = []
+            seen_dedup_keys_in_batch = set()
             for tx in imported_transactions:
                 tx_fitid = tx.get('fitid')
+                tx_dedup_key = tx.get('dedup_key')
                 if tx_fitid and tx_fitid in existing_fitids:
                     duplicates_skipped += 1
                     continue
+                if tx_dedup_key and tx_dedup_key in existing_dedup_keys:
+                    duplicates_skipped += 1
+                    continue
+                if tx_dedup_key and tx_dedup_key in seen_dedup_keys_in_batch:
+                    # Mesmo arquivo com linhas duplicadas internamente
+                    duplicates_skipped += 1
+                    continue
+                if tx_dedup_key:
+                    seen_dedup_keys_in_batch.add(tx_dedup_key)
                 deduped_transactions.append(tx)
 
             if deduped_transactions:
@@ -512,6 +542,7 @@ def transactions_facets():
     cat_counter = Counter()
     acc_counter = Counter()
     type_counter = Counter()
+    resp_counter = Counter()
 
     for tx in data:
         if tx.get('category_id'):
@@ -520,6 +551,8 @@ def transactions_facets():
             acc_counter[tx['account_id']] += 1
         if tx.get('type'):
             type_counter[tx['type']] += 1
+        if tx.get('responsible_person'):
+            resp_counter[tx['responsible_person']] += 1
 
     # Resolve nomes de categorias e contas
     categories = []
@@ -561,9 +594,11 @@ def transactions_facets():
                 })
 
     types = [{'type': t, 'count': c} for t, c in type_counter.items()]
+    responsible_persons = [{'name': n, 'count': c} for n, c in resp_counter.items()]
 
     return jsonify({
         'categories': categories,
         'accounts': accounts,
         'types': types,
+        'responsible_persons': responsible_persons,
     })
