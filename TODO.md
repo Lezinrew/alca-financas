@@ -5,6 +5,7 @@
 
 ### Concluído recentemente (código na `main`)
 
+- **OFX como SSOT do realizado (2026-07-28):** consultas financeiras, relatórios e IA filtram `source_file` por `.ofx`; 157 receitas/despesas canônicas foram sincronizadas do FinanceOS e 16 transferências internas permaneceram fora do fluxo operacional. Registros legados foram preservados com origem `legacy:*` para rollback.
 - **Transações ↔ contas a pagar (2026-04-17):** migration `20260417120001_transactions_entry_source_and_payable_source_tx.sql` (`entry_source`, `fitid`, `source_transaction_id`); import CSV/OFX define `entry_source`; criação manual define `manual`; `POST /api/financial-expenses/from-transactions`; UI em Contas a pagar (colar UUIDs + coluna Origem) e Transações (etiqueta CSV/OFX). Runbook: `EXECUTION_RUNBOOK.md` §6, `supabase/DEPLOY_RUNBOOK.md`, `skills/transactions/runbooks/observability.md`.
 - **Módulo administrativo (2026-04-17):** API `/api/admin/*` (stats, utilizadores, papel/estado, avisos inatividade, export CSV), auditoria em `admin_audit_logs`, notificações; **`POST /api/admin/users/<id>/purge`** (exclusão total: Auth + `public.users` com confirmação por e-mail; requer **`SUPABASE_SERVICE_ROLE_KEY`**).
 - **UI admin modo escuro:** `AdminDashboard`, `UserManagement`, `UserDetail`, `AdminLogs` com tokens Tailwind `dark-surface` / `dark-border` / `dark-text-*`; modal de purge; ação `purge_user` nos logs.

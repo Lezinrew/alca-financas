@@ -17,6 +17,8 @@
 
 ## 2. Contexto válido (premissas para trabalhar)
 
+- **Fonte do realizado:** somente transações com `source_file` terminado em `.ofx` entram em saldo, relatórios, contas pagas e respostas da IA. CSV, PDF, manual e `legacy:*` ficam fora dos cálculos.
+- A sincronização canônica é feita por `scripts/sync_financeos_ofx_ssot.py`; execute primeiro sem `--apply` e mantenha backup antes da aplicação.
 - Repositório: **alca-financas** (Flask + React + Supabase, não MongoDB em runtime atual).
 - Branches de integração: tipicamente `**main`** e `**develop**` (ver workflows).
 - Configuração local: copiar `**.env.example` → `.env**` na raiz; `SECRET_KEY` com **≥ 32 caracteres** (exigido por `backend/app.py`).

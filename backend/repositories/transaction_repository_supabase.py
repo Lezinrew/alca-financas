@@ -8,6 +8,8 @@ from database.connection import get_supabase
 
 
 class TransactionRepository(BaseRepository):
+    CANONICAL_SOURCE_PATTERN = "%.ofx"
+
     def __init__(self):
         super().__init__("transactions")
 
@@ -39,6 +41,7 @@ class TransactionRepository(BaseRepository):
         try:
             supabase = get_supabase()
             query = supabase.table(self.table_name).select("*", count="exact")
+            query = query.ilike("source_file", self.CANONICAL_SOURCE_PATTERN)
 
             # Filtro obrigatório: user_id
             query = query.eq("user_id", user_id)
@@ -117,6 +120,7 @@ class TransactionRepository(BaseRepository):
                 get_supabase()
                 .table(self.table_name)
                 .select("*")
+                .ilike("source_file", self.CANONICAL_SOURCE_PATTERN)
                 .eq("user_id", user_id)
                 .gte("date", start_date)
                 .lt("date", end_date)
@@ -164,6 +168,7 @@ class TransactionRepository(BaseRepository):
         try:
             supabase = get_supabase()
             query = supabase.table(self.table_name).select("*", count="exact")
+            query = query.ilike("source_file", self.CANONICAL_SOURCE_PATTERN)
 
             # Escopo obrigatório
             query = query.eq("user_id", user_id)
@@ -332,6 +337,7 @@ class TransactionRepository(BaseRepository):
                 get_supabase()
                 .table(self.table_name)
                 .select("*")
+                .ilike("source_file", self.CANONICAL_SOURCE_PATTERN)
                 .eq("user_id", user_id)
                 .order("date", desc=True)
                 .limit(limit)
@@ -429,6 +435,7 @@ class TransactionRepository(BaseRepository):
                 get_supabase()
                 .table(self.table_name)
                 .select("date, type, amount, status")
+                .ilike("source_file", self.CANONICAL_SOURCE_PATTERN)
                 .eq("user_id", user_id)
                 .gte("date", start_date)
                 .lt("date", end_date)

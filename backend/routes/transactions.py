@@ -385,6 +385,7 @@ def import_transactions():
                     'responsible_person': None,
                     'installment_info': None,
                     'entry_source': entry_src,
+                    'source_file': file.filename,
                     # Propaga FITID (quando disponível) para deduplicação e rastreio
                     'fitid': (tx.get('raw_data') or {}).get('fitid'),
                 }
