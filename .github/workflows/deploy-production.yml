@@ -85,7 +85,7 @@ jobs:
             set -e
             gunzip -c /tmp/backend-images.tar.gz | docker load
             rm -f /tmp/backend-images.tar.gz
-            cd /var/www/alca-financas
+            cd /apps/alca-financas
             git fetch origin
             git reset --hard ${{ env.DEPLOY_SHA }}
             git clean -fd
@@ -116,7 +116,7 @@ jobs:
           envs: VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY
           script: |
             set -e
-            cd /var/www/alca-financas
+            cd /apps/alca-financas
             git fetch origin
             git reset --hard ${{ env.DEPLOY_SHA }}
             git clean -fd
@@ -133,7 +133,7 @@ jobs:
             docker run --rm \
               -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
               -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
-              -v /var/www/alca-financas/frontend:/app \
+              -v /apps/alca-financas/frontend:/app \
               -w /app \
               node:22-alpine \
               sh -lc "npm ci && npm run build"
