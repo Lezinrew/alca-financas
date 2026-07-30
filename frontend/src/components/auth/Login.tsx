@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Input } from '../ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { GradientButton } from '../ui/gradient-button';
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import LoginVisualPanel from './LoginVisualPanel';
 
 const Login: React.FC = () => {
   const { login } = useAuth();
@@ -75,47 +75,51 @@ const Login: React.FC = () => {
     }
   };
 
+  const errorId = 'login-error-message';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-login-page dark:bg-login-page p-4 transition-colors duration-200">
-      <div className="w-full max-w-md relative z-10">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <div className="relative flex justify-center mb-8 animate-fade-in">
-            <div className="relative animate-float">
-              {/* Glow adaptativo: light = emerald, dark = branco suave */}
-              <div
-                className="absolute -inset-12 -z-10 rounded-full blur-3xl opacity-40 animate-glow-pulse bg-emerald-500/15 dark:bg-white/10"
-                aria-hidden
-              />
+    <div className="login-page">
+      <LoginVisualPanel />
+
+      <div className="login-form-panel">
+        <div className="login-form-panel__inner">
+          <div className="login-form-panel__brand-mobile login-stagger-1">
+            <span className="login-logo-badge">
               <img
                 src="/alcahub-logo.png"
                 alt="Alça Finanças"
-                className="w-44 h-auto drop-shadow-lg dark:drop-shadow-[0_10px_30px_rgba(255,255,255,0.25)]"
+                className="login-form-panel__logo-mobile"
               />
-            </div>
+            </span>
           </div>
-          <p className="text-slate-600 dark:text-slate-300 transition-colors mt-2">
-            Controle financeiro inteligente
-          </p>
-        </div>
 
-        <Card className="card-login shadow-xl border-0">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl font-semibold text-center text-slate-900 dark:text-white">
-              Bem-vindo de volta
-            </CardTitle>
-            <CardDescription className="text-center text-slate-600 dark:text-slate-400">
-              Entre com seu e-mail e senha
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="login-form-panel__copy-tablet login-stagger-1">
+            <h1 className="login-form-panel__copy-tablet-headline">
+              Sua vida financeira, organizada em um só lugar.
+            </h1>
+            <p className="login-form-panel__copy-tablet-subtext">
+              Visualize seus gastos, acompanhe suas metas e tome decisões com mais clareza.
+            </p>
+          </div>
+
+          <div className="login-glass-card login-stagger-2">
+            <div className="login-glass-card__header">
+              <h2 className="login-glass-card__title">Bem-vindo de volta</h2>
+              <p className="login-glass-card__subtitle">
+                Entre para continuar no Alça Finanças
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="login-glass-card__form" noValidate>
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   E-mail
                 </label>
                 <div className={cn('relative rounded-lg input-with-icon', error && 'input-error')}>
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <Mail
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
+                    aria-hidden="true"
+                  />
                   <Input
                     id="email"
                     name="email"
@@ -127,6 +131,7 @@ const Login: React.FC = () => {
                     onChange={handleChange}
                     className="h-11 pl-10 border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
                     aria-invalid={!!error}
+                    aria-describedby={error ? errorId : undefined}
                   />
                 </div>
               </div>
@@ -136,7 +141,10 @@ const Login: React.FC = () => {
                   Senha
                 </label>
                 <div className={cn('relative rounded-lg input-with-icon', error && 'input-error')}>
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <Lock
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
+                    aria-hidden="true"
+                  />
                   <Input
                     id="password"
                     name="password"
@@ -148,21 +156,26 @@ const Login: React.FC = () => {
                     onChange={handleChange}
                     className="h-11 pl-10 pr-10 border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
                     aria-invalid={!!error}
+                    aria-describedby={error ? errorId : undefined}
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                     aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
                   </button>
                 </div>
               </div>
 
               <div className="flex items-center justify-between gap-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex items-center gap-2 cursor-pointer select-none py-1">
                   <input
                     id="remember-me"
                     name="rememberMe"
@@ -175,7 +188,7 @@ const Login: React.FC = () => {
                 </label>
                 <Link
                   to="/forgot-password"
-                  className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                  className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline py-1"
                 >
                   Esqueci a senha
                 </Link>
@@ -183,7 +196,7 @@ const Login: React.FC = () => {
 
               {postRegisterInfo && (
                 <div
-                  className="text-sm text-slate-700 dark:text-slate-200 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2.5"
+                  className="text-sm text-slate-700 dark:text-slate-200 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2.5 animate-fade-in"
                   role="status"
                 >
                   {postRegisterInfo}
@@ -192,10 +205,11 @@ const Login: React.FC = () => {
 
               {error && (
                 <div
+                  id={errorId}
                   className="text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5 animate-shake"
                   role="alert"
                 >
-                  <i className="bi bi-exclamation-triangle-fill text-amber-500 dark:text-amber-400 mr-2"></i>
+                  <i className="bi bi-exclamation-triangle-fill text-amber-500 dark:text-amber-400 mr-2" aria-hidden="true"></i>
                   {error}
                 </div>
               )}
@@ -208,7 +222,7 @@ const Login: React.FC = () => {
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     Entrando...
                   </>
                 ) : (
@@ -217,17 +231,14 @@ const Login: React.FC = () => {
               </GradientButton>
             </form>
 
-            <p className="text-center text-sm text-slate-600 dark:text-slate-400">
+            <p className="login-glass-card__footer">
               Não tem uma conta?{' '}
-              <Link
-                to="/register"
-                className="font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
-              >
+              <Link to="/register" className="login-glass-card__link">
                 Cadastre-se
               </Link>
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
