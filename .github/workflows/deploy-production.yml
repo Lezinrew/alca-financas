@@ -89,7 +89,7 @@ jobs:
             git fetch origin
             git reset --hard ${{ env.DEPLOY_SHA }}
             git clean -fd
-            docker compose -f docker-compose.prod.yml up -d openclaw-bridge backend
+            docker compose -f docker-compose.prod.yml up -d backend
 
   deploy-frontend:
     name: Deploy Frontend
