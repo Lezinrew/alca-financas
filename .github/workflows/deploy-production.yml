@@ -52,19 +52,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build OpenClaw Bridge image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/openclaw_bridge/Dockerfile
-          push: false
-          load: true
-          tags: alcahub-openclaw-bridge:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Save images
-        run: docker save alcahub-backend:latest alcahub-openclaw-bridge:latest | gzip > backend-images.tar.gz
+        run: docker save alcahub-backend:latest | gzip > backend-images.tar.gz
 
       - name: Copy image to server
         uses: appleboy/scp-action@v0.1.7
