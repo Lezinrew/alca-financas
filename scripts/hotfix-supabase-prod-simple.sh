@@ -32,7 +32,7 @@ echo ""
 
 ssh $PROD_USER@$PROD_HOST << EOF
     set -e
-    cd /var/www/alca-financas
+    cd /apps/alca-financas
 
     echo "🧹 Limpando builds antigos..."
     rm -rf frontend/dist build/frontend
@@ -43,7 +43,7 @@ ssh $PROD_USER@$PROD_HOST << EOF
       -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
       -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
       -e VITE_API_URL="http://localhost:8001" \
-      -v /var/www/alca-financas/frontend:/app \
+      -v /apps/alca-financas/frontend:/app \
       -w /app \
       node:22-alpine \
       sh -c "npm ci && npm run build"

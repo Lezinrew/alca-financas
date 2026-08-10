@@ -59,7 +59,7 @@ Servidor novo e primeiro deploy em sequência (inclui envio do `.env` com **pscp
 export SERVER_HOST="76.13.239.220"           # Seu IP VPS
 export SERVER_USER="root"                     # Seu usuário SSH
 export SERVER_SSH_KEY="~/.ssh/id_rsa"        # Chave SSH (opcional)
-export PROJECT_DIR="/var/www/alca-financas"  # Diretório no servidor
+export PROJECT_DIR="/apps/alca-financas"  # Diretório no servidor
 export DOMAIN="alcahub.cloud"                 # Seu domínio
 ```
 
@@ -76,7 +76,7 @@ O script criará um `.env.example`. Você precisa editá-lo com suas credenciais
 ```bash
 ssh root@76.13.239.220
 
-cd /var/www/alca-financas
+cd /apps/alca-financas
 nano .env
 ```
 
@@ -105,7 +105,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ### Passo 4: Restart Após Configurar .env
 
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker-compose -f docker-compose.prod.yml restart
 ```
 
@@ -145,7 +145,7 @@ export SERVER_USER="root"
 ```bash
 ssh root@76.13.239.220
 
-cd /var/www/alca-financas
+cd /apps/alca-financas
 git pull origin main
 docker-compose -f docker-compose.prod.yml restart
 ```
@@ -171,7 +171,7 @@ docker-compose -f docker-compose.prod.yml restart
 # Já corrigido no commit 11fa4f26
 # Fazer rebuild do frontend:
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker-compose -f docker-compose.prod.yml build frontend
 docker-compose -f docker-compose.prod.yml up -d frontend
 ```
@@ -181,7 +181,7 @@ docker-compose -f docker-compose.prod.yml up -d frontend
 **Verificar logs:**
 ```bash
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker-compose -f docker-compose.prod.yml logs backend
 ```
 
@@ -193,7 +193,7 @@ docker-compose -f docker-compose.prod.yml logs backend
 **Solução:**
 ```bash
 # Verificar .env
-cat /var/www/alca-financas/.env
+cat /apps/alca-financas/.env
 
 # Verificar porta
 netstat -tulpn | grep 8001
@@ -238,7 +238,7 @@ docker logs <container_id>
 
 **Rebuild completo:**
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker-compose -f docker-compose.prod.yml down
 docker-compose -f docker-compose.prod.yml build --no-cache
 docker-compose -f docker-compose.prod.yml up -d
@@ -254,7 +254,7 @@ docker-compose -f docker-compose.prod.yml up -d
 **Solução:**
 ```bash
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 # Rebuild frontend
 docker-compose -f docker-compose.prod.yml build frontend
@@ -274,7 +274,7 @@ ls -la build/frontend/
 **Solução:**
 ```bash
 # Editar .env
-nano /var/www/alca-financas/.env
+nano /apps/alca-financas/.env
 
 # Adicionar domínio correto
 CORS_ORIGINS=https://alcahub.cloud,https://www.alcahub.cloud

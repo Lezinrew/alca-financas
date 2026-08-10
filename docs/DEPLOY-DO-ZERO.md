@@ -29,18 +29,18 @@ Conectar via SSH e garantir que o diretório do projeto existe (o script também
 ssh root@SEU_IP_VPS
 
 # Criar diretório do projeto (se ainda não existir)
-mkdir -p /var/www/alca-financas
+mkdir -p /apps/alca-financas
 exit
 ```
 
 **Nota:** O script de deploy faz o clone automaticamente usando `git clone .` para evitar criar subpastas. Se você for clonar manualmente, use:
 
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 git clone https://github.com/Lezinrew/alca-financas.git .
 ```
 
-(O ponto `.` no final clona direto no diretório atual, evitando `/var/www/alca-financas/alca-financas`)
+(O ponto `.` no final clona direto no diretório atual, evitando `/apps/alca-financas/alca-financas`)
 
 O script de deploy instala Docker e Docker Compose no servidor; não é obrigatório instalar antes.
 
@@ -92,13 +92,13 @@ Se ainda não tiver: baixe PuTTY e use o `pscp.exe` do mesmo instalador.
 ```cmd
 cd C:\caminho\para\alca-financas
 
-pscp -pw SUA_SENHA_SSH .env root@SEU_IP_VPS:/var/www/alca-financas/.env
+pscp -pw SUA_SENHA_SSH .env root@SEU_IP_VPS:/apps/alca-financas/.env
 ```
 
 Com chave em vez de senha:
 
 ```cmd
-pscp -i C:\Users\Voce\.ssh\sua_chave.ppk .env root@SEU_IP_VPS:/var/www/alca-financas/.env
+pscp -i C:\Users\Voce\.ssh\sua_chave.ppk .env root@SEU_IP_VPS:/apps/alca-financas/.env
 ```
 
 ### Mac / Linux – **scp**
@@ -107,10 +107,10 @@ pscp -i C:\Users\Voce\.ssh\sua_chave.ppk .env root@SEU_IP_VPS:/var/www/alca-fina
 cd /caminho/para/alca-financas
 
 # Com senha (vai pedir a senha)
-scp .env root@SEU_IP_VPS:/var/www/alca-financas/.env
+scp .env root@SEU_IP_VPS:/apps/alca-financas/.env
 
 # Com chave SSH
-scp -i ~/.ssh/sua_chave .env root@SEU_IP_VPS:/var/www/alca-financas/.env
+scp -i ~/.ssh/sua_chave .env root@SEU_IP_VPS:/apps/alca-financas/.env
 ```
 
 Substitua `SEU_IP_VPS` (ex.: `76.13.239.220`) e o caminho da chave conforme seu ambiente.
@@ -127,7 +127,7 @@ cd /caminho/para/alca-financas
 # Variáveis do deploy (ajuste IP, domínio e chave se precisar)
 export SERVER_HOST="76.13.239.220"
 export SERVER_USER="root"
-export PROJECT_DIR="/var/www/alca-financas"
+export PROJECT_DIR="/apps/alca-financas"
 export DOMAIN="alcahub.cloud"
 
 # Opcional: chave SSH (senão o script pede senha)
@@ -157,8 +157,8 @@ Se o proxy/reverso (Traefik, Nginx, etc.) já estiver apontando para as portas d
 Para ver logs e reiniciar:
 
 ```bash
-ssh root@SEU_IP_VPS 'cd /var/www/alca-financas && docker-compose -f docker-compose.prod.yml logs -f backend'
-ssh root@SEU_IP_VPS 'cd /var/www/alca-financas && docker-compose -f docker-compose.prod.yml restart'
+ssh root@SEU_IP_VPS 'cd /apps/alca-financas && docker-compose -f docker-compose.prod.yml logs -f backend'
+ssh root@SEU_IP_VPS 'cd /apps/alca-financas && docker-compose -f docker-compose.prod.yml restart'
 ```
 
 ---
@@ -169,24 +169,24 @@ Ajuste `SEU_IP_VPS`, `SEU_DOMINIO` e o caminho do projeto.
 
 **1. Criar diretório no servidor (se quiser fazer antes):**
 ```bash
-ssh root@SEU_IP_VPS "mkdir -p /var/www/alca-financas"
+ssh root@SEU_IP_VPS "mkdir -p /apps/alca-financas"
 ```
 
 **2. Enviar .env (Mac/Linux):**
 ```bash
-scp .env root@SEU_IP_VPS:/var/www/alca-financas/.env
+scp .env root@SEU_IP_VPS:/apps/alca-financas/.env
 ```
 
 **2. Enviar .env (Windows – pscp):**
 ```cmd
-pscp -pw SUA_SENHA .env root@SEU_IP_VPS:/var/www/alca-financas/.env
+pscp -pw SUA_SENHA .env root@SEU_IP_VPS:/apps/alca-financas/.env
 ```
 
 **3. Deploy:**
 ```bash
 export SERVER_HOST="SEU_IP_VPS"
 export SERVER_USER="root"
-export PROJECT_DIR="/var/www/alca-financas"
+export PROJECT_DIR="/apps/alca-financas"
 export DOMAIN="SEU_DOMINIO"
 ./scripts/deploy-docker-remote.sh
 ```

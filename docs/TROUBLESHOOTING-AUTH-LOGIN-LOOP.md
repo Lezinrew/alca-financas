@@ -35,7 +35,7 @@ O erro **mais frequente** é reutilizar um único `.env` ou copiar variáveis cr
 
 ```bash
 # No servidor (SSH)
-cd /var/www/alca-financas
+cd /apps/alca-financas
 grep -E "SUPABASE_URL|SUPABASE_JWT_SECRET" .env
 ```
 
@@ -69,7 +69,7 @@ docker compose logs -f backend | grep -i "auth\|jwt\|401"
 2. Copie o **JWT Secret**
 3. No servidor:
    ```bash
-   nano /var/www/alca-financas/.env
+   nano /apps/alca-financas/.env
    # Atualizar: SUPABASE_JWT_SECRET=<jwt-secret-correto>
    docker compose restart backend
    ```
@@ -77,7 +77,7 @@ docker compose logs -f backend | grep -i "auth\|jwt\|401"
 ### Cenário 2: Frontend Buildado com Projeto Errado
 
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 ./scripts/rebuild-frontend-on-server.sh
 ```
 

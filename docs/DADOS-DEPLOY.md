@@ -101,7 +101,7 @@ Este documento lista **todos os dados necessários** para que eu possa fazer o d
 ### 6.1 Informações do Sistema
 - **Sistema Operacional**: `exemplo: Ubuntu 22.04` ou `Debian 11`
 - **Usuário do sistema** (para rodar a aplicação): `exemplo: www-data` ou `deploy`
-- **Diretório de instalação**: `exemplo: /var/www/alca-financas` (padrão recomendado)
+- **Diretório de instalação**: `exemplo: /apps/alca-financas` (padrão recomendado)
 
 ### 6.2 Portas
 - **Porta do backend** (Gunicorn): `8001` (padrão) ou outra

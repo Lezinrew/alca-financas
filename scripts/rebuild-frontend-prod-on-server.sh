@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild do frontend em produção no VPS com VITE_SUPABASE_* vindos do .env na raiz do projeto.
 # Uso (no servidor):
-#   cd /var/www/alca-financas
+#   cd /apps/alca-financas
 #   chmod +x scripts/rebuild-frontend-prod-on-server.sh
 #   ./scripts/rebuild-frontend-prod-on-server.sh
 #

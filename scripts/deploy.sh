@@ -157,8 +157,8 @@ elif [[ "$ENVIRONMENT" == "production" ]]; then
   ssh "$PROD_USER@$PROD_HOST" << EOF
     set -e
 
-    echo "📂 Navegando para /var/www/alca-financas"
-    cd /var/www/alca-financas
+    echo "📂 Navegando para /apps/alca-financas"
+    cd /apps/alca-financas
 
     echo "📥 Fazendo pull das mudanças"
     git fetch origin
@@ -193,10 +193,10 @@ EOF
   log_success "✅ Deploy de produção concluído!"
   echo ""
   log_info "Verificar status:"
-  echo "  ssh $PROD_USER@$PROD_HOST 'cd /var/www/alca-financas && docker compose -f docker-compose.prod.yml ps'"
+  echo "  ssh $PROD_USER@$PROD_HOST 'cd /apps/alca-financas && docker compose -f docker-compose.prod.yml ps'"
   echo ""
   log_info "Ver logs:"
-  echo "  ssh $PROD_USER@$PROD_HOST 'cd /var/www/alca-financas && docker compose -f docker-compose.prod.yml logs -f'"
+  echo "  ssh $PROD_USER@$PROD_HOST 'cd /apps/alca-financas && docker compose -f docker-compose.prod.yml logs -f'"
 
 fi
 

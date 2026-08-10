@@ -70,7 +70,7 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
 
 2. Edite o arquivo `.env` do backend:
    ```bash
-   nano /var/www/alca-financas/backend/.env
+   nano /apps/alca-financas/backend/.env
    ```
 
 3. Adicione ou atualize as linhas:
@@ -106,7 +106,7 @@ Este guia explica como configurar a autenticação OAuth do Google para permitir
 
 ```bash
 ssh root@alcahub.cloud
-cat /var/www/alca-financas/backend/.env | grep GOOGLE
+cat /apps/alca-financas/backend/.env | grep GOOGLE
 ```
 
 Deve mostrar:

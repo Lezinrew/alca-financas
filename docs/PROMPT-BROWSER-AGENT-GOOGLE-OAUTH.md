@@ -98,7 +98,7 @@ Configure OAuth 2.0 no Google Cloud Console para "Alça Finanças":
    - https://alcahub.cloud/api/auth/google/callback
    - http://localhost:8001/api/auth/google/callback
 4. Capture e exiba GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET
-5. Informe que essas credenciais devem ser adicionadas em /var/www/alca-financas/backend/.env
+5. Informe que essas credenciais devem ser adicionadas em /apps/alca-financas/backend/.env
 ```
 
 ---
@@ -113,7 +113,7 @@ Configure OAuth 2.0 no Google Cloud Console para "Alça Finanças":
 
 ```bash
 ssh root@alcahub.com.br
-nano /var/www/alca-financas/backend/.env
+nano /apps/alca-financas/backend/.env
 # Adicione as linhas:
 # GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 # GOOGLE_CLIENT_SECRET=GOCSPX-xxx

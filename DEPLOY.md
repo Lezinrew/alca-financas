@@ -161,7 +161,7 @@ https://github.com/Lezinrew/alca-financas/actions
 
 # Via SSH no servidor
 ssh user@servidor
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f
 ```
@@ -172,7 +172,7 @@ Se algo der errado após deploy:
 
 ```bash
 # No servidor
-cd /var/www/alca-financas
+cd /apps/alca-financas
 git log --oneline -5  # Ver últimos commits
 git reset --hard <commit-anterior>
 docker compose -f docker-compose.prod.yml up -d --force-recreate
@@ -202,7 +202,7 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate
 ssh user@servidor
 
 # 2. Navegar para o diretório
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 # 3. Pull últimas mudanças
 git fetch origin

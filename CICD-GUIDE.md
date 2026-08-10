@@ -135,7 +135,7 @@ docker compose ps
 
 # PRODUÇÃO (via SSH)
 ssh user@servidor
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker compose -f docker-compose.prod.yml ps
 
 # Saída esperada:
@@ -158,7 +158,7 @@ docker compose logs -f frontend
 
 # PRODUÇÃO
 ssh user@servidor
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker compose -f docker-compose.prod.yml logs -f backend frontend
 ```
 
@@ -178,7 +178,7 @@ docker compose -f docker-compose.prod.yml logs -f backend frontend
 #### Método 2: Manual via SSH
 ```bash
 ssh user@servidor
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 # Ver últimos commits
 git log --oneline -5

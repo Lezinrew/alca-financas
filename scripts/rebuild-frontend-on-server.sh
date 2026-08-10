@@ -9,16 +9,16 @@ echo "================================"
 echo ""
 
 # Verificar se está no servidor
-if [ ! -d "/var/www/alca-financas" ]; then
+if [ ! -d "/apps/alca-financas" ]; then
     echo "❌ Este script deve ser executado NO SERVIDOR!"
     echo "Execute:"
     echo "  ssh root@76.13.239.220"
-    echo "  cd /var/www/alca-financas"
+    echo "  cd /apps/alca-financas"
     echo "  ./scripts/rebuild-frontend-on-server.sh"
     exit 1
 fi
 
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 echo "🧹 Limpando builds antigos e node_modules..."
 rm -rf frontend/node_modules frontend/dist build/frontend
@@ -28,7 +28,7 @@ echo "📦 Rebuilding frontend com Supabase config (fresh install)..."
 docker run --rm \
   -e VITE_SUPABASE_URL="https://blutjlzyvhdvnkvrzdcm.supabase.co" \
   -e VITE_SUPABASE_ANON_KEY="***REMOVED_SUPABASE_ANON_KEY***" \
-  -v /var/www/alca-financas/frontend:/app \
+  -v /apps/alca-financas/frontend:/app \
   -w /app \
   node:22-alpine \
   sh -c "rm -rf node_modules package-lock.json && npm install && npm run build"

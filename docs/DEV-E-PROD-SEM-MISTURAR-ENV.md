@@ -17,7 +17,7 @@ Quando se tenta fazer **desenvolvimento local** e **produção (VPS)** funcionar
    Em prod costuma ficar **vazio** ou **URL absoluta correta** para a API pública. Se apontar para `http://localhost:8001`, o browser dos utilizadores chama o **computador deles**, não o teu servidor.
 
 5. **Dois backends a usar o mesmo `.env` na VPS**  
-   Se alteraste o `.env` em `/var/www/alca-financas` para “parecer dev” (URLs locais, outro Supabase), **produção** deixa de validar os tokens certos.
+   Se alteraste o `.env` em `/apps/alca-financas` para “parecer dev” (URLs locais, outro Supabase), **produção** deixa de validar os tokens certos.
 
 ## Regra prática
 

@@ -7,7 +7,7 @@ O container **nginx** corre como utilizador `nginx` (UID típico **101**). Os fi
 ### Corrigir no servidor (imediato)
 
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 sudo chmod -R a+rX build/frontend
 sudo docker compose -f docker-compose.prod.yml exec -T frontend ls -la /usr/share/nginx/html/
 curl -sI http://127.0.0.1:3000/   # deve ser 200

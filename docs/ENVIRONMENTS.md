@@ -299,7 +299,7 @@ test -f frontend/.env && grep -E '^VITE_' frontend/.env | cut -d= -f1 | sort -u
 
 ### Servidor remoto (produção)
 
-Por SSH, na pasta do projeto (ex.: `/var/www/alca-financas`):
+Por SSH, na pasta do projeto (ex.: `/apps/alca-financas`):
 
 ```bash
 ./scripts/prod/check-env.sh

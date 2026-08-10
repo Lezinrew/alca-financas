@@ -13,7 +13,7 @@ Adicionar os secrets do Supabase no GitHub Actions para que sejam injetados dura
 
 Se o site já está no ar mas o bundle foi gerado **sem** as variáveis, o erro continua até **voltar a fazer o build** com `VITE_SUPABASE_*` definidas.
 
-1. No servidor, garanta `/var/www/alca-financas/.env` com **pelo menos**:
+1. No servidor, garanta `/apps/alca-financas/.env` com **pelo menos**:
    - `VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co`
    - `VITE_SUPABASE_ANON_KEY=` (chave **anon** do dashboard)
 
@@ -94,14 +94,14 @@ Isso vai:
 ssh lezinrew@$PROD_HOST
 
 # No servidor:
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 # Rebuild do frontend com variáveis corretas
 docker run --rm \
   -e VITE_SUPABASE_URL="https://blutjlzyvhdvnkvrzdcm.supabase.co" \
   -e VITE_SUPABASE_ANON_KEY="***REMOVED_SUPABASE_ANON_KEY***" \
   -e VITE_API_URL="http://localhost:8001" \
-  -v /var/www/alca-financas/frontend:/app \
+  -v /apps/alca-financas/frontend:/app \
   -w /app \
   node:22-alpine \
   sh -c "npm ci && npm run build"
@@ -125,7 +125,7 @@ docker compose -f docker-compose.prod.yml logs -f frontend
 ### 1. Verificar build do frontend
 ```bash
 # No servidor, após deploy:
-ls -lah /var/www/alca-financas/build/frontend/
+ls -lah /apps/alca-financas/build/frontend/
 
 # Deve conter:
 # - index.html
@@ -136,7 +136,7 @@ ls -lah /var/www/alca-financas/build/frontend/
 ### 2. Verificar variáveis no bundle JavaScript
 ```bash
 # No servidor:
-grep -r "blutjlzyvhdvnkvrzdcm" /var/www/alca-financas/build/frontend/assets/*.js
+grep -r "blutjlzyvhdvnkvrzdcm" /apps/alca-financas/build/frontend/assets/*.js
 
 # Deve retornar match - significa que a URL do Supabase está "baked" no bundle
 ```
@@ -156,7 +156,7 @@ grep -r "blutjlzyvhdvnkvrzdcm" /var/www/alca-financas/build/frontend/assets/*.js
 ```yaml
 # ANTES (SEM variáveis):
 docker run --rm \
-  -v /var/www/alca-financas/frontend:/app \
+  -v /apps/alca-financas/frontend:/app \
   -w /app \
   node:22-alpine \
   sh -c "npm ci && npm run build"
@@ -166,7 +166,7 @@ docker run --rm \
   -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
   -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
   -e VITE_API_URL="http://localhost:8001" \
-  -v /var/www/alca-financas/frontend:/app \
+  -v /apps/alca-financas/frontend:/app \
   -w /app \
   node:22-alpine \
   sh -c "npm ci && npm run build"

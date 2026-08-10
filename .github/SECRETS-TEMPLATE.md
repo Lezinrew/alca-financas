@@ -101,7 +101,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 Usado por: [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-production.yml). Ver também [`SUPABASE-SECRETS-SETUP.md`](../SUPABASE-SECRETS-SETUP.md) na raiz do repo.
 
-**Backend na VPS (ficheiro `.env` em `/var/www/alca-financas`, não é GitHub Secret):**  
+**Backend na VPS (ficheiro `.env` em `/apps/alca-financas`, não é GitHub Secret):**  
 deve incluir **`SUPABASE_JWT_SECRET`** (mesmo valor que **JWT Secret** no painel Supabase). Sem esta variável, `refresh_token` responde 200 mas `bootstrap` / `accounts` devolvem **401**. Ver `docs/TROUBLESHOOTING-AUTH-LOGIN-LOOP.md`.
 
 ---

@@ -89,7 +89,7 @@ O login com Apple ainda não está implementado no backend. Para implementar:
 
 ```bash
 ssh root@alcahub.cloud
-nano /var/www/alca-financas/backend/.env
+nano /apps/alca-financas/backend/.env
 ```
 
 Adicione as credenciais:

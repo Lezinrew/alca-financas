@@ -94,7 +94,7 @@ export SERVER_HOST="76.13.239.220"
 ```bash
 # Execute diretamente no servidor via SSH
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 ./scripts/deploy-hostinger.sh
 ```
 
@@ -151,7 +151,7 @@ export DOMAIN="alcahub.cloud"
 cat > .env.deploy << EOF
 DEPLOY_HOST=76.13.239.220
 DEPLOY_USER=root
-DEPLOY_PATH=/var/www/alca-financas
+DEPLOY_PATH=/apps/alca-financas
 DOMAIN=alcahub.cloud
 EOF
 
@@ -218,13 +218,13 @@ export SERVER_USER="root"            # Usuário SSH
 export SERVER_SSH_KEY="~/.ssh/id_rsa"  # Chave SSH (opcional)
 
 # Projeto
-export PROJECT_DIR="/var/www/alca-financas"
+export PROJECT_DIR="/apps/alca-financas"
 export DOMAIN="alcahub.cloud"
 ```
 
 ### Arquivo .env no Servidor
 
-Obrigatório em `/var/www/alca-financas/.env`:
+Obrigatório em `/apps/alca-financas/.env`:
 
 ```env
 # Supabase
@@ -280,7 +280,7 @@ Para guia detalhado, veja: **[docs/DEPLOY-GUIDE.md](../docs/DEPLOY-GUIDE.md)**
 ```bash
 # Via SSH
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 # Ver todos os logs
 docker-compose -f docker-compose.prod.yml logs -f
@@ -296,7 +296,7 @@ docker-compose -f docker-compose.prod.yml logs -f frontend
 
 ```bash
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 docker-compose -f docker-compose.prod.yml restart
 ```
 
@@ -304,7 +304,7 @@ docker-compose -f docker-compose.prod.yml restart
 
 ```bash
 ssh root@76.13.239.220
-cd /var/www/alca-financas
+cd /apps/alca-financas
 git reset --hard HEAD@{1}
 docker-compose -f docker-compose.prod.yml restart
 ```

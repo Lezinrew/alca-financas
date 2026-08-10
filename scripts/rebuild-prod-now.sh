@@ -3,7 +3,7 @@
 
 ssh root@76.13.239.220 << 'EOF'
     set -e
-    cd /var/www/alca-financas
+    cd /apps/alca-financas
 
     echo "🧹 Limpando builds antigos..."
     rm -rf frontend/dist build/frontend
@@ -13,7 +13,7 @@ ssh root@76.13.239.220 << 'EOF'
     docker run --rm \
       -e VITE_SUPABASE_URL="https://blutjlzyvhdvnkvrzdcm.supabase.co" \
       -e VITE_SUPABASE_ANON_KEY="***REMOVED_SUPABASE_ANON_KEY***" \
-      -v /var/www/alca-financas/frontend:/app \
+      -v /apps/alca-financas/frontend:/app \
       -w /app \
       node:22-alpine \
       sh -c "npm ci && npm run build"

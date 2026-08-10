@@ -36,27 +36,27 @@ No seu **computador local**, envie os arquivos necessários:
 
 ```bash
 # Enviar configuração Nginx
-scp /Users/lezinrew/Projetos/alca-financas/nginx-vps.conf root@76.13.239.220:/var/www/alca-financas/
+scp /Users/lezinrew/Projetos/alca-financas/nginx-vps.conf root@76.13.239.220:/apps/alca-financas/
 
 # Enviar script de setup SSL
-scp /Users/lezinrew/Projetos/alca-financas/scripts/setup-ssl-production.sh root@76.13.239.220:/var/www/alca-financas/scripts/
+scp /Users/lezinrew/Projetos/alca-financas/scripts/setup-ssl-production.sh root@76.13.239.220:/apps/alca-financas/scripts/
 
 # Enviar script de verificação
-scp /Users/lezinrew/Projetos/alca-financas/scripts/verify-production.sh root@76.13.239.220:/var/www/alca-financas/scripts/
+scp /Users/lezinrew/Projetos/alca-financas/scripts/verify-production.sh root@76.13.239.220:/apps/alca-financas/scripts/
 ```
 
 **Ou clone o repositório no servidor:**
 
 ```bash
 # No servidor VPS
-cd /var/www/alca-financas
+cd /apps/alca-financas
 git pull origin main
 ```
 
 ### 4️⃣ Executar Setup SSL (No servidor VPS)
 
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 
 # ⚠️  IMPORTANTE: Edite o script e altere o EMAIL!
 nano scripts/setup-ssl-production.sh
@@ -84,7 +84,7 @@ Após o SSL estar configurado, atualize o `.env` no servidor:
 
 ```bash
 # No servidor VPS
-cd /var/www/alca-financas
+cd /apps/alca-financas
 nano .env
 ```
 
@@ -106,7 +106,7 @@ docker-compose -f docker-compose.prod.yml restart
 **No servidor VPS:**
 
 ```bash
-cd /var/www/alca-financas
+cd /apps/alca-financas
 ./scripts/verify-production.sh
 ```
 
@@ -246,7 +246,7 @@ sudo systemctl status certbot.timer
 
 ```bash
 # Verificar .env
-cat /var/www/alca-financas/.env | grep CORS
+cat /apps/alca-financas/.env | grep CORS
 
 # Deve ter:
 # CORS_ORIGINS=https://alcahub.cloud,https://www.alcahub.cloud

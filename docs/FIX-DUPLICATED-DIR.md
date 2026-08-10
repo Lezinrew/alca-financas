@@ -1,12 +1,12 @@
 # Fix: Diretório duplicado após git clone
 
-Se você executou os comandos antigos e acabou com `/var/www/alca-financas/alca-financas`, use este guia para corrigir.
+Se você executou os comandos antigos e acabou com `/apps/alca-financas/alca-financas`, use este guia para corrigir.
 
 ## Problema
 
 Você tem:
 ```
-/var/www/alca-financas/
+/apps/alca-financas/
 └── alca-financas/    ← repositório clonado aqui (ERRADO)
     ├── backend/
     ├── frontend/
@@ -15,7 +15,7 @@ Você tem:
 
 Deveria ser:
 ```
-/var/www/alca-financas/    ← repositório clonado aqui (CERTO)
+/apps/alca-financas/    ← repositório clonado aqui (CERTO)
 ├── backend/
 ├── frontend/
 └── ...
@@ -29,11 +29,11 @@ Deveria ser:
 ssh root@SEU_IP_VPS
 
 # Verificar a estrutura atual
-ls -la /var/www/alca-financas/
-ls -la /var/www/alca-financas/alca-financas/
+ls -la /apps/alca-financas/
+ls -la /apps/alca-financas/alca-financas/
 
 # Mover todo o conteúdo para o diretório pai
-cd /var/www/alca-financas
+cd /apps/alca-financas
 mv alca-financas/* .
 mv alca-financas/.* . 2>/dev/null || true
 
@@ -41,7 +41,7 @@ mv alca-financas/.* . 2>/dev/null || true
 rmdir alca-financas
 
 # Verificar que ficou correto
-ls -la /var/www/alca-financas/
+ls -la /apps/alca-financas/
 ```
 
 ### Opção 2: Remover tudo e reclonar corretamente
@@ -50,23 +50,23 @@ ls -la /var/www/alca-financas/
 ssh root@SEU_IP_VPS
 
 # Backup do .env se já existir
-[ -f /var/www/alca-financas/alca-financas/.env ] && \
-  cp /var/www/alca-financas/alca-financas/.env /tmp/alca-backup.env
+[ -f /apps/alca-financas/alca-financas/.env ] && \
+  cp /apps/alca-financas/alca-financas/.env /tmp/alca-backup.env
 
 # Remover tudo
-rm -rf /var/www/alca-financas/*
-rm -rf /var/www/alca-financas/.*  2>/dev/null || true
+rm -rf /apps/alca-financas/*
+rm -rf /apps/alca-financas/.*  2>/dev/null || true
 
 # Clonar corretamente (com ponto no final!)
-cd /var/www/alca-financas
+cd /apps/alca-financas
 git clone https://github.com/Lezinrew/alca-financas.git .
 
 # Restaurar .env se houver backup
 [ -f /tmp/alca-backup.env ] && \
-  mv /tmp/alca-backup.env /var/www/alca-financas/.env
+  mv /tmp/alca-backup.env /apps/alca-financas/.env
 
 # Verificar
-ls -la /var/www/alca-financas/
+ls -la /apps/alca-financas/
 ```
 
 ## Verificação
@@ -74,7 +74,7 @@ ls -la /var/www/alca-financas/
 Depois de corrigir, você deve ver isto:
 
 ```bash
-ssh root@SEU_IP_VPS "ls -la /var/www/alca-financas/"
+ssh root@SEU_IP_VPS "ls -la /apps/alca-financas/"
 
 # Saída esperada:
 drwxr-xr-x  10 root root 4096 Mar  5 10:00 .
@@ -87,7 +87,7 @@ drwxr-xr-x   5 root root 4096 Mar  5 10:00 frontend   ← deve estar aqui
 ...
 ```
 
-**NÃO deve ter** uma pasta `alca-financas` dentro de `/var/www/alca-financas/`.
+**NÃO deve ter** uma pasta `alca-financas` dentro de `/apps/alca-financas/`.
 
 ## Depois de corrigir
 
@@ -99,7 +99,7 @@ cd /caminho/para/alca-financas
 
 export SERVER_HOST="SEU_IP_VPS"
 export SERVER_USER="root"
-export PROJECT_DIR="/var/www/alca-financas"
+export PROJECT_DIR="/apps/alca-financas"
 export DOMAIN="alcahub.cloud"
 
 ./scripts/deploy-docker-remote.sh

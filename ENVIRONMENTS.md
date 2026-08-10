@@ -256,7 +256,7 @@ server {
 ssh root@srv1353242.hostinger.com
 
 # Navegar para projeto
-cd /var/www/alca-financas
+cd /apps/alca-financas
 ```
 
 ### Deploy Passo a Passo
