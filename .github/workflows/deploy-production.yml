@@ -16,6 +16,7 @@ on:
           - production
 
 concurrency:
+  # Serializa os deploys para evitar concorrência sobre /apps/alca-financas.
   group: production-deploy
   cancel-in-progress: true
 
