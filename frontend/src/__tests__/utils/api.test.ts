@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import axios from 'axios'
-import api from '@/utils/api'
+import api, { formatDate } from '@/utils/api'
 
 vi.mock('axios', () => ({
   default: {
@@ -20,6 +20,10 @@ describe('API Utils', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
+  })
+
+  it('preserva data civil ISO sem deslocamento de fuso horário', () => {
+    expect(formatDate('2026-08-12')).toBe('12/08/2026')
   })
 
   it('should have correct base URL for local environment', () => {

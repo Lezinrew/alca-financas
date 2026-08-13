@@ -21,7 +21,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCurrency, dashboardAPI, accountsAPI } from '../../utils/api';
+import { formatCurrency, formatDate, dashboardAPI, accountsAPI } from '../../utils/api';
 import { fetchPayablesSummary, type PayablesSummary } from '../../utils/payablesSummary';
 import { PayablesSummaryBlock } from '../shared/PayablesSummaryBlock';
 
@@ -642,7 +642,7 @@ const Dashboard: React.FC = () => {
                   <div>
                     <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.description}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {transaction.category} • {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                      {transaction.category} • {formatDate(transaction.date)}
                     </p>
                   </div>
                 </div>
