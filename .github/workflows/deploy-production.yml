@@ -48,12 +48,12 @@ jobs:
           file: backend/Dockerfile
           push: false
           load: true
-          tags: alcahub-backend:latest
+          tags: alca-financas-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Save images
-        run: docker save alcahub-backend:latest | gzip > backend-images.tar.gz
+        run: docker save alca-financas-backend:latest | gzip > backend-images.tar.gz
 
       - name: Copy image to server
         uses: appleboy/scp-action@v0.1.7
