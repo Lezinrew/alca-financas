@@ -24,6 +24,7 @@ describe('API Utils', () => {
 
   it('preserva data civil ISO sem deslocamento de fuso horário', () => {
     expect(formatDate('2026-08-12')).toBe('12/08/2026')
+    expect(formatDate('2026-08-12T00:00:00')).toBe('12/08/2026')
   })
 
   it('should have correct base URL for local environment', () => {

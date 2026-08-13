@@ -632,9 +632,10 @@ export const formatCurrency = (value: number, currency = 'BRL') => {
 };
 
 export const formatDate = (date: string | Date) => {
-  const parsed = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
-    ? new Date(`${date}T00:00:00`)
-    : new Date(date);
+  const civilDate = typeof date === 'string'
+    ? date.match(/^(\d{4}-\d{2}-\d{2})(?:$|T)/)?.[1]
+    : undefined;
+  const parsed = civilDate ? new Date(`${civilDate}T00:00:00`) : new Date(date);
   return parsed.toLocaleDateString('pt-BR');
 };
 
