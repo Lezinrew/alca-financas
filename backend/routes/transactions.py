@@ -11,6 +11,41 @@ from utils.exceptions import ValidationException, NotFoundException
 
 bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
 
+
+def _build_transaction_summary(data, category_map):
+    paid_income = 0.0
+    paid_expense = 0.0
+    uncategorized_ids = {
+        str(category_id)
+        for category_id, category in category_map.items()
+        if str(category.get('name') or '').strip().casefold() in {
+            'não classificado',
+            'nao classificado',
+            'sem categoria',
+        }
+    }
+
+    for tx in data:
+        if tx.get('status') != 'paid':
+            continue
+        amount = float(tx.get('amount') or 0)
+        if tx.get('type') == 'income':
+            paid_income += amount
+        elif tx.get('type') == 'expense':
+            paid_expense += amount
+
+    return {
+        'paid_income': round(paid_income, 2),
+        'paid_expense': round(paid_expense, 2),
+        'net_paid': round(paid_income - paid_expense, 2),
+        'transaction_count': len(data),
+        'uncategorized_count': sum(
+            1
+            for tx in data
+            if not tx.get('category_id') or str(tx.get('category_id')) in uncategorized_ids
+        ),
+    }
+
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 @require_tenant
@@ -557,6 +592,7 @@ def transactions_facets():
 
     # Resolve nomes de categorias e contas
     categories = []
+    category_map = {}
     if cat_counter:
         category_items = []
         if hasattr(categories_repo, 'find_by_user'):
@@ -602,4 +638,5 @@ def transactions_facets():
         'accounts': accounts,
         'types': types,
         'responsible_persons': responsible_persons,
+        'summary': _build_transaction_summary(data, category_map),
     })

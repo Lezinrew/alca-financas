@@ -104,10 +104,11 @@ export const FilterChipsBar: FC<FilterChipsBarProps> = ({
         <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
           {total === 0
             ? 'Nenhuma transação encontrada'
-            : `${total} transação${total === 1 ? '' : 's'} encontradas`}
+            : total === 1
+              ? '1 transação encontrada'
+              : `${total} transações encontradas`}
         </div>
       )}
     </div>
   );
 };
-

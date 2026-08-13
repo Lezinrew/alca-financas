@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { transactionsAPI, categoriesAPI, accountsAPI } from '../../utils/api';
+import { transactionsAPI, categoriesAPI, accountsAPI, formatCurrency } from '../../utils/api';
 import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
 import { TransactionFilters as TransactionFiltersBar } from './TransactionFilters';
@@ -32,10 +32,18 @@ const Transactions = () => {
     accounts: Array<{ id: string; name: string; count: number }>;
     types: Array<{ type: string; count: number }>;
     responsible_persons?: Array<{ name: string; count: number }>;
+    summary?: {
+      paid_income: number;
+      paid_expense: number;
+      net_paid: number;
+      transaction_count: number;
+      uncategorized_count: number;
+    };
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
   const [initialTransactionType, setInitialTransactionType] = useState<TransactionType | null>(null);
   const requestSeqRef = useRef(0);
@@ -351,12 +359,12 @@ const Transactions = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('transactions.title')}</h1>
           <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Gerencie suas receitas e despesas</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate('/import')}
             className="btn-base bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white shadow-sm px-4 py-2.5 flex items-center gap-2"
@@ -381,14 +389,64 @@ const Transactions = () => {
         </div>
       )}
 
+      <section aria-label="Resumo das transações filtradas" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          { label: 'Entradas recebidas', value: facets?.summary?.paid_income ?? 0, icon: 'arrow-down-left', valueClass: 'text-emerald-600 dark:text-emerald-400', iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300', hint: 'Receitas pagas no filtro' },
+          { label: 'Total pago', value: facets?.summary?.paid_expense ?? 0, icon: 'check2-circle', valueClass: 'text-blue-600 dark:text-blue-400', iconClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300', hint: 'Despesas efetivadas no filtro' },
+          { label: 'Saldo líquido', value: facets?.summary?.net_paid ?? 0, icon: 'activity', valueClass: (facets?.summary?.net_paid ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400', iconClass: (facets?.summary?.net_paid ?? 0) >= 0 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300', hint: 'Entradas menos pagamentos' },
+        ].map((item) => (
+          <article key={item.label} className="card-base p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
+                <p className={`mt-2 truncate text-xl font-bold ${item.valueClass}`}>
+                  {formatCurrency(item.value)}
+                </p>
+              </div>
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.iconClass}`}>
+                <i className={`bi bi-${item.icon}`} aria-hidden="true" />
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p>
+          </article>
+        ))}
+        <article className="card-base p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Transações</p>
+          <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">{facets?.summary?.transaction_count ?? totalCount ?? 0}</p>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">No período e filtros atuais</p>
+        </article>
+        <article className="card-base border-amber-200 p-4 sm:p-5 dark:border-amber-800/50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Revisar categoria</p>
+          <p className="mt-2 text-xl font-bold text-amber-700 dark:text-amber-300">{facets?.summary?.uncategorized_count ?? 0}</p>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Sem classificação confiável</p>
+        </article>
+      </section>
+
       {/* Filtros */}
-      <TransactionFiltersBar
-        filters={filters}
-        onChange={updateFilters}
-        onClear={clearFilters}
-        categories={categories}
-        accounts={accounts}
-      />
+      <section className="card-base overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowFilters((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          aria-expanded={showFilters}
+        >
+          <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-white">
+            <i className="bi bi-sliders2" aria-hidden="true" /> Filtros avançados
+          </span>
+          <i className={`bi bi-chevron-${showFilters ? 'up' : 'down'} text-slate-500`} aria-hidden="true" />
+        </button>
+        {showFilters && (
+          <div className="border-t border-slate-200 p-3 dark:border-slate-700">
+            <TransactionFiltersBar
+              filters={filters}
+              onChange={updateFilters}
+              onClear={clearFilters}
+              categories={categories}
+              accounts={accounts}
+            />
+          </div>
+        )}
+      </section>
 
       <QuickFilters filters={filters} onChange={updateFilters} />
 

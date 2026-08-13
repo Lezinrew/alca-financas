@@ -69,7 +69,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
     <div className="table-container">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="table-header">
+          <thead className="table-header sticky top-0 z-10">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">{t('transactions.description')}</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">{t('transactions.category')}</th>
@@ -122,7 +122,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
               const categoryIcon = transaction.category?.icon || 'circle';
 
               return (
-                <tr key={transaction.id} className="table-row">
+                <tr key={transaction.id} className="table-row group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div
@@ -134,7 +134,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         <i className={`bi bi-${categoryIcon} text-white`}></i>
                       </div>
                       <div>
-                        <div className="font-medium text-slate-900 dark:text-white">{transaction.description}</div>
+                        <div className="font-medium text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">{transaction.description}</div>
                         {transaction.installment_info && (
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                             Parcela {transaction.installment_info.current}/{transaction.installment_info.total}
