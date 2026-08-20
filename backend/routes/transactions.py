@@ -141,6 +141,147 @@ def transaction_detail(transaction_id: str):
     except (ValidationException, NotFoundException) as e:
         return jsonify(e.to_dict()), e.status_code
 
+def _handle_ofx_import(file_content, filename, account_id, account_created, created_account_name, is_preview=False):
+    """Executa o pipeline OFX desacoplado com categorização, deduplicação e normalização."""
+    from services.ofx_import.pipeline import OfxImportPipeline
+    from services.ofx_import.categorizer import AliasCategorizer
+    from services.category_detector import get_or_create_category
+    from utils.category_name import build_import_category_cache, import_category_cache_key
+    from services.account_service import AccountService
+    from services.category_service import CategoryService
+
+    transaction_repo = current_app.config['TRANSACTIONS']
+    categories_repo = current_app.config['CATEGORIES']
+    accounts_repo = current_app.config['ACCOUNTS']
+    service = TransactionService(transaction_repo, categories_repo, accounts_repo)
+    account_service = AccountService(accounts_repo, transaction_repo)
+    category_service = CategoryService(categories_repo, transaction_repo)
+    alias_repo = current_app.config.get('MERCHANT_ALIAS_REPO')
+
+    # Carrega aliases/regras do tenant
+    rules = []
+    if alias_repo and hasattr(alias_repo, 'find_all_by_tenant'):
+        try:
+            aliases_raw = alias_repo.find_all_by_tenant(request.tenant_id) or []
+            for a in aliases_raw:
+                rules.append({
+                    'keyword': a.get('pattern') or a.get('keyword') or a.get('alias') or '',
+                    'category_name': a.get('category_name') or 'Não classificado',
+                    'subcategory': a.get('subcategory'),
+                    'responsible_person': a.get('default_responsible_person')
+                })
+        except Exception as e:
+            current_app.logger.warning(f"Erro ao carregar merchant aliases: {e}")
+
+    categorizer = AliasCategorizer(rules)
+    pipeline = OfxImportPipeline(categorizer=categorizer)
+
+    account_obj = accounts_repo.find_by_id(account_id) if hasattr(accounts_repo, 'find_by_id') else None
+    account_name_val = account_obj.get('name') if account_obj else None
+
+    # Executa o pipeline OFX
+    batch_result = pipeline.process_file(
+        content=file_content,
+        filename=filename,
+        user_id=request.user_id,
+        tenant_id=request.tenant_id,
+        account_id=account_id,
+        account_name=account_name_val,
+    )
+
+    if is_preview:
+        return jsonify(batch_result), 200
+
+    transactions_to_insert = batch_result['transactions_to_insert']
+    created_categories = []
+    user_cats = categories_repo.find_by_user(request.user_id, tenant_id=request.tenant_id) if hasattr(categories_repo, 'find_by_user') else []
+    user_categories = build_import_category_cache(user_cats, request.tenant_id or "")
+
+    for tx in transactions_to_insert:
+        cat_name = tx.get('category_name') or 'Não classificado'
+        tx_type = tx.get('type') or 'expense'
+        _ck = import_category_cache_key(cat_name, tx_type, request.tenant_id or '')
+        category_id = user_categories.get(_ck)
+
+        if not category_id:
+            try:
+                category_id = get_or_create_category(
+                    category_service,
+                    request.user_id,
+                    cat_name,
+                    tx_type if tx_type in ('income', 'expense') else 'expense',
+                    tenant_id=request.tenant_id,
+                )
+                user_categories[_ck] = category_id
+                created_categories.append(cat_name)
+            except Exception as exc:
+                current_app.logger.warning(f"Erro ao resolver categoria {cat_name}: {exc}")
+
+        tx['category_id'] = category_id
+
+    if transactions_to_insert:
+        service.create_many_transactions(transactions_to_insert)
+
+        try:
+            from database.connection import get_supabase
+            supabase = get_supabase()
+            supabase.table('import_batches').insert({
+                'id': batch_result['import_batch_id'],
+                'user_id': request.user_id,
+                'tenant_id': request.tenant_id,
+                'account_id': account_id,
+                'filename': filename,
+                'file_format': 'ofx',
+                'total_parsed': batch_result['total_parsed'],
+                'imported_count': len(transactions_to_insert),
+                'ignored_count': batch_result['ignored_count'],
+                'duplicate_count': batch_result['duplicate_count'],
+                'unclassified_count': batch_result['unclassified_count'],
+                'total_income': batch_result['summary']['total_income'],
+                'total_expense': batch_result['summary']['total_expense'],
+                'total_transfer': batch_result['summary']['total_transfer'],
+                'ledger_balance': (batch_result.get('ledger_reconciliation') or {}).get('declared_balance'),
+                'status': 'completed',
+                'metadata': {
+                    'category_breakdown': batch_result['category_breakdown'],
+                    'ignored_transactions': batch_result['ignored_transactions']
+                }
+            }).execute()
+        except Exception as e:
+            current_app.logger.warning(f"Não foi possível registrar histórico em import_batches: {e}")
+
+        total_change = 0.0
+        for tx in transactions_to_insert:
+            if tx.get('status') == 'paid':
+                amt = float(tx.get('amount') or 0)
+                if tx.get('type') == 'expense':
+                    total_change -= amt
+                elif tx.get('type') == 'income':
+                    total_change += amt
+
+        if total_change != 0 and hasattr(account_service, 'update_balance'):
+            account_service.update_balance(account_id, total_change)
+
+    response_payload = {
+        'message': f"{len(transactions_to_insert)} transações importadas com sucesso",
+        'import_batch_id': batch_result['import_batch_id'],
+        'imported_count': len(transactions_to_insert),
+        'total_parsed': batch_result['total_parsed'],
+        'ignored_count': batch_result['ignored_count'],
+        'duplicate_count': batch_result['duplicate_count'],
+        'unclassified_count': batch_result['unclassified_count'],
+        'summary': batch_result['summary'],
+        'file_format': 'ofx',
+        'categories_created': len(created_categories),
+        'categories_created_list': list(set(created_categories)),
+        'account_created': account_created,
+        'account_name': created_account_name,
+        'account_id': account_id,
+        'ignored_transactions': batch_result['ignored_transactions'],
+        'ledger_reconciliation': batch_result['ledger_reconciliation']
+    }
+    return jsonify(response_payload), 201 if transactions_to_insert else 200
+
 
 @bp.route('/import', methods=['POST'])
 @require_auth
@@ -229,8 +370,22 @@ def import_transactions():
         return jsonify({'error': 'Conta não encontrada'}), 404
     
     try:
-        
-        # Detecta formato e parseia
+        is_preview = (
+            request.args.get('preview', '').lower() in ('true', '1', 'yes')
+            or request.form.get('preview', '').lower() in ('true', '1', 'yes')
+        )
+
+        if filename_lower.endswith('.ofx'):
+            return _handle_ofx_import(
+                file_content=file_content,
+                filename=file.filename,
+                account_id=account_id,
+                account_created=account_created,
+                created_account_name=created_account_name,
+                is_preview=is_preview
+            )
+
+        # Detecta formato e parseia para CSV
         try:
             file_format, parsed_transactions = parse_import_file(file.filename, file_content)
         except Exception as e:
@@ -532,6 +687,80 @@ def import_transactions():
         current_app.logger.error(f'Erro inesperado na importação: {str(e)}', exc_info=True)
         return jsonify({
             'error': 'Erro inesperado ao processar a importação. Tente novamente mais tarde.'
+        }), 500
+
+
+@bp.route('/import/preview', methods=['POST'])
+@require_auth
+@require_tenant
+def preview_import_transactions():
+    """Endpoint dedicado para Dry-run de importação OFX/CSV sem gravação."""
+    request.args = {**request.args, 'preview': 'true'}
+    return import_transactions()
+
+
+@bp.route('/import/rollback/<batch_id>', methods=['POST', 'DELETE'])
+@require_auth
+@require_tenant
+def rollback_import_batch(batch_id: str):
+    """
+    Desfaz atomicamente todas as transações importadas de um lote específico (import_batch_id).
+    """
+    transaction_repo = current_app.config['TRANSACTIONS']
+    accounts_repo = current_app.config['ACCOUNTS']
+    from services.account_service import AccountService
+    account_service = AccountService(accounts_repo, transaction_repo)
+
+    try:
+        if hasattr(transaction_repo, 'find_by_batch_id'):
+            transactions = transaction_repo.find_by_batch_id(batch_id, request.tenant_id)
+        else:
+            transactions = []
+
+        if not transactions:
+            return jsonify({
+                'message': f'Nenhuma transação ativa encontrada para o lote {batch_id}.',
+                'rolled_back_count': 0
+            }), 404
+
+        balance_reversals = {}
+        for tx in transactions:
+            acc_id = tx.get('account_id')
+            if acc_id and tx.get('status') == 'paid':
+                amt = float(tx.get('amount') or 0)
+                change = amt if tx.get('type') == 'expense' else -amt
+                balance_reversals[acc_id] = balance_reversals.get(acc_id, 0.0) + change
+
+        if hasattr(transaction_repo, 'delete_by_batch_id'):
+            deleted_count = transaction_repo.delete_by_batch_id(batch_id, request.tenant_id)
+        else:
+            deleted_count = 0
+
+        for acc_id, change in balance_reversals.items():
+            if change != 0 and hasattr(account_service, 'update_balance'):
+                account_service.update_balance(acc_id, change)
+
+        try:
+            from database.connection import get_supabase
+            from datetime import datetime, timezone
+            supabase = get_supabase()
+            supabase.table('import_batches').update({
+                'status': 'rolled_back',
+                'rolled_back_at': datetime.now(timezone.utc).isoformat()
+            }).eq('id', batch_id).eq('tenant_id', request.tenant_id).execute()
+        except Exception as e:
+            current_app.logger.warning(f"Erro ao atualizar status em import_batches: {e}")
+
+        return jsonify({
+            'message': f'Lote {batch_id} revertido com sucesso.',
+            'rolled_back_count': deleted_count or len(transactions),
+            'batch_id': batch_id
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'Erro ao reverter lote {batch_id}: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': f'Falha ao reverter lote de importação: {str(e)}'
         }), 500
 
 

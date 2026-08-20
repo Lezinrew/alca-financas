@@ -46,6 +46,8 @@ frontend/node_modules/
 # Playwright (gerados localmente / CI)
 frontend/playwright-report/
 frontend/test-results/
+test-results/
+.superdesign/
 
 # Scripts (debug)
 debug_google_login.sh

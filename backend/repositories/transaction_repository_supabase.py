@@ -453,30 +453,37 @@ class TransactionRepository(BaseRepository):
 
     def create_many(self, transactions: List[Dict[str, Any]]) -> List[str]:
         """
-        Cria múltiplas transações. Garante account_tenant_id e category_tenant_id = tenant_id.
+        Cria múltiplas transações. Garante account_tenant_id e category_tenant_id = tenant_id
+        e normaliza chaves de dicionários para compatibilidade com PostgREST (PGRST102).
         """
         if not transactions:
             return []
         try:
+            from services.ofx_import.normalizer import normalize_batch_objects
             now = datetime.utcnow().isoformat()
+            prepared = []
             for tx in transactions:
-                if "created_at" not in tx:
-                    tx["created_at"] = now
-                if "updated_at" not in tx:
-                    tx["updated_at"] = now
-                t_tenant_id = tx.get("tenant_id")
+                item = dict(tx)
+                if "created_at" not in item or not item["created_at"]:
+                    item["created_at"] = now
+                if "updated_at" not in item or not item["updated_at"]:
+                    item["updated_at"] = now
+                t_tenant_id = item.get("tenant_id")
                 if not t_tenant_id:
                     raise ValueError("Cada transação deve ter tenant_id.")
-                if tx.get("account_id") and not tx.get("account_tenant_id"):
-                    raise ValueError("account_tenant_id é obrigatório quando account_id está preenchido.")
-                if tx.get("category_id") and not tx.get("category_tenant_id"):
-                    raise ValueError("category_tenant_id é obrigatório quando category_id está preenchido.")
-                if not tx.get("account_tenant_id"):
-                    tx["account_tenant_id"] = t_tenant_id
-                if not tx.get("category_tenant_id"):
-                    tx["category_tenant_id"] = t_tenant_id
+                if item.get("account_id") and not item.get("account_tenant_id"):
+                    item["account_tenant_id"] = t_tenant_id
+                if item.get("category_id") and not item.get("category_tenant_id"):
+                    item["category_tenant_id"] = t_tenant_id
+                if not item.get("account_tenant_id"):
+                    item["account_tenant_id"] = t_tenant_id
+                if not item.get("category_tenant_id"):
+                    item["category_tenant_id"] = t_tenant_id
+                prepared.append(item)
+
+            normalized_transactions = normalize_batch_objects(prepared)
             supabase = get_supabase()
-            response = supabase.table(self.table_name).insert(transactions).execute()
+            response = supabase.table(self.table_name).insert(normalized_transactions).execute()
 
             if response.data:
                 return [item['id'] for item in response.data]
@@ -484,4 +491,38 @@ class TransactionRepository(BaseRepository):
         except Exception as e:
             import logging
             logging.error(f"Erro ao criar múltiplas transações: {e}")
+            raise e
+
+    def find_by_batch_id(self, batch_id: str, tenant_id: str) -> List[Dict[str, Any]]:
+        """Busca todas as transações de um lote específico."""
+        try:
+            supabase = get_supabase()
+            response = (
+                supabase.table(self.table_name)
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .eq("import_batch_id", batch_id)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao buscar transações do lote {batch_id}: {e}")
             return []
+
+    def delete_by_batch_id(self, batch_id: str, tenant_id: str) -> int:
+        """Exclui todas as transações associadas a um lote de importação."""
+        try:
+            supabase = get_supabase()
+            response = (
+                supabase.table(self.table_name)
+                .delete()
+                .eq("tenant_id", tenant_id)
+                .eq("import_batch_id", batch_id)
+                .execute()
+            )
+            return len(response.data or [])
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao excluir transações do lote {batch_id}: {e}")
+            raise e

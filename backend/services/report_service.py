@@ -96,7 +96,7 @@ def dashboard_summary_supabase(
             by_cat_expense.setdefault(cat_id, {'total': 0, 'count': 0})
             by_cat_expense[cat_id]['total'] += amount
             by_cat_expense[cat_id]['count'] += 1
-        else:
+        elif typ == 'income':
             by_cat_income.setdefault(cat_id, {'total': 0, 'count': 0})
             by_cat_income[cat_id]['total'] += amount
             by_cat_income[cat_id]['count'] += 1
