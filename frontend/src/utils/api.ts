@@ -321,6 +321,8 @@ export const transactionsAPI = {
     }
     return api.post('/transactions/import', formData, formDataPostConfig);
   },
+  getImportBatches: () => api.get('/transactions/import/batches'),
+  rollbackImportBatch: (batchId: string) => api.post(`/transactions/import/rollback/${batchId}`),
 };
 
 // Funções de relatórios

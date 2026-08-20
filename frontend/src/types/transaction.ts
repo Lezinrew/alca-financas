@@ -1,4 +1,4 @@
-export type TransactionType = 'income' | 'expense';
+export type TransactionType = 'income' | 'expense' | 'transfer';
 export type TransactionStatus = 'paid' | 'pending' | 'overdue' | 'cancelled';
 export type TransactionEntrySource = 'manual' | 'csv' | 'ofx';
 
@@ -30,6 +30,27 @@ export interface TransactionRecord {
   installment_info?: InstallmentInfo;
   entry_source?: TransactionEntrySource;
   fitid?: string | null;
+  import_batch_id?: string | null;
+}
+
+export interface ImportBatchRecord {
+  id: string;
+  filename: string;
+  file_format: string;
+  account_id?: string;
+  total_parsed: number;
+  imported_count: number;
+  ignored_count: number;
+  duplicate_count: number;
+  unclassified_count: number;
+  total_income: number;
+  total_expense: number;
+  total_transfer: number;
+  ledger_balance?: number | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'rolled_back';
+  metadata?: Record<string, any>;
+  created_at: string;
+  rolled_back_at?: string | null;
 }
 
 export interface TransactionSubmitPayload {
@@ -44,4 +65,5 @@ export interface TransactionSubmitPayload {
   status: TransactionStatus;
   responsible_person: string;
 }
+
 

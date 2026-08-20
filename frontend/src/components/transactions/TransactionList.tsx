@@ -174,8 +174,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </td>
 
                   <td className="px-6 py-4">
-                    <span className={`text-sm font-semibold ${transaction.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {transaction.type === 'income' ? '+' : '-'}
+                    <span className={`text-sm font-semibold ${
+                      transaction.type === 'income'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : transaction.type === 'transfer'
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {transaction.type === 'income' ? '+' : transaction.type === 'transfer' ? '⇄ ' : '-'}
                       {formatCurrency(Math.abs(Number(transaction.amount) || 0))}
                     </span>
                   </td>

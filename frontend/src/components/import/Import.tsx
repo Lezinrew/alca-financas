@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { transactionsAPI, accountsAPI } from '../../utils/api';
 
+import { ImportBatchRecord } from '../../types/transaction';
+
 interface AccountOption {
   id: string;
   name: string;
@@ -22,7 +24,7 @@ interface ImportResult {
   [key: string]: unknown;
 }
 
-type ActiveTab = 'debit' | 'credit_card';
+type ActiveTab = 'debit' | 'credit_card' | 'history';
 
 const Import = () => {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -38,11 +40,48 @@ const Import = () => {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('debit');
 
+  // Estado para histórico de lotes
+  const [batches, setBatches] = useState<ImportBatchRecord[]>([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
       loadAccounts();
     }
   }, [isAuthenticated, authLoading]);
+
+  const loadBatches = async () => {
+    setLoadingBatches(true);
+    try {
+      const res = await transactionsAPI.getImportBatches();
+      setBatches(res.data?.batches || []);
+    } catch (err: any) {
+      console.error('Erro ao carregar lotes:', err);
+      setError('Não foi possível carregar o histórico de importações.');
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
+  const handleRollbackBatch = async (batchId: string, filename: string) => {
+    if (!window.confirm(`Tem certeza que deseja desfazer a importação do arquivo "${filename}"?\n\nTodas as transações deste lote serão excluídas e os saldos revertidos atomicamente.`)) {
+      return;
+    }
+    setRollingBackId(batchId);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await transactionsAPI.rollbackImportBatch(batchId);
+      setSuccess(res.data?.message || 'Lote revertido com sucesso!');
+      await loadBatches();
+    } catch (err: any) {
+      console.error('Erro ao reverter lote:', err);
+      setError(err.response?.data?.error || 'Falha ao reverter lote de importação.');
+    } finally {
+      setRollingBackId(null);
+    }
+  };
 
   const loadAccounts = async () => {
     try {
@@ -268,6 +307,25 @@ const Import = () => {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
             </button>
+            <button
+              onClick={() => {
+                setActiveTab('history');
+                setError('');
+                setSuccess('');
+                setImportResult(null);
+                loadBatches();
+              }}
+              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === 'history'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              HISTÓRICO DE LOTES & ROLLBACK
+              {activeTab === 'history' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
+              )}
+            </button>
           </div>
 
           {/* Mensagens de Erro/Sucesso */}
@@ -297,15 +355,142 @@ const Import = () => {
                     {progressMessage}
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Por favor, aguarde. Não feche esta página.
+                    Por favor, aguarde enquanto processamos suas transações...
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Conteúdo da Aba */}
-          {activeTab === 'debit' ? (
+          {/* Conteúdo Aba Histórico de Lotes */}
+          {activeTab === 'history' ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700/50">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Gerenciamento de lotes importados com auditoria e reversão atômica (Rollback).
+                </p>
+                <button
+                  onClick={loadBatches}
+                  disabled={loadingBatches}
+                  className="px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <i className={`bi bi-arrow-clockwise ${loadingBatches ? 'animate-spin' : ''}`}></i>
+                  Atualizar
+                </button>
+              </div>
+
+              {loadingBatches ? (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  <i className="bi bi-arrow-repeat text-3xl animate-spin block mb-2"></i>
+                  Carregando histórico de lotes...
+                </div>
+              ) : batches.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  <i className="bi bi-inbox text-4xl block mb-2 text-slate-400"></i>
+                  Nenhum lote de importação registrado até o momento.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Data / Lote</th>
+                        <th className="px-4 py-3">Arquivo</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Contadores</th>
+                        <th className="px-4 py-3">Totalizadores</th>
+                        <th className="px-4 py-3 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                      {batches.map((batch) => {
+                        const isRolledBack = batch.status === 'rolled_back';
+                        const isRolling = rollingBackId === batch.id;
+                        return (
+                          <tr key={batch.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                            <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                              <div className="font-medium text-slate-900 dark:text-white">
+                                {new Date(batch.created_at).toLocaleString('pt-BR')}
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-mono" title={batch.id}>
+                                {batch.id.slice(0, 8)}...
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <i className="bi bi-file-earmark-text text-blue-600"></i>
+                                {batch.filename}
+                              </div>
+                              <span className="text-xs text-slate-500 uppercase">
+                                {batch.file_format || 'OFX'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                isRolledBack
+                                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+                                  : batch.status === 'completed'
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                              }`}>
+                                {isRolledBack ? 'Revertido' : batch.status === 'completed' ? 'Concluído' : batch.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                              <div><span className="font-semibold text-emerald-600">+{batch.imported_count}</span> importadas</div>
+                              {batch.duplicate_count > 0 && (
+                                <div className="text-slate-400">{batch.duplicate_count} duplicatas ignoradas</div>
+                              )}
+                              {batch.ignored_count > 0 && (
+                                <div className="text-slate-400">{batch.ignored_count} espelhos ignorados</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {Number(batch.total_income || 0) > 0 && (
+                                <div className="text-emerald-600 font-medium">Rec: R$ {Number(batch.total_income).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                              )}
+                              {Number(batch.total_expense || 0) > 0 && (
+                                <div className="text-red-600 font-medium">Desp: R$ {Number(batch.total_expense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                              )}
+                              {Number(batch.total_transfer || 0) > 0 && (
+                                <div className="text-blue-600 font-medium">Trf: R$ {Number(batch.total_transfer).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => handleRollbackBatch(batch.id, batch.filename)}
+                                disabled={isRolledBack || isRolling}
+                                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                                  isRolledBack
+                                    ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed'
+                                    : 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40'
+                                }`}
+                                title={isRolledBack ? 'Lote já revertido' : 'Excluir transações e reverter saldo'}
+                              >
+                                {isRolling ? (
+                                  <>
+                                    <i className="bi bi-arrow-repeat animate-spin me-1"></i>
+                                    Revertendo...
+                                  </>
+                                ) : isRolledBack ? (
+                                  'Revertido'
+                                ) : (
+                                  <>
+                                    <i className="bi bi-arrow-counterclockwise me-1"></i>
+                                    Desfazer Lote
+                                  </>
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : activeTab === 'debit' ? (
             <div className="space-y-4">
               {/* Seleção de Conta */}
               <div>

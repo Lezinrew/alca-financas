@@ -699,6 +699,29 @@ def preview_import_transactions():
     return import_transactions()
 
 
+@bp.route('/import/batches', methods=['GET'])
+@require_auth
+@require_tenant
+def list_import_batches():
+    """
+    Lista todos os lotes de importação registrados para o tenant com auditoria e contadores.
+    """
+    try:
+        from database.connection import get_supabase
+        supabase = get_supabase()
+        res = (
+            supabase.table('import_batches')
+            .select('*')
+            .eq('tenant_id', request.tenant_id)
+            .order('created_at', desc=True)
+            .execute()
+        )
+        return jsonify({'batches': res.data or []}), 200
+    except Exception as e:
+        current_app.logger.error(f'Erro ao listar lotes de importação: {str(e)}', exc_info=True)
+        return jsonify({'error': f'Falha ao listar lotes: {str(e)}'}), 500
+
+
 @bp.route('/import/rollback/<batch_id>', methods=['POST', 'DELETE'])
 @require_auth
 @require_tenant
