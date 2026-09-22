@@ -1,194 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../utils/api';
 import { Account } from '../../types/account';
+import { MENU_ITEM_CLASS, MENU_TRIGGER_CLASS, useActionMenu } from './useActionMenu';
+import { getAccountTypeName } from './accountLabels';
 
 interface AccountCardProps {
   account: Account;
   onEdit: (account: Account) => void;
-  onDelete: (accountId: string) => void;
+  onDelete: (account: Account) => void;
 }
+
+const typeIcons: Record<Account['type'], string> = {
+  wallet: 'bi-wallet2', checking: 'bi-bank', savings: 'bi-piggy-bank', credit_card: 'bi-credit-card', investment: 'bi-graph-up-arrow',
+};
+
+const balanceTone = (value: number) =>
+  value > 0 ? 'text-emerald-600 dark:text-emerald-400' : value < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400';
 
 const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) => {
   const navigate = useNavigate();
-  const [openMenu, setOpenMenu] = useState(false);
-
-  // Fecha o menu ao clicar fora
-  useEffect(() => {
-    if (!openMenu) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      
-      // Não fecha se o clique foi dentro do menu dropdown ou no botão do menu
-      const clickedInsideMenu = target.closest('.dropdown-menu');
-      const clickedOnMenuButton = target.closest('.account-menu');
-      const clickedOnDropdownItem = target.closest('.dropdown-item');
-      
-      if (clickedInsideMenu || clickedOnMenuButton || clickedOnDropdownItem) {
-        return;
-      }
-      
-      // Fecha o menu se o clique foi fora
-      setOpenMenu(false);
-    };
-
-    // Adiciona o listener no próximo tick para não interferir com o clique do botão
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-    }, 100);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [openMenu]);
-
-  const getAccountTypeIcon = (type: Account['type']): string => {
-    switch (type) {
-      case 'wallet':
-        return 'bi-wallet2';
-      case 'checking':
-        return 'bi-bank';
-      case 'savings':
-        return 'bi-piggy-bank';
-      case 'credit_card':
-        return 'bi-credit-card';
-      case 'investment':
-        return 'bi-graph-up-arrow';
-      default:
-        return 'bi-wallet2';
-    }
-  };
-
-  const getAccountTypeName = (type: Account['type']): string => {
-    switch (type) {
-      case 'wallet':
-        return 'Carteira';
-      case 'checking':
-        return 'Conta Corrente';
-      case 'savings':
-        return 'Poupança';
-      case 'credit_card':
-        return 'Cartão de Crédito';
-      case 'investment':
-        return 'Investimento';
-      default:
-        return 'Conta';
-    }
-  };
+  const menu = useActionMenu();
 
   const isCreditCard = account.type === 'credit_card';
-  
-  // Para cartões de crédito: usa initial_balance como limite total, current_balance como gasto
-  // Para outras contas: usa current_balance e projected_balance normalmente
   const currentBalance = account.current_balance ?? 0;
   const projectedBalance = account.projected_balance ?? currentBalance;
-  
-  // Para cartões de crédito
-  const creditLimit = account.limit ?? account.initial_balance ?? 0; // Limite total
-  // current_balance em cartões de crédito pode ser negativo (gasto) ou positivo
-  // Vamos sempre calcular o gasto como valor absoluto
-  const creditUsed = Math.abs(currentBalance); // Valor gasto (sempre positivo)
-  const creditAvailable = creditLimit - creditUsed; // Limite disponível
+  // Cartões: initial_balance/limit é o limite total e current_balance o valor gasto.
+  const creditLimit = account.limit ?? account.initial_balance ?? 0;
+  const creditUsed = Math.abs(currentBalance);
+  const creditAvailable = creditLimit - creditUsed;
 
   const handleAddExpense = () => {
     if (!account.id) return;
-    navigate('/transactions', {
-      state: {
-        openForm: true,
-        transactionType: 'expense',
-        accountId: account.id
-      }
-    });
+    navigate('/transactions', { state: { openForm: true, transactionType: 'expense', accountId: account.id } });
   };
 
+  const run = (action: () => void) => { menu.close(); action(); };
+
   return (
-          <div className="card-base p-4 hover:shadow-md">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-            style={{ backgroundColor: account.color || '#6366f1' }}
-          >
-            <i className={`bi ${account.icon || getAccountTypeIcon(account.type)} text-lg`}></i>
+    <article className="card-base p-4 hover:shadow-md" aria-label={account.name}>
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: account.color || '#6366f1' }} aria-hidden="true">
+            <i className={`bi ${account.icon || typeIcons[account.type] || 'bi-wallet2'} text-lg`}></i>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm truncate">{account.name}</h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{account.name}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">{getAccountTypeName(account.type)}</p>
           </div>
         </div>
 
-        {/* Actions Menu */}
-        <div className="relative account-menu flex-shrink-0">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setOpenMenu(!openMenu);
-            }}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Opções da conta"
-          >
-            <i className="bi bi-three-dots-vertical text-sm"></i>
+        <div ref={menu.container} className="relative flex-shrink-0">
+          <button ref={menu.trigger} type="button" onClick={menu.toggle} aria-haspopup="menu" aria-expanded={menu.open}
+            aria-label={`Mais ações para ${account.name}`} className={MENU_TRIGGER_CLASS}>
+            <i className="bi bi-three-dots-vertical" aria-hidden="true"></i>
           </button>
-          
-          {openMenu && (
-                            <div className="dropdown-menu absolute right-0 top-full mt-1 w-48 py-1 z-50">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('AccountCard: Botão editar clicado para conta:', account.id);
-                  setOpenMenu(false);
-                  // Usa setTimeout para garantir que o menu seja fechado antes de chamar onEdit
-                  setTimeout(() => {
-                    onEdit(account);
-                  }, 0);
-                }}
-                className="dropdown-item w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-              >
-                <i className="bi bi-pencil text-blue-600 dark:text-blue-400"></i>
+
+          {menu.open && (
+            <div role="menu" aria-label={`Ações de ${account.name}`} className="dropdown-menu absolute right-0 top-full z-50 mt-1 w-48 py-1">
+              <button type="button" role="menuitem" onClick={() => run(() => onEdit(account))} className={MENU_ITEM_CLASS}>
+                <i className="bi bi-pencil text-blue-600 dark:text-blue-400" aria-hidden="true"></i>
                 <span>Editar</span>
               </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('AccountCard: Botão transações clicado para conta:', account.id);
-                  setOpenMenu(false);
-                  // Usa setTimeout para garantir que o menu seja fechado antes de navegar
-                  setTimeout(() => {
-                    navigate(`/transactions?account_id=${account.id}`);
-                  }, 0);
-                }}
-                className="dropdown-item w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-              >
-                <i className="bi bi-list-ul text-blue-600 dark:text-blue-400"></i>
+              <button type="button" role="menuitem" onClick={() => run(() => navigate(`/transactions?account_id=${account.id}`))} className={MENU_ITEM_CLASS}>
+                <i className="bi bi-list-ul text-blue-600 dark:text-blue-400" aria-hidden="true"></i>
                 <span>Transações</span>
               </button>
-              <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('AccountCard: Botão excluir clicado para conta:', account.id);
-                  setOpenMenu(false);
-                  // Usa setTimeout para garantir que o menu seja fechado antes de chamar onDelete
-                  setTimeout(() => {
-                    if (account.id) {
-                      onDelete(account.id);
-                    }
-                  }, 0);
-                }}
-                className="dropdown-item w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-              >
-                <i className="bi bi-trash"></i>
+              <div className="my-1 border-t border-slate-200 dark:border-slate-700" role="separator"></div>
+              <button type="button" role="menuitem" onClick={() => run(() => onDelete(account))} className={`${MENU_ITEM_CLASS} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20`}>
+                <i className="bi bi-trash" aria-hidden="true"></i>
                 <span>Excluir</span>
               </button>
             </div>
@@ -196,73 +76,30 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
         </div>
       </div>
 
-      {/* Saldos ou Limites (dependendo do tipo de conta) */}
-      <div className="space-y-3 mb-4">
+      <div className="mb-4 space-y-3">
         {isCreditCard ? (
           <>
-            {/* Limite Total */}
             <div>
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Limite total</p>
-                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Limite total do cartão de crédito"></i>
-              </div>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">
-                {formatCurrency(creditLimit)}
-              </p>
+              <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Limite total</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{formatCurrency(creditLimit)}</p>
             </div>
-
-            {/* Limite Disponível */}
             <div>
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Limite disponível</p>
-                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Limite disponível para uso (limite total - gasto atual)"></i>
-              </div>
-              <p className={`text-lg font-semibold ${
-                creditAvailable > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-                creditAvailable < 0 ? 'text-red-600 dark:text-red-400' :
-                'text-slate-600 dark:text-slate-400'
-              }`}>
-                {formatCurrency(creditAvailable)}
-              </p>
-              {creditUsed > 0 && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Gasto: {formatCurrency(creditUsed)} de {formatCurrency(creditLimit)}
-                </p>
-              )}
+              <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Limite disponível</p>
+              <p className={`text-lg font-semibold ${balanceTone(creditAvailable)}`}>{formatCurrency(creditAvailable)}</p>
+              {creditUsed > 0 && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Gasto: {formatCurrency(creditUsed)} de {formatCurrency(creditLimit)}</p>}
             </div>
           </>
         ) : (
           <>
-            {/* Saldo Atual */}
             <div>
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Saldo atual</p>
-                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Saldo atual considerando apenas transações pagas"></i>
-              </div>
-              <p className={`text-xl font-bold ${
-                currentBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-                currentBalance < 0 ? 'text-red-600 dark:text-red-400' :
-                'text-slate-600 dark:text-slate-400'
-              }`}>
-                {formatCurrency(currentBalance)}
-              </p>
+              <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Saldo atual (transações pagas)</p>
+              <p className={`text-xl font-bold ${balanceTone(currentBalance)}`}>{formatCurrency(currentBalance)}</p>
             </div>
-
-            {/* Saldo Previsto */}
             <div>
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Saldo previsto</p>
-                <i className="bi bi-info-circle text-xs text-slate-400 dark:text-slate-500" title="Projeção incluindo transações pendentes e futuras"></i>
-              </div>
-              <p className={`text-lg font-semibold ${
-                projectedBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-                projectedBalance < 0 ? 'text-red-600 dark:text-red-400' :
-                'text-slate-600 dark:text-slate-400'
-              }`}>
-                {formatCurrency(projectedBalance)}
-              </p>
+              <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Saldo previsto (inclui pendentes e futuras)</p>
+              <p className={`text-lg font-semibold ${balanceTone(projectedBalance)}`}>{formatCurrency(projectedBalance)}</p>
               {projectedBalance !== currentBalance && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
                   {projectedBalance > currentBalance ? '↑' : '↓'} {formatCurrency(Math.abs(projectedBalance - currentBalance))} de diferença
                 </p>
               )}
@@ -271,16 +108,12 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete }) 
         )}
       </div>
 
-      {/* Botão Adicionar Despesa */}
-      <button
-        type="button"
-        onClick={handleAddExpense}
-        className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-      >
-        <i className="bi bi-plus-circle text-sm"></i>
-        Adicionar Despesa
+      <button type="button" onClick={handleAddExpense}
+        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+        <i className="bi bi-plus-circle text-sm" aria-hidden="true"></i>
+        Adicionar despesa
       </button>
-    </div>
+    </article>
   );
 };
 

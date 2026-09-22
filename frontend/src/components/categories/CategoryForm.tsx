@@ -1,24 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategoryNameSuggestions, CategoryRelatedExamples } from './CategoryAssist';
 import { getTemplateForSuggestionText } from '../../utils/categoryAssist';
-
-type CategoryType = 'income' | 'expense';
-
-interface Category {
-  id?: string;
-  name?: string;
-  type?: CategoryType;
-  color?: string;
-  icon?: string;
-  description?: string;
-}
+import { AppDialog } from '../shared/AppDialog';
+import { availableColors, availableIcons } from './categoryExampleFile';
+import { CATEGORY_SAVE_ERROR, type Category, type CategoryPayload, type CategoryType } from './types';
 
 interface CategoryFormProps {
-  show: boolean;
   onHide: () => void;
-  onSubmit: (data: Required<Omit<Category, 'id'>>) => Promise<void> | void;
-  category?: Category | null;
+  /** Deve lançar em caso de falha; o formulário permanece aberto com mensagem fixa. */
+  onSubmit: (data: CategoryPayload) => Promise<void> | void;
+  category?: Partial<Category> | null;
 }
 
 type FormData = {
@@ -29,383 +21,191 @@ type FormData = {
   description: string;
 };
 
-type InputChangeEvent =
-  | React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  | { target: { name: keyof FormData; value: string } };
+function initialValues(category?: Partial<Category> | null): FormData {
+  return {
+    name: category?.name || '',
+    type: category?.type || 'expense',
+    color: category?.color || '#6366f1',
+    icon: category?.icon || 'circle',
+    description: category?.description || '',
+  };
+}
 
-const CategoryForm: React.FC<CategoryFormProps> = ({ show, onHide, onSubmit, category }) => {
+const labelClass = 'mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200';
+
+/** Monte uma instância nova a cada abertura (o estado inicial vem de `category`). */
+const CategoryForm: React.FC<CategoryFormProps> = ({ onHide, onSubmit, category }) => {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    type: 'expense',
-    color: '#6366f1',
-    icon: 'circle',
-    description: ''
-  });
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<FormData>(() => initialValues(category));
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const submitting = useRef(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const prefix = useId();
+  const id = (field: string) => `${prefix}-${field}`;
 
-  // Lista de ícones disponíveis
-  const availableIcons: string[] = [
-    'circle', 'basket', 'car-front', 'house', 'heart-pulse', 'currency-dollar',
-    'briefcase', 'phone', 'wifi', 'lightning', 'fuel-pump', 'bag',
-    'cart', 'cup-straw', 'trophy', 'gift', 'airplane', 'bicycle',
-    'bus-front', 'train-front', 'bank', 'credit-card', 'piggy-bank',
-    'cash-coin', 'graph-up-arrow', 'tools', 'hammer', 'wrench'
-  ];
-
-  // Cores predefinidas
-  const availableColors: string[] = [
-    '#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
-    '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280',
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
-    '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43'
-  ];
-
-  // Preenche o formulário se estiver editando
-  useEffect(() => {
-    if (category && show) {
-      setFormData({
-        name: category.name || '',
-        type: category.type || 'expense',
-        color: category.color || '#6366f1',
-        icon: category.icon || 'circle',
-        description: category.description || ''
-      });
-    } else if (!category && show) {
-      // Reset form for new category
-      setFormData({
-        name: '',
-        type: 'expense',
-        color: '#6366f1',
-        icon: 'circle',
-        description: ''
-      });
-    }
-  }, [category, show]);
-
-  const handleChange = (e: InputChangeEvent) => {
-    const { name, value } = e.target;
-
-    setFormData(prev => {
-      return {
-        ...prev,
-        [name]: value
-      };
-    });
-
+  const setField = (name: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
   };
 
-  const applyNameSuggestion = useCallback(
-    (text: string) => {
-      const isCreate = !category;
-      setFormData((prev) => {
-        const template = getTemplateForSuggestionText(prev.type, text);
-        const next: FormData = { ...prev, name: text };
-        if (isCreate && template) {
-          next.color = template.color ?? prev.color;
-          next.icon = template.icon ?? prev.icon;
-          if (!prev.description.trim() && template.descriptionHint) {
-            next.description = template.descriptionHint;
-          }
-        }
-        return next;
-      });
-      setError('');
-      requestAnimationFrame(() => {
-        const el = nameInputRef.current;
-        if (!el) return;
-        el.focus();
-        const end = el.value.length;
-        el.setSelectionRange(end, end);
-      });
-    },
-    [category],
-  );
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setField(e.target.name as keyof FormData, e.target.value);
+  };
+
+  const applyNameSuggestion = useCallback((text: string) => {
+    const isCreate = !category;
+    setFormData(prev => {
+      const template = getTemplateForSuggestionText(prev.type, text);
+      const next: FormData = { ...prev, name: text };
+      if (isCreate && template) {
+        next.color = template.color ?? prev.color;
+        next.icon = template.icon ?? prev.icon;
+        if (!prev.description.trim() && template.descriptionHint) next.description = template.descriptionHint;
+      }
+      return next;
+    });
+    setError('');
+    requestAnimationFrame(() => {
+      const el = nameInputRef.current;
+      if (!el) return;
+      el.focus();
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    });
+  }, [category]);
 
   const appendExampleToDescription = useCallback((tag: string) => {
     const piece = tag.trim();
     if (!piece) return;
-    setFormData((prev) => {
+    setFormData(prev => {
       const d = prev.description.trim();
-      if (!d) {
-        return { ...prev, description: piece };
-      }
-      if (d.toLowerCase().includes(piece.toLowerCase())) {
-        return prev;
-      }
+      if (!d) return { ...prev, description: piece };
+      if (d.toLowerCase().includes(piece.toLowerCase())) return prev;
       return { ...prev, description: `${d}; ${piece}` };
     });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    e.stopPropagation();
-
-    setLoading(true);
+    if (submitting.current) return;
     setError('');
 
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      setError('Informe o nome da categoria.');
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (formData.type !== 'income' && formData.type !== 'expense') {
+      setError('Selecione o tipo da categoria.');
+      return;
+    }
+
+    const submitData: CategoryPayload = {
+      name: trimmedName,
+      type: formData.type,
+      color: formData.color || '#6366f1',
+      icon: formData.icon || 'circle',
+      description: formData.description.trim(),
+    };
+
+    submitting.current = true;
+    setSaving(true);
     try {
-      // Validações mais robustas
-      const trimmedName = formData.name?.trim() || '';
-      if (!trimmedName) {
-        setError('Nome da categoria é obrigatório');
-        setLoading(false);
-        return;
-      }
-
-      if (!formData.type || (formData.type !== 'income' && formData.type !== 'expense')) {
-        setError('Tipo da categoria é obrigatório');
-        setLoading(false);
-        return;
-      }
-
-      // Prepara dados para envio
-      const submitData = {
-        name: trimmedName,
-        type: formData.type,
-        color: formData.color || '#6366f1',
-        icon: formData.icon || 'circle',
-        description: formData.description?.trim() || ''
-      };
-
       await onSubmit(submitData);
-    } catch (err: any) {
-      const apiError = err?.response?.data?.error || err?.response?.data?.message || err?.message;
-      const errorMessage = apiError || 'Erro ao salvar categoria';
-      setError(errorMessage);
+    } catch {
+      setError(CATEGORY_SAVE_ERROR);
     } finally {
-      setLoading(false);
+      submitting.current = false;
+      setSaving(false);
     }
   };
 
-  const handleClose = () => {
-    if (!loading) {
-      onHide();
-    }
-  };
-
-  if (!show) return null;
+  const close = () => { if (!submitting.current) onHide(); };
 
   return (
-    <>
-      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }} onClick={handleClose}></div>
-      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
-        <div className="modal-dialog modal-lg" role="document" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">
-                {category ? t('categories.edit') : t('categories.add')}
-              </h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={handleClose}
-                disabled={loading}
-              ></button>
-            </div>
+    <AppDialog title={category ? t('categories.edit') : t('categories.add')} onClose={close} busy={saving} initialFocus={nameInputRef} size="lg">
+      <form onSubmit={handleSubmit} className="p-4" noValidate>
+        {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
 
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                {error && (
-                  <div className="alert alert-danger" role="alert">
-                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                    {error}
-                  </div>
-                )}
-
-                {/* Preview da Categoria */}
-                <div className="text-center mb-4">
-                  <div
-                    className="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-2"
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      backgroundColor: formData.color
-                    }}
-                  >
-                    <i className={`bi bi-${formData.icon} text-white`} style={{ fontSize: '2rem' }}></i>
-                  </div>
-                  <h5 className="mb-0">{formData.name || 'Nome da Categoria'}</h5>
-                  <small className="text-muted">
-                    {formData.type === 'income' ? t('categories.income') : t('categories.expense')}
-                  </small>
-                </div>
-
-                <div className="row g-3">
-                  {/* Nome */}
-                  <div className="col-12">
-                    <label htmlFor="category-name" className="form-label">{t('categories.name')}</label>
-                    <input
-                      ref={nameInputRef}
-                      type="text"
-                      id="category-name"
-                      name="name"
-                      className="form-control"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      disabled={loading}
-                      placeholder="Ex: Alimentação, Salário, etc."
-                      autoComplete="category-name"
-                    />
-                    <CategoryNameSuggestions
-                      className="mt-2"
-                      kind={formData.type}
-                      nameQuery={formData.name}
-                      currentName={formData.name}
-                      disabled={loading}
-                      onSelect={applyNameSuggestion}
-                    />
-                  </div>
-
-                  {/* Descrição */}
-                  <div className="col-12">
-                    <label htmlFor="category-description" className="form-label">{t('categories.description') || 'Descrição'} <small className="text-muted">(opcional)</small></label>
-                    <textarea
-                      id="category-description"
-                      name="description"
-                      className="form-control"
-                      value={formData.description}
-                      onChange={handleChange}
-                      disabled={loading}
-                      placeholder="Ex: Doações recebidas, contribuições, etc."
-                      rows={3}
-                    />
-                    <CategoryRelatedExamples
-                      className="mt-2"
-                      kind={formData.type}
-                      currentName={formData.name}
-                      disabled={loading}
-                      onExampleTagClick={appendExampleToDescription}
-                    />
-                  </div>
-
-                  {/* Tipo */}
-                  <div className="col-md-6">
-                    <label className="form-label">{t('categories.type')}</label>
-                    <div className="btn-group w-100" role="group" aria-label="Tipo de categoria">
-                      <input
-                        type="radio"
-                        className="btn-check"
-                        name="type"
-                        id="income_cat"
-                        value="income"
-                        checked={formData.type === 'income'}
-                        onChange={handleChange}
-                        disabled={loading}
-                      />
-                      <label className="btn btn-outline-success" htmlFor="income_cat">
-                        <i className="bi bi-arrow-up-circle me-2"></i>
-                        {t('categories.income')}
-                      </label>
-
-                      <input
-                        type="radio"
-                        className="btn-check"
-                        name="type"
-                        id="expense_cat"
-                        value="expense"
-                        checked={formData.type === 'expense'}
-                        onChange={handleChange}
-                        disabled={loading}
-                      />
-                      <label className="btn btn-outline-danger" htmlFor="expense_cat">
-                        <i className="bi bi-arrow-down-circle me-2"></i>
-                        {t('categories.expense')}
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Cor */}
-                  <div className="col-md-6">
-                    <label className="form-label">{t('categories.color')}</label>
-                    <div className="d-flex flex-wrap gap-2">
-                      {availableColors.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          name={`color-${color}`}
-                          aria-label={`Selecionar cor ${color}`}
-                          className={`btn p-0 border ${formData.color === color ? 'border-dark border-3' : 'border-2'}`}
-                          style={{
-                            width: '40px',
-                            height: '40px',
-                            backgroundColor: color,
-                            borderRadius: '50%'
-                          }}
-                          onClick={() => handleChange({ target: { name: 'color', value: color } })}
-                          disabled={loading}
-                        />
-                      ))}
-                    </div>
-                    <input
-                      type="color"
-                      id="category-color"
-                      name="color"
-                      className="form-control form-control-color mt-2"
-                      value={formData.color}
-                      onChange={handleChange}
-                      disabled={loading}
-                      title="Escolher cor personalizada"
-                      aria-label="Escolher cor personalizada"
-                    />
-                  </div>
-
-                  {/* Ícone */}
-                  <div className="col-12">
-                    <label className="form-label">{t('categories.icon')}</label>
-                    <div className="d-flex flex-wrap gap-2" role="group" aria-label="Selecionar ícone">
-                      {availableIcons.map((icon) => (
-                        <button
-                          key={icon}
-                          type="button"
-                          name={`icon-${icon}`}
-                          aria-label={`Selecionar ícone ${icon}`}
-                          className={`btn btn-outline-secondary ${formData.icon === icon ? 'active' : ''}`}
-                          style={{ width: '50px', height: '50px' }}
-                          onClick={() => handleChange({ target: { name: 'icon', value: icon } })}
-                          disabled={loading}
-                        >
-                          <i className={`bi bi-${icon}`}></i>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleClose}
-                  disabled={loading}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <span className="loading-spinner me-2"></span>
-                      {t('common.loading')}
-                    </>
-                  ) : (
-                    t('common.save')
-                  )}
-                </button>
-              </div>
-            </form>
+        {/* Prévia */}
+        <div className="mb-4 text-center" aria-hidden="true">
+          <div className="mx-auto mb-2 flex h-20 w-20 items-center justify-center rounded-full" style={{ backgroundColor: formData.color }}>
+            <i className={`bi bi-${formData.icon} text-white`} style={{ fontSize: '2rem' }}></i>
           </div>
+          <p className="font-semibold text-slate-900 dark:text-white">{formData.name || 'Nome da categoria'}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{formData.type === 'income' ? t('categories.income') : t('categories.expense')}</p>
         </div>
-      </div>
-    </>
+
+        <fieldset disabled={saving} className="space-y-4">
+          <div>
+            <label htmlFor={id('name')} className={labelClass}>{t('categories.name')} *</label>
+            <input ref={nameInputRef} type="text" id={id('name')} name="name" value={formData.name} onChange={handleChange} required
+              placeholder="Ex: Alimentação, Salário, etc." autoComplete="off" className="native-input-themed min-h-[44px] w-full" />
+            <CategoryNameSuggestions className="mt-2" kind={formData.type} nameQuery={formData.name} currentName={formData.name} disabled={saving} onSelect={applyNameSuggestion} />
+          </div>
+
+          <div>
+            <label htmlFor={id('description')} className={labelClass}>Descrição (opcional)</label>
+            <textarea id={id('description')} name="description" value={formData.description} onChange={handleChange} rows={3}
+              placeholder="Ex: Doações recebidas, contribuições, etc." className="native-input-themed w-full" />
+            <CategoryRelatedExamples className="mt-2" kind={formData.type} currentName={formData.name} disabled={saving} onExampleTagClick={appendExampleToDescription} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <fieldset>
+              <legend className={labelClass}>{t('categories.type')} *</legend>
+              <div className="flex gap-2">
+                {(['income', 'expense'] as const).map(type => {
+                  const selected = formData.type === type;
+                  const tone = type === 'income' ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-red-600 bg-red-600 text-white';
+                  return (
+                    <label key={type} htmlFor={id(`type-${type}`)}
+                      className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border text-sm font-medium focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 ${selected ? tone : 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700'}`}>
+                      <input type="radio" id={id(`type-${type}`)} name="type" value={type} checked={selected} onChange={handleChange} className="sr-only" />
+                      <i className={`bi ${type === 'income' ? 'bi-arrow-up-circle' : 'bi-arrow-down-circle'}`} aria-hidden="true"></i>
+                      {t(`categories.${type}`)}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend className={labelClass}>{t('categories.color')}</legend>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {availableColors.map(color => (
+                  <button key={color} type="button" aria-label={`Cor ${color}`} aria-pressed={formData.color === color}
+                    className={`h-9 w-9 rounded-full border-2 ${formData.color === color ? 'border-slate-900 ring-2 ring-slate-400 ring-offset-2 dark:border-white' : 'border-slate-200 dark:border-slate-600'}`}
+                    style={{ backgroundColor: color }} onClick={() => setField('color', color)} />
+                ))}
+              </div>
+              <label htmlFor={id('color')} className="text-xs text-slate-500 dark:text-slate-400">Cor personalizada</label>
+              <input type="color" id={id('color')} name="color" value={formData.color} onChange={handleChange} className="ml-2 h-9 w-12 cursor-pointer rounded border border-slate-300 dark:border-slate-600" />
+            </fieldset>
+          </div>
+
+          <fieldset>
+            <legend className={labelClass}>{t('categories.icon')}</legend>
+            <div className="flex flex-wrap gap-1">
+              {availableIcons.map(icon => (
+                <button key={icon} type="button" aria-label={`Ícone ${icon}`} aria-pressed={formData.icon === icon}
+                  className={`flex h-11 w-11 items-center justify-center rounded-lg border text-lg ${formData.icon === icon ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+                  onClick={() => setField('icon', icon)}>
+                  <i className={`bi bi-${icon}`}></i>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </fieldset>
+
+        <div className="mt-5 flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <button type="button" onClick={close} disabled={saving} className="min-h-[44px] rounded-lg border border-slate-300 px-4 text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-100">{t('common.cancel')}</button>
+          <button type="submit" disabled={saving} className="min-h-[44px] rounded-lg bg-indigo-600 px-4 font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50">{saving ? 'Salvando…' : t('common.save')}</button>
+        </div>
+      </form>
+    </AppDialog>
   );
 };
 
