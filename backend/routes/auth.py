@@ -8,8 +8,10 @@ import base64
 import json
 import jwt
 import requests
+import unicodedata
 
 from utils.auth_utils import require_auth
+from utils.exceptions import AppException, ValidationException
 from services.user_service import create_default_categories, get_user_public
 from services.bootstrap_service import AuthBootstrapService, TenantBootstrapError
 from schemas.auth_schemas import UserRegisterSchema, UserLoginSchema, RefreshTokenSchema
@@ -172,18 +174,12 @@ def reset_password():
     return jsonify({'error': 'Use o fluxo de redefinição de senha do Supabase pelo frontend.'}), 410
 
 
-@bp.route('/auth/me', methods=['GET'])
-@limiter.exempt
-@require_auth
-def get_user():
-    users_collection = current_app.config['USERS']
-    user = users_collection.find_one(_user_id_filter(request.user_id))
-    if not user:
-        return jsonify({'error': 'Usuário não encontrado'}), 404
+def _serialize_me(user):
+    """Formato único de resposta de GET /auth/me e PUT /auth/profile."""
     role = user.get('role') or ('admin' if user.get('is_admin') else 'user')
     status = user.get('status') or 'active'
     is_admin = role == 'admin' or bool(user.get('is_admin'))
-    return jsonify({
+    return {
         'id': _user_id(user),
         'name': user['name'],
         'email': user['email'],
@@ -192,7 +188,76 @@ def get_user():
         'role': role,
         'status': status,
         'is_admin': is_admin,
-    })
+    }
+
+
+PROFILE_NAME_MIN = 2
+PROFILE_NAME_MAX = 120
+
+
+def _validate_profile_name(raw):
+    if not isinstance(raw, str):
+        raise ValidationException('Nome é obrigatório.', payload={'field': 'name'})
+    name = raw.strip()
+    if len(name) < PROFILE_NAME_MIN:
+        raise ValidationException(
+            f'Nome deve ter pelo menos {PROFILE_NAME_MIN} caracteres.', payload={'field': 'name'}
+        )
+    if len(name) > PROFILE_NAME_MAX:
+        raise ValidationException(
+            f'Nome deve ter no máximo {PROFILE_NAME_MAX} caracteres.', payload={'field': 'name'}
+        )
+    # Rejeita caracteres de controle/formatação invisíveis (Cc, Cf, ...) e separadores de linha.
+    if any(unicodedata.category(ch)[0] == 'C' or unicodedata.category(ch) in ('Zl', 'Zp') for ch in name):
+        raise ValidationException('Nome contém caracteres inválidos.', payload={'field': 'name'})
+    return name
+
+
+@bp.route('/auth/me', methods=['GET'])
+@limiter.exempt
+@require_auth
+def get_user():
+    users_collection = current_app.config['USERS']
+    user = users_collection.find_one(_user_id_filter(request.user_id))
+    if not user:
+        return jsonify({'error': 'Usuário não encontrado'}), 404
+    return jsonify(_serialize_me(user))
+
+
+@bp.route('/auth/profile', methods=['PUT'])
+@limiter.limit("10 per minute")
+@require_auth
+def update_profile():
+    """
+    Atualiza o perfil do próprio usuário autenticado (id sempre do JWT).
+
+    Aceita apenas `name`. Troca de e-mail NÃO é feita aqui: exige o fluxo de
+    confirmação do Supabase Auth (fora do escopo) — enviar `email` retorna 400.
+    O nome exibido vem de public.users (GET /auth/me); user_metadata do Supabase
+    Auth só é lido no bootstrap inicial e não é atualizado aqui.
+    """
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ValidationException('Envie um objeto JSON com o campo name.')
+    if 'email' in data:
+        raise ValidationException(
+            'O e-mail não pode ser alterado por aqui. Fale com o suporte.', payload={'field': 'email'}
+        )
+    unknown = sorted(k for k in data if k != 'name')
+    if unknown:
+        raise ValidationException(f'Campos não permitidos: {", ".join(unknown)}.')
+    name = _validate_profile_name(data.get('name'))
+
+    users_repo = current_app.config['USERS']
+    user_id = request.user_id
+    if not users_repo.find_one(_user_id_filter(user_id)):
+        return jsonify({'error': 'Usuário não encontrado'}), 404
+    if not users_repo.update(user_id, {'name': name}):
+        raise AppException('Não foi possível salvar o nome. Tente novamente.', status_code=503)
+    updated = users_repo.find_one(_user_id_filter(user_id))
+    if not updated:
+        raise AppException('Não foi possível confirmar a alteração. Tente novamente.', status_code=503)
+    return jsonify(_serialize_me(updated))
 
 
 @bp.route('/auth/bootstrap', methods=['POST'])

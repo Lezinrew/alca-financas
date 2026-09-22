@@ -1,6 +1,7 @@
-import { useRef, useState, ChangeEvent, FormEvent } from 'react';
+import { useEffect, useRef, useState, ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { authAPI } from '../../utils/api';
 import { supabase } from '../../utils/supabaseClient';
 import './profile.css';
 
@@ -16,7 +17,22 @@ interface PasswordFieldErrors {
 }
 
 const MIN_PASSWORD_LENGTH = 6;
-const PROFILE_EDIT_UNAVAILABLE = 'A edição do perfil ainda não está disponível. Os dados abaixo são somente leitura.';
+const NAME_MIN_LENGTH = 2;
+const NAME_MAX_LENGTH = 120;
+const NAME_SAVE_ERROR = 'Não foi possível salvar o nome. Tente novamente.';
+const NAME_SAVE_SUCCESS = 'Nome atualizado com sucesso!';
+const EMAIL_READONLY_HINT = 'Para alterar o e-mail, fale com o suporte.';
+// Mesmas regras do backend (PUT /auth/profile): controle/formatação invisíveis e separadores de linha.
+const NAME_INVALID_CHARS = /[\p{C}\u2028\u2029]/u;
+
+/** Validação local do nome (espelha o backend); devolve a mensagem ou ''. */
+function validateName(raw: string): string {
+  const name = raw.trim();
+  if (name.length < NAME_MIN_LENGTH) return `O nome deve ter pelo menos ${NAME_MIN_LENGTH} caracteres.`;
+  if (name.length > NAME_MAX_LENGTH) return `O nome deve ter no máximo ${NAME_MAX_LENGTH} caracteres.`;
+  if (NAME_INVALID_CHARS.test(name)) return 'O nome contém caracteres inválidos.';
+  return '';
+}
 
 /** Validação local da nova senha; devolve mensagens por campo. */
 function validatePassword(data: PasswordData): PasswordFieldErrors {
@@ -32,9 +48,62 @@ function validatePassword(data: PasswordData): PasswordFieldErrors {
 
 const Profile = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  // Não existe endpoint de atualização de perfil no backend (apenas GET /auth/me);
-  // o formulário fica somente leitura até que exista. A senha usa o Supabase Auth.
+  const { user, updateUser } = useAuth();
+  // Nome: PUT /auth/profile (public.users). E-mail: somente leitura (troca exige fluxo do Supabase).
+  // Senha: Supabase Auth.
+  const [nameValue, setNameValue] = useState(user?.name ?? '');
+  const [nameFieldError, setNameFieldError] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [nameSuccess, setNameSuccess] = useState('');
+  const [nameSaving, setNameSaving] = useState(false);
+  const nameLock = useRef(false);
+
+  useEffect(() => {
+    setNameValue(user?.name ?? '');
+  }, [user?.name]);
+
+  const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setNameValue(e.target.value);
+    setNameFieldError('');
+    setNameError('');
+    setNameSuccess('');
+  };
+
+  const handleNameSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (nameLock.current) return;
+    setNameError('');
+    setNameSuccess('');
+
+    const validation = validateName(nameValue);
+    setNameFieldError(validation);
+    if (validation) {
+      document.getElementById('profile-name')?.focus();
+      return;
+    }
+
+    nameLock.current = true;
+    setNameSaving(true);
+    try {
+      const response = await authAPI.updateProfile({ name: nameValue.trim() });
+      const updated = response?.data;
+      if (!updated || typeof updated.name !== 'string' || !updated.id) {
+        setNameError(NAME_SAVE_ERROR);
+        return;
+      }
+      updateUser(updated);
+      setNameValue(updated.name);
+      setNameSuccess(NAME_SAVE_SUCCESS);
+    } catch {
+      setNameError(NAME_SAVE_ERROR);
+    } finally {
+      nameLock.current = false;
+      setNameSaving(false);
+    }
+  };
+
+  const nameUnchanged = nameValue.trim() === (user?.name ?? '');
+
   const [passwordLoading, setPasswordLoading] = useState(false);
   const passwordLock = useRef(false);
   const [passwordError, setPasswordError] = useState('');
@@ -147,43 +216,79 @@ const Profile = () => {
               </div>
             </div>
             <div className="p-6">
-              <div id="profile-readonly-notice" role="note" className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/50 rounded-lg">
-                <p className="text-sm text-blue-800 dark:text-blue-100 flex items-center gap-2">
-                  <i className="bi bi-info-circle-fill"></i>
-                  {PROFILE_EDIT_UNAVAILABLE}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome Completo</label>
-                  <input
-                    type="text"
-                    id="profile-name"
-                    name="name"
-                    autoComplete="name"
-                    className="input-base profile-readonly-field w-full"
-                    value={user?.name || ''}
-                    readOnly
-                    aria-readonly="true"
-                    aria-describedby="profile-readonly-notice"
-                  />
+              <form onSubmit={handleNameSubmit} noValidate aria-busy={nameSaving}>
+                {nameError && (
+                  <div role="alert" className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
+                    <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400" aria-hidden="true"></i>
+                    <span className="text-sm text-red-800 dark:text-red-200">{nameError}</span>
+                  </div>
+                )}
+                {nameSuccess && (
+                  <div role="status" className="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 flex items-center gap-2">
+                    <i className="bi bi-check-circle-fill text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
+                    <span className="text-sm text-emerald-800 dark:text-emerald-200">{nameSuccess}</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome Completo</label>
+                    <input
+                      type="text"
+                      id="profile-name"
+                      name="name"
+                      autoComplete="name"
+                      className="input-base w-full"
+                      value={nameValue}
+                      onChange={handleNameChange}
+                      required
+                      disabled={nameSaving}
+                      maxLength={NAME_MAX_LENGTH}
+                      aria-invalid={Boolean(nameFieldError)}
+                      aria-describedby={nameFieldError ? 'profile-name-error profile-name-hint' : 'profile-name-hint'}
+                    />
+                    <p id="profile-name-hint" className="text-xs text-slate-500 dark:text-slate-400 mt-1">Entre {NAME_MIN_LENGTH} e {NAME_MAX_LENGTH} caracteres.</p>
+                    {nameFieldError && (
+                      <p id="profile-name-error" className="profile-field-error" role="alert">{nameFieldError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                    <input
+                      type="email"
+                      id="profile-email"
+                      name="email"
+                      autoComplete="email"
+                      className="input-base profile-readonly-field w-full"
+                      value={user?.email || ''}
+                      readOnly
+                      aria-readonly="true"
+                      aria-describedby="profile-email-hint"
+                    />
+                    <p id="profile-email-hint" className="text-xs text-slate-500 dark:text-slate-400 mt-1">{EMAIL_READONLY_HINT}</p>
+                  </div>
                 </div>
 
-                <div>
-                  <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
-                  <input
-                    type="email"
-                    id="profile-email"
-                    name="email"
-                    autoComplete="email"
-                    className="input-base profile-readonly-field w-full"
-                    value={user?.email || ''}
-                    readOnly
-                    aria-readonly="true"
-                    aria-describedby="profile-readonly-notice"
-                  />
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={nameSaving || nameUnchanged}
+                  >
+                    {nameSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" aria-hidden="true"></div>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check2" aria-hidden="true"></i>
+                        Salvar nome
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
 

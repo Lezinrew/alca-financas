@@ -132,6 +132,8 @@ export const authAPI = {
   exportBackup: () => api.get('/auth/backup/export'),
   importBackup: (backupData: any) => api.post('/auth/backup/import', backupData),
   clearAllData: () => api.post('/auth/data/clear'),
+  /** PUT /auth/profile: altera só o nome do usuário autenticado; responde no formato de /auth/me. */
+  updateProfile: (data: { name: string }) => api.put('/auth/profile', { name: data.name }),
 };
 
 // Funções de categorias
