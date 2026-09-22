@@ -4,8 +4,18 @@ import toast from 'react-hot-toast';
 import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Mail, Calendar, Shield, Ban, Trash2, Download, Skull } from 'lucide-react';
+import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
+import { PurgeUserDialog } from './PurgeUserDialog';
 
 const ADMIN_CARD = 'admin-card-shell p-6';
+
+interface PendingAction {
+    title: string;
+    consequence: string;
+    confirmLabel: string;
+    danger?: boolean;
+    run: () => Promise<void>;
+}
 
 interface UserDetails {
     user: {
@@ -54,8 +64,7 @@ const UserDetail: React.FC = () => {
     const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [purgeOpen, setPurgeOpen] = useState(false);
-    const [purgeEmail, setPurgeEmail] = useState('');
-    const [purging, setPurging] = useState(false);
+    const [pending, setPending] = useState<PendingAction | null>(null);
 
     useEffect(() => {
         if (!userId) return;
@@ -66,7 +75,7 @@ const UserDetail: React.FC = () => {
                 setUserDetails(response.data);
             } catch (error) {
                 console.error('Erro ao carregar detalhes do usuário:', error);
-                alert('Erro ao carregar detalhes do usuário');
+                toast.error('Não foi possível carregar os detalhes do usuário.');
             } finally {
                 setLoading(false);
             }
@@ -81,68 +90,58 @@ const UserDetail: React.FC = () => {
         setUserDetails(response.data);
     };
 
-    const handleBlockUser = async () => {
+    // Cada ação abre um ConfirmDialog; a API só é chamada após confirmar.
+    const handleBlockUser = () => {
         if (!userDetails || !userId) return;
         const blocked = userDetails.user.is_blocked;
-        const action = blocked ? 'reativar (estado ativo)' : 'desativar conta (bloqueio)';
-        if (!window.confirm(`Tem certeza que deseja ${action}?`)) return;
-
-        try {
-            if (blocked) {
-                await adminAPI.reactivateUser(userId);
-            } else {
-                await adminAPI.patchUserStatus(userId, 'disabled');
-            }
-            await reload();
-        } catch (error) {
-            alert('Erro ao atualizar status do usuário');
-        }
+        setPending(blocked ? {
+            title: 'Desbloquear usuário',
+            consequence: 'A conta volta ao estado ativo e o usuário poderá entrar novamente.',
+            confirmLabel: 'Desbloquear',
+            run: async () => { await adminAPI.reactivateUser(userId); await reload(); toast.success('Conta reativada.'); },
+        } : {
+            title: 'Bloquear usuário',
+            consequence: 'A conta passa a "desativada" e o usuário deixa de conseguir entrar até ser reativado.',
+            confirmLabel: 'Bloquear',
+            danger: true,
+            run: async () => { await adminAPI.patchUserStatus(userId, 'disabled'); await reload(); toast.success('Conta bloqueada.'); },
+        });
     };
 
-    const handleDeleteUser = async () => {
+    const handleDeleteUser = () => {
         if (!userId) return;
-        if (!window.confirm('Desativar esta conta? Remoção lógica: o utilizador deixa de aceder.')) return;
-
-        try {
-            await adminAPI.deleteUser(userId);
-            alert('Conta desativada');
-            navigate('/admin/users');
-        } catch (error) {
-            alert('Erro ao desativar utilizador');
-        }
+        setPending({
+            title: 'Desativar conta',
+            consequence: 'O usuário deixa de ter acesso. Os dados ficam guardados e a conta pode ser reativada depois.',
+            confirmLabel: 'Desativar',
+            danger: true,
+            run: async () => { await adminAPI.deleteUser(userId); toast.success('Conta desativada.'); navigate('/admin/users'); },
+        });
     };
 
-    const submitPurge = async () => {
+    const submitPurge = async (confirmEmail: string) => {
         if (!userId) return;
-        setPurging(true);
-        try {
-            await adminAPI.purgeUser(userId, { confirm_email: purgeEmail.trim() });
-            toast.success('Conta e dados apagados permanentemente.');
-            setPurgeOpen(false);
-            setPurgeEmail('');
-            navigate('/admin/users');
-        } catch (e: unknown) {
-            const msg =
-                (e as { response?: { data?: { error?: string; detail?: string } } })?.response?.data?.error ||
-                (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            toast.error(msg ? String(msg) : 'Falha na exclusão total.');
-        } finally {
-            setPurging(false);
-        }
+        await adminAPI.purgeUser(userId, { confirm_email: confirmEmail });
+        toast.success('Conta e dados apagados permanentemente.');
+        setPurgeOpen(false);
+        navigate('/admin/users');
     };
 
-    const handlePromoteAdmin = async () => {
+    const handlePromoteAdmin = () => {
         if (!userDetails || !userId) return;
         const isAdm = userDetails.user.role === 'admin' || userDetails.user.is_admin;
-        const action = isAdm ? 'remover' : 'conceder';
-        if (!window.confirm(`Tem certeza que deseja ${action} privilégios de administrador?`)) return;
-
-        try {
-            await adminAPI.patchUserRole(userId, isAdm ? 'user' : 'admin');
-            await reload();
-        } catch (error) {
-            alert('Erro ao atualizar privilégios');
-        }
+        setPending(isAdm ? {
+            title: 'Remover privilégios de administrador',
+            consequence: 'O usuário perde o acesso ao painel administrativo e passa a ter permissões comuns.',
+            confirmLabel: 'Remover admin',
+            danger: true,
+            run: async () => { await adminAPI.patchUserRole(userId, 'user'); await reload(); toast.success('Privilégios removidos.'); },
+        } : {
+            title: 'Promover a administrador',
+            consequence: 'O usuário passa a ter acesso total ao painel administrativo, incluindo dados de outros usuários.',
+            confirmLabel: 'Promover',
+            run: async () => { await adminAPI.patchUserRole(userId, 'admin'); await reload(); toast.success('Usuário promovido a administrador.'); },
+        });
     };
 
     const handleExportData = async () => {
@@ -160,7 +159,8 @@ const UserDetail: React.FC = () => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (error) {
-            alert('Erro ao exportar dados');
+            console.error('Erro ao exportar dados:', error);
+            toast.error('Não foi possível exportar os dados. Tente novamente.');
         }
     };
 
@@ -270,10 +270,7 @@ const UserDetail: React.FC = () => {
                     {currentUser?.id !== userId && (
                         <button
                             type="button"
-                            onClick={() => {
-                                setPurgeEmail('');
-                                setPurgeOpen(true);
-                            }}
+                            onClick={() => setPurgeOpen(true)}
                             className="flex items-center rounded-lg border border-red-200/90 bg-red-50 px-4 py-2 text-red-800 transition-colors hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70"
                         >
                             <Skull className="mr-2 h-4 w-4" />
@@ -383,66 +380,25 @@ const UserDetail: React.FC = () => {
                 </div>
             )}
 
-            {purgeOpen && userDetails && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="user-detail-purge-title"
-                >
-                    <div className="admin-modal-panel">
-                        <h2 id="user-detail-purge-title" className="text-lg font-bold text-slate-900 dark:text-white">
-                            Exclusão total da conta
-                        </h2>
-                        <p className="mt-2 text-sm text-slate-600 dark:text-dark-text-secondary">
-                            Remove o utilizador do Auth e apaga o perfil e dados em cascata. Irreversível.
-                        </p>
-                        <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
-                            {userDetails.user.name}{' '}
-                            <span className="font-normal text-slate-500 dark:text-dark-text-muted">
-                                ({userDetails.user.email})
-                            </span>
-                        </p>
-                        <label
-                            htmlFor="user-detail-purge-email"
-                            className="mt-4 block text-sm font-medium text-slate-700 dark:text-dark-text-secondary"
-                        >
-                            Escreva o e-mail do utilizador para confirmar
-                        </label>
-                        <input
-                            id="user-detail-purge-email"
-                            name="user-detail-purge-email"
-                            type="email"
-                            autoComplete="off"
-                            value={purgeEmail}
-                            onChange={(e) => setPurgeEmail(e.target.value)}
-                            className="native-input-themed mt-1 w-full rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                            placeholder={userDetails.user.email}
-                        />
-                        <div className="mt-6 flex justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (purging) return;
-                                    setPurgeOpen(false);
-                                    setPurgeEmail('');
-                                }}
-                                disabled={purging}
-                                className="admin-outline-btn rounded-xl font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-dark-text-secondary"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => void submitPurge()}
-                                disabled={purging}
-                                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                            >
-                                {purging ? 'A apagar…' : 'Apagar permanentemente'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {purgeOpen && (
+                <PurgeUserDialog
+                    name={userDetails.user.name}
+                    email={userDetails.user.email}
+                    onConfirm={submitPurge}
+                    onClose={() => setPurgeOpen(false)}
+                />
+            )}
+
+            {pending && (
+                <ConfirmDialog
+                    title={pending.title}
+                    subject={`${userDetails.user.name} (${userDetails.user.email})`}
+                    consequence={<p>{pending.consequence}</p>}
+                    confirmLabel={pending.confirmLabel}
+                    danger={pending.danger}
+                    onConfirm={async () => { await pending.run(); setPending(null); }}
+                    onClose={() => setPending(null)}
+                />
             )}
         </div>
     );

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useKeyedRequest } from '../../hooks/useKeyedRequest';
+import { AdminUnavailable } from './AdminUnavailable';
 
 const ADMIN_CARD = 'admin-card-shell p-6';
 
@@ -35,36 +37,29 @@ interface Stats {
 }
 
 const AdminDashboard: React.FC = () => {
-    const [stats, setStats] = useState<Stats | null>(null);
-    const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const navigate = useNavigate();
+    const isAdmin = Boolean(user && (user.role === 'admin' || user.is_admin));
+    const [attempt, setAttempt] = useState(0);
+    const { data: stats, loading, error } = useKeyedRequest<Stats>(String(attempt), isAdmin, () => adminAPI.getStats());
 
     useEffect(() => {
-        const isAdmin = user && (user.role === 'admin' || user.is_admin);
-        if (user && !isAdmin) {
-            navigate('/dashboard');
-            return;
-        }
-
-        const fetchStats = async () => {
-            try {
-                const response = await adminAPI.getStats();
-                setStats(response.data);
-            } catch (error) {
-                console.error('Erro ao carregar estatísticas:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchStats();
-    }, [user, navigate]);
+        if (user && !isAdmin) navigate('/dashboard');
+    }, [user, isAdmin, navigate]);
 
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (error || !stats) {
+        return (
+            <div className="p-6">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Painel Administrativo</h1>
+                <AdminUnavailable what="as estatísticas do sistema" onRetry={() => setAttempt((a) => a + 1)} />
             </div>
         );
     }
@@ -79,7 +74,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total de Usuários</p>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats?.users.total}</h3>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.users.total}</h3>
                         </div>
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                             <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,7 +84,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center text-sm">
                         <span className="text-green-500 font-medium flex items-center">
-                            +{stats?.users.new_this_month}
+                            +{stats.users.new_this_month}
                         </span>
                         <span className="ml-2 text-slate-400 dark:text-dark-text-muted">novos este mês</span>
                     </div>
@@ -100,7 +95,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total de Transações</p>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats?.data.transactions}</h3>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.data.transactions}</h3>
                         </div>
                         <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                             <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +113,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Categorias</p>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats?.data.categories}</h3>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.data.categories}</h3>
                         </div>
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                             <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,7 +131,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Status do Sistema</p>
-                            <h3 className="text-2xl font-bold text-green-500 mt-1 capitalize">{stats?.system_status}</h3>
+                            <h3 className="text-2xl font-bold text-green-500 mt-1 capitalize">{stats.system_status}</h3>
                         </div>
                         <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                             <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,7 +152,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Usuários Ativos (24h)</p>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats?.users.active_24h || 0}</h3>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.users.active_24h || 0}</h3>
                         </div>
                         <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                             <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,7 +171,7 @@ const AdminDashboard: React.FC = () => {
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Volume Financeiro</p>
                             <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                                R$ {(stats?.financial?.total_volume || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                R$ {(stats.financial?.total_volume || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </h3>
                         </div>
                         <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
@@ -195,7 +190,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Contas Cadastradas</p>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats?.data.accounts}</h3>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.data.accounts}</h3>
                         </div>
                         <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
                             <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,7 +205,7 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Top Categories */}
-            {stats?.financial?.top_categories && stats.financial.top_categories.length > 0 && (
+            {stats.financial?.top_categories && stats.financial.top_categories.length > 0 && (
                 <div className={`${ADMIN_CARD} mb-8`}>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">🏆 Top 10 Categorias Mais Usadas</h3>
                     <div className="overflow-x-auto">
@@ -257,7 +252,7 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                                 <div className="text-left">
                                     <p className="font-medium text-slate-900 dark:text-white">Gerenciar Usuários</p>
-                                    <p className="text-sm text-slate-500 dark:text-dark-text-muted">Listar, bloquear ou remover utilizadores</p>
+                                    <p className="text-sm text-slate-500 dark:text-dark-text-muted">Listar, bloquear ou remover usuários</p>
                                 </div>
                             </div>
                             <svg className="h-5 w-5 text-slate-400 dark:text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">

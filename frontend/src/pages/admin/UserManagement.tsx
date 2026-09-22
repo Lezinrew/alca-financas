@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { adminAPI } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
+import { PurgeUserDialog } from './PurgeUserDialog';
 
 interface AdminUserRow {
   id: string;
@@ -21,6 +23,17 @@ interface AdminUserRow {
 
 const ADMIN_CARD = 'admin-card-shell';
 const ADMIN_TABLE_SHELL = `${ADMIN_CARD} overflow-hidden`;
+/** Alvo mínimo de toque de 44px. */
+const ACTION_BTN = 'min-h-[44px] min-w-[44px] rounded-lg px-2 py-1 text-xs font-medium';
+
+interface PendingAction {
+  user: AdminUserRow;
+  title: string;
+  consequence: string;
+  confirmLabel: string;
+  danger?: boolean;
+  run: () => Promise<void>;
+}
 
 const statusLabel: Record<string, string> = {
   active: 'Ativo',
@@ -56,8 +69,7 @@ const UserManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [adminsOnly, setAdminsOnly] = useState(false);
   const [purgeTarget, setPurgeTarget] = useState<AdminUserRow | null>(null);
-  const [purgeEmail, setPurgeEmail] = useState('');
-  const [purging, setPurging] = useState(false);
+  const [pending, setPending] = useState<PendingAction | null>(null);
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -80,7 +92,7 @@ const UserManagement: React.FC = () => {
       setTotalPages(Math.max(1, response.data.pages ?? 1));
     } catch (e: unknown) {
       console.error(e);
-      toast.error('Não foi possível carregar utilizadores.');
+      toast.error('Não foi possível carregar os usuários.');
     } finally {
       setLoading(false);
     }
@@ -100,91 +112,134 @@ const UserManagement: React.FC = () => {
     setSearch(searchInput.trim());
   };
 
-  const patchStatus = async (id: string, status: string) => {
-    try {
-      await adminAPI.patchUserStatus(id, status);
-      toast.success('Estado atualizado.');
-      await fetchUsers();
-      await fetchStats();
-    } catch {
-      toast.error('Falha ao atualizar estado.');
-    }
+  const refresh = async () => {
+    await fetchUsers();
+    await fetchStats();
   };
 
-  const patchRole = async (id: string, role: 'admin' | 'user') => {
-    if (!window.confirm(role === 'admin' ? 'Promover a administrador?' : 'Remover privilégios de administrador?')) return;
-    try {
-      await adminAPI.patchUserRole(id, role);
-      toast.success('Papel atualizado.');
-      await fetchUsers();
-      await fetchStats();
-    } catch {
-      toast.error('Falha ao atualizar papel.');
-    }
+  // Mudanças de estado/papel abrem um ConfirmDialog; a API só é chamada após confirmar.
+  const patchStatus = (u: AdminUserRow, status: 'inactive' | 'pending_deletion') => {
+    setPending({
+      user: u,
+      title: status === 'inactive' ? 'Marcar como inativo' : 'Marcar para exclusão',
+      consequence: status === 'inactive'
+        ? 'A conta passa ao estado "Inativo". O usuário continua podendo entrar, mas fica elegível para avisos de inatividade.'
+        : 'A conta passa ao estado "Pendente exclusão" e entra na fila de remoção automática. Pode ser reativada antes disso.',
+      confirmLabel: status === 'inactive' ? 'Marcar inativo' : 'Marcar para exclusão',
+      danger: status === 'pending_deletion',
+      run: async () => {
+        await adminAPI.patchUserStatus(u.id, status);
+        toast.success('Estado atualizado.');
+        await refresh();
+      },
+    });
+  };
+
+  const patchRole = (u: AdminUserRow, role: 'admin' | 'user') => {
+    setPending({
+      user: u,
+      title: role === 'admin' ? 'Promover a administrador' : 'Remover privilégios de administrador',
+      consequence: role === 'admin'
+        ? 'O usuário passa a ter acesso total ao painel administrativo, incluindo dados de outros usuários.'
+        : 'O usuário perde o acesso ao painel administrativo e passa a ter permissões comuns.',
+      confirmLabel: role === 'admin' ? 'Promover' : 'Remover admin',
+      danger: role === 'user',
+      run: async () => {
+        await adminAPI.patchUserRole(u.id, role);
+        toast.success('Papel atualizado.');
+        await refresh();
+      },
+    });
   };
 
   const sendWarning = async (id: string) => {
     try {
       const res = await adminAPI.sendInactiveWarning(id);
-      if (res.data?.skipped) toast('Aviso já tinha sido registado para este utilizador.');
-      else toast.success('Aviso enviado (ou registado em log se SMTP não configurado).');
+      if (res.data?.skipped) toast('Este usuário já tinha recebido o aviso.');
+      else toast.success('Aviso de inatividade registrado.');
       await fetchUsers();
     } catch {
-      toast.error('Falha ao enviar aviso.');
+      toast.error('Não foi possível enviar o aviso. Tente novamente.');
     }
   };
 
-  const deactivate = async (id: string) => {
-    if (!window.confirm('Desativar esta conta? O utilizador deixará de aceder (remoção lógica).')) return;
-    try {
-      await adminAPI.deleteUser(id);
-      toast.success('Conta desativada.');
-      await fetchUsers();
-      await fetchStats();
-    } catch {
-      toast.error('Não foi possível desativar.');
-    }
+  const deactivate = (u: AdminUserRow) => {
+    setPending({
+      user: u,
+      title: 'Desativar conta',
+      consequence: 'O usuário deixa de ter acesso. Os dados ficam guardados e a conta pode ser reativada depois.',
+      confirmLabel: 'Desativar',
+      danger: true,
+      run: async () => {
+        await adminAPI.deleteUser(u.id);
+        toast.success('Conta desativada.');
+        await refresh();
+      },
+    });
   };
 
-  const openPurge = (u: AdminUserRow) => {
-    setPurgeTarget(u);
-    setPurgeEmail('');
-  };
-
-  const closePurge = () => {
-    setPurgeTarget(null);
-    setPurgeEmail('');
-  };
-
-  const submitPurge = async () => {
+  const submitPurge = async (confirmEmail: string) => {
     if (!purgeTarget) return;
-    setPurging(true);
-    try {
-      await adminAPI.purgeUser(purgeTarget.id, { confirm_email: purgeEmail.trim() });
-      toast.success('Conta e dados apagados permanentemente.');
-      closePurge();
-      await fetchUsers();
-      await fetchStats();
-    } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { error?: string; detail?: string } } })?.response?.data?.error ||
-        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(msg ? String(msg) : 'Falha na exclusão total.');
-    } finally {
-      setPurging(false);
-    }
+    await adminAPI.purgeUser(purgeTarget.id, { confirm_email: confirmEmail });
+    toast.success('Conta e dados apagados permanentemente.');
+    setPurgeTarget(null);
+    await refresh();
   };
 
-  const reactivate = async (id: string) => {
-    try {
-      await adminAPI.reactivateUser(id);
-      toast.success('Conta reativada.');
-      await fetchUsers();
-      await fetchStats();
-    } catch {
-      toast.error('Falha ao reativar.');
-    }
+  const reactivate = (u: AdminUserRow) => {
+    setPending({
+      user: u,
+      title: 'Reativar conta',
+      consequence: 'A conta volta ao estado "Ativo": o usuário recupera o acesso e sai da fila de exclusão.',
+      confirmLabel: 'Reativar',
+      run: async () => {
+        await adminAPI.reactivateUser(u.id);
+        toast.success('Conta reativada.');
+        await refresh();
+      },
+    });
   };
+
+  const actionButtons = (u: AdminUserRow) => (
+    <div className="flex flex-wrap justify-end gap-1">
+      <button type="button" onClick={() => navigate(`/admin/users/${u.id}`)} className={`${ACTION_BTN} text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20`}>
+        Detalhe
+      </button>
+      {u.role !== 'admin' ? (
+        <button type="button" onClick={() => patchRole(u, 'admin')} className={`${ACTION_BTN} text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20`}>
+          Admin
+        </button>
+      ) : (
+        <button type="button" onClick={() => patchRole(u, 'user')} className={`${ACTION_BTN} text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800`}>
+          Remover admin
+        </button>
+      )}
+      <button type="button" onClick={() => patchStatus(u, 'inactive')} className={`${ACTION_BTN} text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20`}>
+        Inativo
+      </button>
+      <button type="button" onClick={() => patchStatus(u, 'pending_deletion')} className={`${ACTION_BTN} text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-900/20`}>
+        Pend. exclusão
+      </button>
+      <button type="button" onClick={() => reactivate(u)} className={`${ACTION_BTN} text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-900/20`}>
+        Reativar
+      </button>
+      <button type="button" onClick={() => sendWarning(u.id)} className={`${ACTION_BTN} text-cyan-700 hover:bg-cyan-50 dark:text-cyan-300 dark:hover:bg-cyan-900/20`}>
+        Aviso
+      </button>
+      <button type="button" onClick={() => deactivate(u)} className={`${ACTION_BTN} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20`}>
+        Desativar
+      </button>
+      {currentUser?.id !== u.id && (
+        <button
+          type="button"
+          onClick={() => setPurgeTarget(u)}
+          className={`${ACTION_BTN} border border-red-200/80 bg-red-50/80 font-semibold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70`}
+        >
+          Excluir total
+        </button>
+      )}
+    </div>
+  );
 
   const authProvider = (u: AdminUserRow) => {
     const p = u.auth_providers?.[0];
@@ -194,14 +249,14 @@ const UserManagement: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Administração — Utilizadores</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Administração — Usuários</h1>
         <button
           type="button"
           onClick={() => {
             void fetchUsers();
             void fetchStats();
           }}
-          className="admin-outline-btn rounded-xl text-slate-600 hover:bg-slate-50 dark:text-dark-text-secondary"
+          className="admin-outline-btn min-h-[44px] rounded-xl text-slate-600 hover:bg-slate-50 dark:text-dark-text-secondary"
         >
           Atualizar
         </button>
@@ -229,6 +284,7 @@ const UserManagement: React.FC = () => {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
         <div className="relative w-full max-w-md flex-1">
+          <label htmlFor="admin-user-search" className="sr-only">Buscar por nome ou e-mail</label>
           <input
             id="admin-user-search"
             name="admin-user-search"
@@ -237,10 +293,11 @@ const UserManagement: React.FC = () => {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && applySearch()}
-            className="native-input-themed w-full rounded-xl py-2 pl-10 pr-24 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="native-input-themed min-h-[44px] w-full rounded-xl py-2 pl-10 pr-24 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <svg
-            className="absolute left-3 top-2.5 h-5 w-5 text-slate-400"
+            className="absolute left-3 top-3 h-5 w-5 text-slate-400"
+            aria-hidden="true"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -250,7 +307,7 @@ const UserManagement: React.FC = () => {
           <button
             type="button"
             onClick={applySearch}
-            className="absolute right-2 top-1.5 rounded-lg bg-primary px-3 py-1 text-xs font-medium text-white"
+            className="absolute right-1 top-1 min-h-[36px] rounded-lg bg-primary px-3 text-xs font-medium text-white"
           >
             Buscar
           </button>
@@ -292,18 +349,53 @@ const UserManagement: React.FC = () => {
       </div>
 
       <div className={ADMIN_TABLE_SHELL}>
-        <div className="overflow-x-auto">
+        {/* Abaixo de 1024px: cartões, sem rolagem horizontal. */}
+        <div className="divide-y divide-slate-100 lg:hidden dark:divide-dark-border">
+          {loading ? (
+            <p className="px-4 py-10 text-center text-slate-500 dark:text-dark-text-muted">Carregando…</p>
+          ) : users.length === 0 ? (
+            <p className="px-4 py-10 text-center text-slate-500 dark:text-dark-text-muted">Nenhum usuário encontrado.</p>
+          ) : (
+            users.map((u) => (
+              <div key={u.id} className="space-y-3 p-4">
+                <div>
+                  <div className="font-medium text-slate-900 dark:text-white">{u.name}</div>
+                  <div className="text-xs text-slate-600 dark:text-dark-text-secondary">{u.email}</div>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Papel</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{u.role === 'admin' ? 'Administrador' : 'Usuário'}</dd>
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Estado</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{statusLabel[u.status] || u.status}</dd>
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Criado</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{formatDt(u.created_at)}</dd>
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Último acesso</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{formatDt(u.last_login_at)}</dd>
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Última atividade</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{formatDt(u.last_activity_at)}</dd>
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Aviso de inatividade</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{formatDt(u.inactive_warning_sent_at)}</dd>
+                  <dt className="text-slate-500 dark:text-dark-text-muted">Exclusão agendada</dt>
+                  <dd className="text-slate-700 dark:text-dark-text-secondary">{formatDt(u.scheduled_deletion_at)}</dd>
+                </dl>
+                {actionButtons(u)}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="table-header">
               <tr className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-dark-text-muted">
-                <th className="px-4 py-3">Utilizador</th>
+                <th className="px-4 py-3">Usuário</th>
                 <th className="px-4 py-3">Papel</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3">Criado</th>
-                <th className="px-4 py-3">Último login</th>
+                <th className="px-4 py-3">Último acesso</th>
                 <th className="px-4 py-3">Última atividade</th>
-                <th className="px-4 py-3">Aviso inat.</th>
-                <th className="px-4 py-3">Exclusão agend.</th>
+                <th className="px-4 py-3">Aviso de inatividade</th>
+                <th className="px-4 py-3">Exclusão agendada</th>
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
@@ -311,13 +403,13 @@ const UserManagement: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-slate-500 dark:text-dark-text-muted">
-                    A carregar…
+                    Carregando…
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-slate-500 dark:text-dark-text-muted">
-                    Nenhum utilizador encontrado.
+                    Nenhum usuário encontrado.
                   </td>
                 </tr>
               ) : (
@@ -338,7 +430,7 @@ const UserManagement: React.FC = () => {
                             : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                         }`}
                       >
-                        {u.role === 'admin' ? 'admin' : 'user'}
+                        {u.role === 'admin' ? 'Administrador' : 'Usuário'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -361,78 +453,7 @@ const UserManagement: React.FC = () => {
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-dark-text-secondary">
                       {formatDt(u.scheduled_deletion_at)}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/admin/users/${u.id}`)}
-                          className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                        >
-                          Detalhe
-                        </button>
-                        {u.role !== 'admin' ? (
-                          <button
-                            type="button"
-                            onClick={() => patchRole(u.id, 'admin')}
-                            className="rounded-lg px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                          >
-                            Admin
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => patchRole(u.id, 'user')}
-                            className="rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            Remover admin
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => patchStatus(u.id, 'inactive')}
-                          className="rounded-lg px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
-                        >
-                          Inativo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => patchStatus(u.id, 'pending_deletion')}
-                          className="rounded-lg px-2 py-1 text-xs text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-900/20"
-                        >
-                          Pend. exclusão
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => reactivate(u.id)}
-                          className="rounded-lg px-2 py-1 text-xs text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-900/20"
-                        >
-                          Reativar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => sendWarning(u.id)}
-                          className="rounded-lg px-2 py-1 text-xs text-cyan-700 hover:bg-cyan-50 dark:text-cyan-300 dark:hover:bg-cyan-900/20"
-                        >
-                          Aviso
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deactivate(u.id)}
-                          className="rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                        >
-                          Desativar
-                        </button>
-                        {currentUser?.id !== u.id && (
-                          <button
-                            type="button"
-                            onClick={() => openPurge(u)}
-                            className="rounded-lg border border-red-200/80 bg-red-50/80 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70"
-                          >
-                            Excluir total
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    <td className="px-4 py-3 text-right">{actionButtons(u)}</td>
                   </tr>
                 ))
               )}
@@ -445,7 +466,7 @@ const UserManagement: React.FC = () => {
             type="button"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="admin-outline-btn rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300"
+            className="admin-outline-btn min-h-[44px] rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300"
           >
             Anterior
           </button>
@@ -456,7 +477,7 @@ const UserManagement: React.FC = () => {
             type="button"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="admin-outline-btn rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300"
+            className="admin-outline-btn min-h-[44px] rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300"
           >
             Seguinte
           </button>
@@ -464,57 +485,24 @@ const UserManagement: React.FC = () => {
       </div>
 
       {purgeTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="purge-dialog-title"
-        >
-          <div className="admin-modal-panel">
-            <h2 id="purge-dialog-title" className="text-lg font-bold text-slate-900 dark:text-white">
-              Exclusão total da conta
-            </h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-dark-text-secondary">
-              Isto remove o utilizador do Auth, apaga o perfil em <span className="font-mono">public.users</span> e todos
-              os dados em cascata. Não pode ser desfeito.
-            </p>
-            <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
-              Alvo: {purgeTarget.name}{' '}
-              <span className="font-normal text-slate-500 dark:text-dark-text-muted">({purgeTarget.email})</span>
-            </p>
-            <label htmlFor="purge-confirm-email" className="mt-4 block text-sm font-medium text-slate-700 dark:text-dark-text-secondary">
-              Escreva o e-mail do utilizador para confirmar
-            </label>
-            <input
-              id="purge-confirm-email"
-              name="purge-confirm-email"
-              type="email"
-              autoComplete="off"
-              value={purgeEmail}
-              onChange={(e) => setPurgeEmail(e.target.value)}
-              className="native-input-themed mt-1 w-full rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              placeholder={purgeTarget.email}
-            />
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closePurge}
-                disabled={purging}
-                className="admin-outline-btn rounded-xl font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-dark-text-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void submitPurge()}
-                disabled={purging}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {purging ? 'A apagar…' : 'Apagar permanentemente'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PurgeUserDialog
+          name={purgeTarget.name}
+          email={purgeTarget.email}
+          onConfirm={submitPurge}
+          onClose={() => setPurgeTarget(null)}
+        />
+      )}
+
+      {pending && (
+        <ConfirmDialog
+          title={pending.title}
+          subject={`${pending.user.name} (${pending.user.email})`}
+          consequence={<p>{pending.consequence}</p>}
+          confirmLabel={pending.confirmLabel}
+          danger={pending.danger}
+          onConfirm={async () => { await pending.run(); setPending(null); }}
+          onClose={() => setPending(null)}
+        />
       )}
     </div>
   );

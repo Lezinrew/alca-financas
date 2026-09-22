@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { adminAPI } from '../../utils/api';
+import { useKeyedRequest } from '../../hooks/useKeyedRequest';
+import { AdminUnavailable } from './AdminUnavailable';
 import { Shield, User, Ban, Trash2, Clock, Mail, Download, Skull } from 'lucide-react';
 
 const ADMIN_CARD = 'admin-card-shell';
@@ -29,31 +31,21 @@ const ACTION_LABELS: Record<string, { label: string; icon: React.ReactNode; colo
     'bulk_inactive_warning': { label: 'Avisos em lote', icon: <Mail className="w-4 h-4" />, color: 'text-cyan-600 dark:text-cyan-400' },
     'new_account_notification': { label: 'Notificação nova conta (sistema)', icon: <User className="w-4 h-4" />, color: 'text-slate-600 dark:text-dark-text-muted' },
     'legacy_update_user': { label: 'Atualização legada (PUT)', icon: <User className="w-4 h-4" />, color: 'text-slate-500 dark:text-dark-text-muted' },
-    'export_user_data': { label: 'Exportou dados do utilizador', icon: <Download className="w-4 h-4" />, color: 'text-emerald-600 dark:text-emerald-400' },
-    'create_user_admin': { label: 'Criou utilizador (admin)', icon: <User className="w-4 h-4" />, color: 'text-blue-600 dark:text-blue-400' },
+    'export_user_data': { label: 'Exportou dados do usuário', icon: <Download className="w-4 h-4" />, color: 'text-emerald-600 dark:text-emerald-400' },
+    'create_user_admin': { label: 'Criou usuário (admin)', icon: <User className="w-4 h-4" />, color: 'text-blue-600 dark:text-blue-400' },
     'purge_user': { label: 'Exclusão total da conta', icon: <Skull className="h-4 w-4" />, color: 'text-red-700 dark:text-red-300' },
 };
 
+const PAGE_SIZE = 50;
+
 const AdminLogs: React.FC = () => {
-    const [logs, setLogs] = useState<AdminLog[]>([]);
-    const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-
-    useEffect(() => {
-        fetchLogs();
-    }, [page]);
-
-    const fetchLogs = async () => {
-        setLoading(true);
-        try {
-            const response = await adminAPI.getLogs(page, 50);
-            setLogs(response.data.logs);
-        } catch (error) {
-            console.error('Erro ao carregar logs:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [attempt, setAttempt] = useState(0);
+    // Chave por página + tentativa: respostas de páginas antigas são descartadas.
+    const { data, loading, error } = useKeyedRequest<{ logs: AdminLog[] }>(
+        `${page}:${attempt}`, true, () => adminAPI.getLogs(page, PAGE_SIZE),
+    );
+    const logs: AdminLog[] = data?.logs ?? [];
 
     const formatTimestamp = (timestamp: string) => {
         const date = new Date(timestamp);
@@ -91,6 +83,9 @@ const AdminLogs: React.FC = () => {
                 </p>
             </div>
 
+            {error ? (
+                <AdminUnavailable what="o histórico de ações" onRetry={() => setAttempt((a) => a + 1)} />
+            ) : (
             <div className={`${ADMIN_CARD} overflow-hidden`}>
                 {logs.length === 0 ? (
                     <div className="p-12 text-center text-slate-500 dark:text-dark-text-muted">
@@ -168,9 +163,10 @@ const AdminLogs: React.FC = () => {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Pagination */}
-            {logs.length > 0 && (
+            {!error && (logs.length > 0 || page > 1) && (
                 <div className="flex justify-center mt-6 gap-2">
                     <button
                         onClick={() => setPage(page - 1)}
@@ -182,7 +178,7 @@ const AdminLogs: React.FC = () => {
                     <span className="px-4 py-2 text-slate-600 dark:text-dark-text-muted">Página {page}</span>
                     <button
                         onClick={() => setPage(page + 1)}
-                        disabled={logs.length < 50}
+                        disabled={logs.length < PAGE_SIZE}
                         className="admin-outline-btn rounded-lg text-slate-600 hover:bg-slate-50 dark:text-dark-text-secondary"
                     >
                         Próxima
