@@ -12,6 +12,8 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 import xml.etree.ElementTree as ET
 
+from utils.text_repair import repair_mojibake
+
 
 def decode_ofx_bytes(content: bytes) -> str:
     """
@@ -182,8 +184,9 @@ def parse_raw_ofx_transactions(content_str: str) -> List[Dict[str, Any]]:
             continue
             
         fitid = fitid_m.group(1).strip() if fitid_m else ''
-        memo = memo_m.group(1).strip() if memo_m else ''
-        name = name_m.group(1).strip() if name_m else ''
+        # Alguns bancos geram o arquivo já com acentuação duplicada; repara sem alterar texto correto.
+        memo = repair_mojibake(memo_m.group(1).strip()) if memo_m else ''
+        name = repair_mojibake(name_m.group(1).strip()) if name_m else ''
         trntype = trntype_m.group(1).strip().upper() if trntype_m else ''
         
         # Descrição canônica

@@ -18,6 +18,7 @@ from supabase import create_client
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 from services.import_service import compute_dedup_key
+from utils.text_repair import repair_mojibake
 
 
 def normalize(value):
@@ -25,11 +26,28 @@ def normalize(value):
     return " ".join("".join(c for c in text if not unicodedata.combining(c)).upper().split())
 
 
+def fetch_all(query, page_size=500):
+    """Lê todas as páginas do PostgREST para não perder chaves de deduplicação."""
+    rows = []
+    seen_ids = set()
+    start = 0
+    while True:
+        page = query.range(start, start + page_size - 1).execute().data or []
+        if not page:
+            return rows
+        new_rows = [row for row in page if row.get("id") not in seen_ids]
+        if not new_rows:
+            return rows
+        rows.extend(new_rows)
+        seen_ids.update(row.get("id") for row in new_rows)
+        start += len(page)
+
+
 def tx_signature(row, tx_type):
     return (
         str(row.get("data") or row.get("date") or "")[:10],
         round(float(row.get("valor") or row.get("amount") or 0), 2),
-        normalize(row.get("descricao") or row.get("description")),
+        normalize(repair_mojibake(row.get("descricao") or row.get("description"))),
         tx_type,
     )
 
@@ -96,25 +114,33 @@ def main():
     )
     category_map = {(normalize(c["name"]), c["type"]): c["id"] for c in categories}
 
-    existing = (
-        sb.table("transactions")
-        .select("*")
-        .eq("tenant_id", tenant_id)
-        .execute()
-        .data
-        or []
+    existing = fetch_all(
+        sb.table("transactions").select("*").eq("tenant_id", tenant_id).order("id")
     )
     by_signature = defaultdict(list)
     by_dedup = {}
     for row in existing:
         by_signature[tx_signature(row, row.get("type"))].append(row)
-        if row.get("dedup_key"):
-            current = by_dedup.get(row["dedup_key"])
+        keys = {row.get("dedup_key")}
+        # Linhas gravadas antes do reparo de acentuação têm a chave calculada sobre o texto
+        # corrompido; indexa também pela chave do texto reparado para não gerar duplicatas.
+        if row.get("description") and row.get("account_id") and row.get("date") is not None:
+            repaired = repair_mojibake(row["description"])
+            if repaired != row["description"]:
+                keys.add(compute_dedup_key(
+                    row["date"], row.get("amount") or 0, repaired, row["account_id"], row.get("type")
+                ))
+        for key in filter(None, keys):
+            current = by_dedup.get(key)
             if current is None or str(current.get("source_file") or "").startswith("legacy:"):
-                by_dedup[row["dedup_key"]] = row
+                by_dedup[key] = row
 
     updates, inserts, new_categories = [], [], {}
+    source_dedups_seen = set()
+    source_duplicates = 0
     for row in operational:
+        # A origem do FinanceOS guarda descrições do Nubank com acentuação duplicada.
+        row["descricao"] = repair_mojibake(row.get("descricao"))
         tx_type = "income" if normalize(row["tipo"]) == "RECEITA" else "expense"
         account = card if "CART" in normalize(row.get("conta")) else checking
         category_name = str(row.get("categoria") or "Outros").strip()
@@ -125,6 +151,10 @@ def main():
         dedup = compute_dedup_key(
             row["data"], row["valor"], row["descricao"], account["id"], tx_type
         )
+        if dedup in source_dedups_seen:
+            source_duplicates += 1
+            continue
+        source_dedups_seen.add(dedup)
         candidates = sorted(
             by_signature.get(tx_signature(row, tx_type), []),
             key=lambda candidate: str(candidate.get("source_file") or "").startswith("legacy:"),
@@ -140,6 +170,9 @@ def main():
             "dedup_key": dedup,
         }
         if match:
+            repaired_description = repair_mojibake(match.get("description"))
+            if repaired_description != match.get("description"):
+                canonical = {**canonical, "description": repaired_description}
             updates.append((match["id"], canonical, cat_key))
         else:
             inserts.append(
@@ -163,9 +196,11 @@ def main():
             "ofx": len(source),
             "operacionais": len(operational),
             "transferencias_excluidas_fluxo": transfers,
+            "existentes_carregadas": len(existing),
             "atualizacoes": len(updates),
             "insercoes": len(inserts),
             "categorias_novas": len(new_categories),
+            "duplicatas_origem_consolidadas": source_duplicates,
             "ofx_legados_a_desconsiderar": max(
                 0,
                 sum(
