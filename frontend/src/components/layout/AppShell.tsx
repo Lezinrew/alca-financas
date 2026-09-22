@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -20,6 +20,10 @@ import {
   Receipt
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { ConfirmDialog } from '../shared/ConfirmDialog';
+
+const FOCUS_RING = 'focus:outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-indigo-400';
+const isMobileViewport = () => window.innerWidth < 1024;
 
 const AppShell = () => {
   const { user, logout } = useAuth();
@@ -27,6 +31,20 @@ const AppShell = () => {
   const navigate = useNavigate();
   const [sidebarHidden, setSidebarHidden] = useState(() => window.innerWidth < 1024);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+
+  // Escape fecha o menu do usuário e, no celular, o menu lateral.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (userDropdownOpen) { setUserDropdownOpen(false); return; }
+      if (!sidebarHidden && isMobileViewport()) setSidebarHidden(true);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [userDropdownOpen, sidebarHidden]);
+
+  const closeSidebarOnMobile = () => { if (isMobileViewport()) setSidebarHidden(true); };
 
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -46,7 +64,6 @@ const AppShell = () => {
   }
 
   const handleLogout = async () => {
-    if (!window.confirm('Deseja sair?')) return;
     try {
       // Aguardar signOut do Supabase antes de navegar — evita reload com sessão ainda no storage.
       await logout();
@@ -62,7 +79,10 @@ const AppShell = () => {
   };
 
   const currentPath = location.pathname;
-  const currentPage = navItems.find(item => item.path === currentPath)?.label || 'Dashboard';
+  const pageTitles: Record<string, string> = { '/profile': 'Meu perfil', '/settings': 'Configurações', '/admin': 'Administração' };
+  const currentPage = navItems.find(item => currentPath === item.path || currentPath.startsWith(`${item.path}/`))?.label
+    || Object.entries(pageTitles).find(([prefix]) => currentPath.startsWith(prefix))?.[1]
+    || 'Dashboard';
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#0f172a]">
@@ -92,7 +112,7 @@ const AppShell = () => {
           {!sidebarHidden && (
             <button
               onClick={toggleSidebar}
-              className="lg:hidden p-1 text-slate-400 hover:text-white transition-colors"
+              className={`lg:hidden min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-300 hover:text-white transition-colors ${FOCUS_RING}`}
               aria-label="Fechar menu"
             >
               <X className="w-5 h-5" />
@@ -104,19 +124,22 @@ const AppShell = () => {
         <nav className={`flex-1 py-4 space-y-1 ${sidebarHidden ? 'px-2' : 'px-3'}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentPath === item.path;
+            const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={`flex items-center rounded-lg text-sm font-medium transition-colors ${sidebarHidden ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                onClick={closeSidebarOnMobile}
+                aria-current={isActive ? 'page' : undefined}
+                aria-label={sidebarHidden ? item.label : undefined}
+                className={`flex items-center min-h-[44px] rounded-lg text-sm font-medium transition-colors ${FOCUS_RING} ${sidebarHidden ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
                   } ${isActive
                     ? 'bg-slate-800 text-white'
                     : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
                   }`}
                 title={sidebarHidden ? item.label : ''}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                 {!sidebarHidden && <span className="ml-3 whitespace-nowrap">{item.label}</span>}
               </NavLink>
             );
@@ -127,8 +150,11 @@ const AppShell = () => {
         <div className={`p-4 border-t border-slate-700 ${sidebarHidden ? 'px-2' : ''} relative`}>
           <button
             onClick={() => !sidebarHidden && setUserDropdownOpen(!userDropdownOpen)}
-            className={`w-full flex items-center ${sidebarHidden ? 'justify-center' : 'justify-between'} mb-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors`}
+            className={`w-full flex items-center ${sidebarHidden ? 'justify-center' : 'justify-between'} mb-3 p-2 min-h-[44px] rounded-lg hover:bg-slate-800/50 transition-colors ${FOCUS_RING}`}
             title={sidebarHidden ? user?.name : ''}
+            aria-haspopup="menu"
+            aria-expanded={userDropdownOpen}
+            aria-label={sidebarHidden ? `Menu de ${user?.name ?? 'usuário'}` : undefined}
           >
             <div className="flex items-center min-w-0">
               <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
@@ -150,14 +176,15 @@ const AppShell = () => {
               <div
                 className="fixed inset-0 z-10"
                 onClick={() => setUserDropdownOpen(false)}
+                aria-hidden="true"
               />
-              <div className="absolute bottom-full left-4 right-4 mb-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 py-2">
+              <div role="menu" aria-label="Menu do usuário" className="absolute bottom-full left-4 right-4 mb-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 py-2">
                 <button
                   onClick={() => {
                     navigate('/profile');
                     setUserDropdownOpen(false);
                   }}
-                  className="w-full flex items-center px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  role="menuitem" className={`w-full flex items-center min-h-[44px] px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 hover:text-white transition-colors ${FOCUS_RING}`}
                 >
                   <User className="w-4 h-4 mr-3" />
                   Meu Perfil
@@ -167,7 +194,7 @@ const AppShell = () => {
                     navigate('/settings');
                     setUserDropdownOpen(false);
                   }}
-                  className="w-full flex items-center px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  role="menuitem" className={`w-full flex items-center min-h-[44px] px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 hover:text-white transition-colors ${FOCUS_RING}`}
                 >
                   <Settings className="w-4 h-4 mr-3" />
                   Configurações
@@ -180,7 +207,7 @@ const AppShell = () => {
                         navigate('/admin/dashboard');
                         setUserDropdownOpen(false);
                       }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 transition-colors"
+                      role="menuitem" className={`w-full flex items-center min-h-[44px] px-4 py-2 text-sm text-emerald-300 hover:bg-slate-700 hover:text-emerald-200 transition-colors ${FOCUS_RING}`}
                     >
                       <Shield className="w-4 h-4 mr-3" />
                       Painel Admin
@@ -191,9 +218,9 @@ const AppShell = () => {
                 <button
                   onClick={() => {
                     setUserDropdownOpen(false);
-                    handleLogout();
+                    setLogoutOpen(true);
                   }}
-                  className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
+                  role="menuitem" className={`w-full flex items-center min-h-[44px] px-4 py-2 text-sm text-red-300 hover:bg-slate-700 hover:text-red-200 transition-colors ${FOCUS_RING}`}
                 >
                   <LogOut className="w-4 h-4 mr-3" />
                   Sair
@@ -212,8 +239,9 @@ const AppShell = () => {
           <div className="flex items-center">
             <button
               onClick={toggleSidebar}
-              className="mr-3 p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+              className={`mr-3 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors ${FOCUS_RING}`}
               aria-label={sidebarHidden ? 'Abrir menu' : 'Fechar menu'}
+              aria-expanded={!sidebarHidden}
             >
               {sidebarHidden ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
             </button>
@@ -223,20 +251,34 @@ const AppShell = () => {
           <div className="flex items-center space-x-4">
             <NavLink
               to="/settings"
-              className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+              aria-label="Configurações"
+              title="Configurações"
+              className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors ${FOCUS_RING}`}
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-5 h-5" aria-hidden="true" />
             </NavLink>
           </div>
         </header>
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto bg-slate-50 dark:bg-[#0f172a]">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <Outlet />
           </div>
         </main>
       </div>
+
+      {logoutOpen && (
+        <ConfirmDialog
+          title="Sair da conta"
+          subject={user?.email}
+          consequence={<p>Você precisará entrar novamente para acessar seus dados. Nada será apagado.</p>}
+          confirmLabel="Sair"
+          onConfirm={handleLogout}
+          onClose={() => setLogoutOpen(false)}
+          errorMessage="Não foi possível sair agora. Tente novamente."
+        />
+      )}
     </div>
   );
 };
