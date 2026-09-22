@@ -1,12 +1,8 @@
-import { useState, ChangeEvent, FormEvent } from 'react';
+import { useRef, useState, ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabaseClient';
-
-interface ProfileData {
-  name: string;
-  email: string;
-}
+import './profile.css';
 
 interface PasswordData {
   currentPassword: string;
@@ -14,17 +10,36 @@ interface PasswordData {
   confirmPassword: string;
 }
 
+interface PasswordFieldErrors {
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+const MIN_PASSWORD_LENGTH = 6;
+const PROFILE_EDIT_UNAVAILABLE = 'A edição do perfil ainda não está disponível. Os dados abaixo são somente leitura.';
+
+/** Validação local da nova senha; devolve mensagens por campo. */
+function validatePassword(data: PasswordData): PasswordFieldErrors {
+  const errors: PasswordFieldErrors = {};
+  if (data.newPassword.length < MIN_PASSWORD_LENGTH) {
+    errors.newPassword = `A nova senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+  if (data.confirmPassword !== data.newPassword) {
+    errors.confirmPassword = 'As senhas não coincidem.';
+  }
+  return errors;
+}
+
 const Profile = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const [profileData, setProfileData] = useState<ProfileData>({
-    name: user?.name || '',
-    email: user?.email || ''
-  });
+  // Não existe endpoint de atualização de perfil no backend (apenas GET /auth/me);
+  // o formulário fica somente leitura até que exista. A senha usa o Supabase Auth.
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const passwordLock = useRef(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<PasswordFieldErrors>({});
 
   const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: '',
@@ -32,70 +47,42 @@ const Profile = () => {
     confirmPassword: ''
   });
 
-  const handleProfileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setProfileData({
-      ...profileData,
-      [e.target.name]: e.target.value
-    });
-    setError('');
-    setSuccess('');
-  };
-
   const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setPasswordData({
-      ...passwordData,
-      [e.target.name]: e.target.value
-    });
-    setError('');
-    setSuccess('');
-  };
-
-  const handleProfileSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    // Simulação - em produção implementar API
-    setTimeout(() => {
-      setLoading(false);
-      setSuccess('Perfil atualizado com sucesso!');
-      setTimeout(() => setSuccess(''), 3000);
-    }, 1000);
+    const name = e.target.name as keyof PasswordData;
+    setPasswordData(prev => ({ ...prev, [name]: e.target.value }));
+    setFieldErrors(prev => (prev[name as keyof PasswordFieldErrors] ? { ...prev, [name]: undefined } : prev));
+    setPasswordError('');
+    setPasswordSuccess('');
   };
 
   const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
+    if (passwordLock.current) return;
+    setPasswordError('');
+    setPasswordSuccess('');
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('As senhas não coincidem');
-      setLoading(false);
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      setError('A nova senha deve ter pelo menos 6 caracteres');
-      setLoading(false);
+    const errors = validatePassword(passwordData);
+    setFieldErrors(errors);
+    if (errors.newPassword || errors.confirmPassword) {
+      const firstInvalid = errors.newPassword ? 'profile-new-password' : 'profile-confirm-password';
+      document.getElementById(firstInvalid)?.focus();
       return;
     }
 
     if (!user?.email) {
-      setError('Sessão inválida. Faça login novamente.');
-      setLoading(false);
+      setPasswordError('Sessão inválida. Faça login novamente.');
       return;
     }
 
+    passwordLock.current = true;
+    setPasswordLoading(true);
     try {
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: passwordData.currentPassword,
       });
       if (signInErr) {
-        setError('Senha atual incorreta.');
-        setLoading(false);
+        setPasswordError('Senha atual incorreta.');
         return;
       }
 
@@ -103,25 +90,24 @@ const Profile = () => {
         password: passwordData.newPassword,
       });
       if (updateErr) {
-        setError(updateErr.message || 'Não foi possível alterar a senha.');
-        setLoading(false);
+        setPasswordError(updateErr.message || 'Não foi possível alterar a senha.');
         return;
       }
 
       await supabase.auth.refreshSession();
 
-      setSuccess('Senha alterada com sucesso!');
+      setPasswordSuccess('Senha alterada com sucesso!');
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
-      setTimeout(() => setSuccess(''), 5000);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao alterar senha.';
-      setError(msg);
+      setPasswordError(msg);
     } finally {
-      setLoading(false);
+      passwordLock.current = false;
+      setPasswordLoading(false);
     }
   };
 
@@ -135,17 +121,17 @@ const Profile = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
+      {passwordError && (
+        <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
           <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
-          <span className="text-red-800 dark:text-red-200">{error}</span>
+          <span className="text-red-800 dark:text-red-200">{passwordError}</span>
         </div>
       )}
 
-      {success && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-center gap-2">
+      {passwordSuccess && (
+        <div role="status" className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-center gap-2">
           <i className="bi bi-check-circle-fill text-emerald-600 dark:text-emerald-400"></i>
-          <span className="text-emerald-800 dark:text-emerald-200">{success}</span>
+          <span className="text-emerald-800 dark:text-emerald-200">{passwordSuccess}</span>
         </div>
       )}
 
@@ -161,59 +147,43 @@ const Profile = () => {
               </div>
             </div>
             <div className="p-6">
-              <form onSubmit={handleProfileSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome Completo</label>
-                    <input
-                      type="text"
-                      id="profile-name"
-                      name="name"
-                      autoComplete="name"
-                      className="input-base w-full"
-                      value={profileData.name}
-                      onChange={handleProfileChange}
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
-                    <input
-                      type="email"
-                      id="profile-email"
-                      name="email"
-                      autoComplete="email"
-                      className="input-base w-full"
-                      value={profileData.email}
-                      onChange={handleProfileChange}
-                      required
-                      disabled={loading}
-                    />
-                  </div>
+              <div id="profile-readonly-notice" role="note" className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/50 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-100 flex items-center gap-2">
+                  <i className="bi bi-info-circle-fill"></i>
+                  {PROFILE_EDIT_UNAVAILABLE}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome Completo</label>
+                  <input
+                    type="text"
+                    id="profile-name"
+                    name="name"
+                    autoComplete="name"
+                    className="input-base profile-readonly-field w-full"
+                    value={user?.name || ''}
+                    readOnly
+                    aria-readonly="true"
+                    aria-describedby="profile-readonly-notice"
+                  />
                 </div>
 
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                        {t('common.loading')}
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-check-lg"></i>
-                        Atualizar Perfil
-                      </>
-                    )}
-                  </button>
+                <div>
+                  <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                  <input
+                    type="email"
+                    id="profile-email"
+                    name="email"
+                    autoComplete="email"
+                    className="input-base profile-readonly-field w-full"
+                    value={user?.email || ''}
+                    readOnly
+                    aria-readonly="true"
+                    aria-describedby="profile-readonly-notice"
+                  />
                 </div>
-              </form>
+              </div>
             </div>
           </div>
 
@@ -226,7 +196,7 @@ const Profile = () => {
               </div>
             </div>
             <div className="p-6">
-              <form onSubmit={handlePasswordSubmit}>
+              <form onSubmit={handlePasswordSubmit} noValidate aria-busy={passwordLoading}>
                 <div className="space-y-4">
                   <div>
                     <label htmlFor="profile-current-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Senha Atual</label>
@@ -239,7 +209,7 @@ const Profile = () => {
                       value={passwordData.currentPassword}
                       onChange={handlePasswordChange}
                       required
-                      disabled={loading}
+                      disabled={passwordLoading}
                       placeholder="Digite sua senha atual"
                     />
                   </div>
@@ -256,10 +226,16 @@ const Profile = () => {
                         value={passwordData.newPassword}
                         onChange={handlePasswordChange}
                         required
-                        disabled={loading}
-                        minLength={6}
+                        disabled={passwordLoading}
+                        minLength={MIN_PASSWORD_LENGTH}
                         placeholder="Digite a nova senha"
+                        aria-invalid={Boolean(fieldErrors.newPassword)}
+                        aria-describedby={fieldErrors.newPassword ? 'profile-new-password-error profile-new-password-hint' : 'profile-new-password-hint'}
                       />
+                      <p id="profile-new-password-hint" className="text-xs text-slate-500 dark:text-slate-400 mt-1">Mínimo de {MIN_PASSWORD_LENGTH} caracteres.</p>
+                      {fieldErrors.newPassword && (
+                        <p id="profile-new-password-error" className="profile-field-error" role="alert">{fieldErrors.newPassword}</p>
+                      )}
                     </div>
 
                     <div>
@@ -273,10 +249,15 @@ const Profile = () => {
                         value={passwordData.confirmPassword}
                         onChange={handlePasswordChange}
                         required
-                        disabled={loading}
-                        minLength={6}
+                        disabled={passwordLoading}
+                        minLength={MIN_PASSWORD_LENGTH}
                         placeholder="Confirme a nova senha"
+                        aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                        aria-describedby={fieldErrors.confirmPassword ? 'profile-confirm-password-error' : undefined}
                       />
+                      {fieldErrors.confirmPassword && (
+                        <p id="profile-confirm-password-error" className="profile-field-error" role="alert">{fieldErrors.confirmPassword}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -285,9 +266,9 @@ const Profile = () => {
                   <button
                     type="submit"
                     className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={loading}
+                    disabled={passwordLoading}
                   >
-                    {loading ? (
+                    {passwordLoading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                         {t('common.loading')}
@@ -313,22 +294,13 @@ const Profile = () => {
               <div
                 className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-full inline-flex items-center justify-center mb-4"
                 style={{ width: '100px', height: '100px' }}
+                aria-hidden="true"
               >
                 <i className="bi bi-person-fill text-white" style={{ fontSize: '3rem' }}></i>
               </div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">{user?.name}</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">{user?.email}</p>
-
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <div className="text-center">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Membro desde</div>
-                  <div className="font-semibold text-slate-900 dark:text-white">Ago 2025</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Último acesso</div>
-                  <div className="font-semibold text-slate-900 dark:text-white">Hoje</div>
-                </div>
-              </div>
+              <p className="text-sm text-slate-600 dark:text-slate-300">{user?.email}</p>
+              {/* "Membro desde" e "Último acesso" foram removidos: a API de perfil não expõe essas datas. */}
             </div>
           </div>
 
@@ -350,11 +322,11 @@ const Profile = () => {
                         <div className="font-medium text-sm text-slate-900 dark:text-white capitalize">{provider.provider}</div>
                         <div className="text-xs text-slate-500 dark:text-slate-400">
                           {provider.email_verified ? (
-                            <span className="text-emerald-600">
+                            <span className="text-emerald-600 dark:text-emerald-300">
                               <i className="bi bi-check-circle-fill"></i> Verificado
                             </span>
                           ) : (
-                            <span className="text-amber-600">
+                            <span className="text-amber-600 dark:text-amber-300">
                               <i className="bi bi-exclamation-circle-fill"></i> Não verificado
                             </span>
                           )}
@@ -368,7 +340,7 @@ const Profile = () => {
           )}
 
           {/* Security Tips */}
-            <div className="card-base overflow-hidden">
+          <div className="card-base overflow-hidden">
             <div className="card-header px-6 py-4">
               <div className="flex items-center gap-2">
                 <i className="bi bi-info-circle text-slate-600 dark:text-slate-300"></i>

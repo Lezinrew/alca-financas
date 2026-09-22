@@ -1,32 +1,112 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { authAPI, categoriesAPI } from '../../utils/api';
+import { authAPI, categoriesAPI, invalidateLookupCache } from '../../utils/api';
+import { ConfirmDialog } from '../shared/ConfirmDialog';
+import { ClearDataDialog } from './ClearDataDialog';
+import { CLEAR_DATA_ENTITIES, summarizeDeleted } from './clearDataEntities';
+import './settings.css';
+
+interface UserSettings {
+  currency: string;
+  theme: string;
+  language: string;
+}
+
+type SettingsStatus = 'loading' | 'ready' | 'error';
+
+interface BackupPayload {
+  categories?: unknown[];
+  accounts?: unknown[];
+  transactions?: unknown[];
+}
+
+const BACKUP_SECTIONS: Array<keyof BackupPayload> = ['categories', 'accounts', 'transactions'];
+const INVALID_BACKUP_MESSAGE = 'O arquivo não é um backup válido.';
+
+/** Aceita apenas um objeto JSON com pelo menos uma das listas exportadas pelo backup. */
+function parseBackup(content: string): BackupPayload | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const payload = parsed as Record<string, unknown>;
+  const hasSection = BACKUP_SECTIONS.some(section => Array.isArray(payload[section]));
+  return hasSection ? (payload as BackupPayload) : null;
+}
+
+/** Lê o arquivo como texto com FileReader (File.text() não existe em todos os ambientes). */
+const readFileText = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+  reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+  reader.readAsText(file);
+});
+
+const errorFrom = (err: unknown, fallback: string) =>
+  (err as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
 
 const Settings = () => {
   const { t, i18n } = useTranslation();
   const { user, updateUser } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<UserSettings>({
     currency: 'BRL',
     theme: theme,
     language: 'pt'
   });
+  const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>('loading');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [backupLoading, setBackupLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
-  const [clearLoading, setClearLoading] = useState(false);
   const [categoryImportLoading, setCategoryImportLoading] = useState(false);
+  const [pendingBackup, setPendingBackup] = useState<{ name: string; data: BackupPayload } | null>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const categoryFileInputRef = useRef<HTMLInputElement>(null);
   const settingsLoadInFlightRef = useRef<Promise<void> | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSuccess = useCallback((message: string, ms = 5000) => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    setSuccess(message);
+    successTimerRef.current = setTimeout(() => setSuccess(''), ms);
+  }, []);
+
+  useEffect(() => () => { if (successTimerRef.current) clearTimeout(successTimerRef.current); }, []);
+
+  const loadSettings = useCallback(async () => {
+    if (settingsLoadInFlightRef.current) {
+      await settingsLoadInFlightRef.current;
+      return;
+    }
+    const task = (async () => {
+      setSettingsStatus('loading');
+      try {
+        const response = await authAPI.getSettings();
+        const data = (response.data ?? {}) as Partial<UserSettings>;
+        setSettings(prev => ({ ...prev, ...data }));
+        setSettingsStatus('ready');
+      } catch (err) {
+        console.error('Load settings error:', err);
+        setSettingsStatus('error');
+      }
+    })();
+    settingsLoadInFlightRef.current = task;
+    await task.finally(() => {
+      settingsLoadInFlightRef.current = null;
+    });
+  }, []);
 
   useEffect(() => {
-    loadSettings();
-  }, []);
+    void loadSettings();
+  }, [loadSettings]);
 
   // Sincroniza o tema do contexto com o estado local
   useEffect(() => {
@@ -36,26 +116,7 @@ const Settings = () => {
     }));
   }, [theme]);
 
-  const loadSettings = async () => {
-    if (settingsLoadInFlightRef.current) {
-      await settingsLoadInFlightRef.current;
-      return;
-    }
-    const task = (async () => {
-    try {
-      const response = await authAPI.getSettings();
-      setSettings(response.data);
-    } catch (err) {
-      console.error('Load settings error:', err);
-    }
-    })();
-    settingsLoadInFlightRef.current = task;
-    await task.finally(() => {
-      settingsLoadInFlightRef.current = null;
-    });
-  };
-
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: keyof UserSettings, value: string) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
@@ -71,7 +132,7 @@ const Settings = () => {
 
     // Apply theme change immediately
     if (field === 'theme') {
-      setTheme(value);
+      setTheme(value as 'light' | 'dark');
     }
   };
 
@@ -80,10 +141,10 @@ const Settings = () => {
       setBackupLoading(true);
       setError('');
       setSuccess('');
-      
+
       const response = await authAPI.exportBackup();
       const backupData = response.data;
-      
+
       // Cria um blob e faz download
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -94,66 +155,74 @@ const Settings = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
-      setSuccess('Backup exportado com sucesso!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao exportar backup');
+
+      showSuccess('Backup exportado com sucesso!', 3000);
+    } catch (err: unknown) {
+      setError(errorFrom(err, 'Erro ao exportar backup'));
     } finally {
       setBackupLoading(false);
     }
   };
 
-  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  /** Lê e valida o arquivo; a importação só acontece após confirmação no diálogo. */
+  const handleBackupFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
-
+    setError('');
+    setSuccess('');
+    let content = '';
     try {
-      setImportLoading(true);
-      setError('');
-      setSuccess('');
-      
-      const fileContent = await file.text();
-      const backupData = JSON.parse(fileContent);
-      
-      if (!window.confirm('Esta ação irá importar os dados do backup. Categorias, contas e transações duplicadas serão ignoradas. Deseja continuar?')) {
-        e.target.value = '';
-        return;
-      }
-      
-      const response = await authAPI.importBackup(backupData);
-      const imported = response.data.imported;
-      
-      setSuccess(
-        `Backup importado com sucesso! ` +
-        `${imported.categories} categorias, ${imported.accounts} contas e ${imported.transactions} transações importadas.`
+      content = await readFileText(file);
+    } catch {
+      setError('Não foi possível ler o arquivo selecionado.');
+      input.value = '';
+      return;
+    }
+    const data = parseBackup(content);
+    input.value = '';
+    if (!data) {
+      setError(INVALID_BACKUP_MESSAGE);
+      return;
+    }
+    setPendingBackup({ name: file.name, data });
+  };
+
+  const confirmImportBackup = async () => {
+    if (!pendingBackup) return;
+    const { data } = pendingBackup;
+    setImportLoading(true);
+    try {
+      const response = await authAPI.importBackup(data);
+      const imported = response.data.imported ?? {};
+      invalidateLookupCache();
+      setPendingBackup(null);
+      showSuccess(
+        'Backup importado com sucesso! ' +
+        `${imported.categories ?? 0} categorias, ${imported.accounts ?? 0} contas e ${imported.transactions ?? 0} transações importadas. ` +
+        'As demais telas exibirão os novos dados ao serem abertas.'
       );
-      setTimeout(() => setSuccess(''), 5000);
-      
-      // Recarrega a página após 2 segundos para atualizar os dados
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao importar backup');
+    } catch (err: unknown) {
+      setPendingBackup(null);
+      setError(errorFrom(err, 'Erro ao importar backup. Nenhum dado foi alterado.'));
     } finally {
       setImportLoading(false);
-      e.target.value = '';
     }
   };
 
   const handleImportCategories = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
 
     try {
       setCategoryImportLoading(true);
       setError('');
       setSuccess('');
-      
+
       const response = await categoriesAPI.import(file);
       const result = response.data;
-      
+
       let message = result.message;
       if (result.errors && result.errors.length > 0) {
         message += ` Alguns erros ocorreram: ${result.errors.slice(0, 3).join(', ')}`;
@@ -161,89 +230,33 @@ const Settings = () => {
           message += ` e mais ${result.errors.length - 3} erros.`;
         }
       }
-      
-      setSuccess(message);
-      setTimeout(() => setSuccess(''), 5000);
-      
-      // Recarrega a página após 2 segundos
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao importar categorias');
+
+      showSuccess(message);
+    } catch (err: unknown) {
+      setError(errorFrom(err, 'Erro ao importar categorias'));
     } finally {
       setCategoryImportLoading(false);
-      e.target.value = '';
+      input.value = '';
     }
   };
 
-  const handleClearAllData = async () => {
-    if (!window.confirm(
-      'ATENÇÃO: Serão removidos permanentemente os dados financeiros da sua conta: transações, contas, ' +
-      'categorias, contas a pagar, metas, planeamento por categoria, conversas do assistente, aliases ' +
-      'de comerciante associados a si, e (se for o único membro do workspace) o planeamento mensal e ' +
-      'aliases desse workspace. A conta de login mantém-se. Em workspaces partilhados, o planeamento ' +
-      'mensal comum ao tenant não é apagado. Esta ação não pode ser desfeita. Continuar?'
-    )) {
-      return;
-    }
-
-    // Confirmação dupla
-    if (!window.confirm(
-      'Última confirmação: tem a certeza absoluta de que pretende apagar todos estes dados? ' +
-      'Esta é a última oportunidade para cancelar.'
-    )) {
-      return;
-    }
-
-    try {
-      setClearLoading(true);
-      setError('');
-      setSuccess('');
-      
-      const response = await authAPI.clearAllData();
-      const deleted = response.data.deleted as Record<string, number | undefined>;
-      const parts: string[] = [];
-      const push = (n: number | undefined, label: string) => {
-        const v = typeof n === 'number' ? n : 0;
-        if (v > 0) parts.push(`${v} ${label}`);
-      };
-      push(deleted.transactions, 'transações');
-      push(deleted.accounts, 'contas');
-      push(deleted.categories, 'categorias');
-      push(deleted.financial_expenses, 'despesas agendadas');
-      push(deleted.goals, 'metas');
-      push(deleted.budget_plans, 'linhas de planeamento por categoria');
-      push(deleted.budget_monthly, 'meses de planeamento (workspace só seu)');
-      const ma =
-        (deleted.merchant_category_aliases_user ?? 0) +
-        (deleted.merchant_category_aliases_tenant ?? 0);
-      push(ma > 0 ? ma : undefined, 'aliases de comerciante');
-      push(deleted.chatbot_conversations, 'conversas do assistente');
-      push(deleted.admin_notification_delivery, 'registos de notificação admin');
-      const audit =
-        (deleted.admin_audit_logs_target ?? 0) + (deleted.admin_audit_logs_actor ?? 0);
-      push(audit > 0 ? audit : undefined, 'linhas de auditoria admin associadas');
-
-      setSuccess(
-        parts.length > 0
-          ? `Limpeza completa: ${parts.join(', ')}.`
-          : 'Limpeza concluída; não havia registos para remover.'
-      );
-      setTimeout(() => setSuccess(''), 5000);
-      
-      // Recarrega a página após 2 segundos
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao limpar dados');
-    } finally {
-      setClearLoading(false);
-    }
+  /** Chamado pelo diálogo; lança em caso de falha para manter o diálogo aberto. */
+  const clearAllData = async () => {
+    setError('');
+    setSuccess('');
+    const response = await authAPI.clearAllData();
+    const parts = summarizeDeleted(response.data?.deleted as Record<string, number | undefined> | undefined);
+    invalidateLookupCache();
+    setClearDialogOpen(false);
+    showSuccess(
+      parts.length > 0
+        ? `Limpeza concluída: ${parts.join(', ')}.`
+        : 'Limpeza concluída; não havia registros para remover.'
+    );
   };
 
   const handleSave = async () => {
+    if (settingsStatus !== 'ready' || loading) return;
     setLoading(true);
     setError('');
     setSuccess('');
@@ -257,10 +270,7 @@ const Settings = () => {
         updateUser(updatedUser);
       }
 
-      setSuccess(t('settings.saveSuccess'));
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
+      showSuccess(t('settings.saveSuccess'), 3000);
     } catch (err) {
       setError('Erro ao salvar configurações');
       console.error('Save settings error:', err);
@@ -287,6 +297,10 @@ const Settings = () => {
     { code: 'dark', name: t('settings.dark'), icon: 'bi-moon-stars-fill' }
   ];
 
+  const preferencesUnavailable = settingsStatus === 'error';
+  const saveDisabled = loading || settingsStatus !== 'ready';
+  const clearDataSummary = CLEAR_DATA_ENTITIES.map(entity => entity.label).join(', ');
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -298,14 +312,14 @@ const Settings = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
+        <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
           <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
           <span className="text-red-800 dark:text-red-200">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-center gap-2">
+        <div role="status" className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-center gap-2">
           <i className="bi bi-check-circle-fill text-emerald-600 dark:text-emerald-400"></i>
           <span className="text-emerald-800 dark:text-emerald-200">{success}</span>
         </div>
@@ -323,6 +337,20 @@ const Settings = () => {
               </div>
             </div>
             <div className="p-6">
+              {preferencesUnavailable && (
+                <div role="alert" className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <i className="bi bi-exclamation-triangle-fill text-amber-600 dark:text-amber-300"></i>
+                    <span className="text-amber-900 dark:text-amber-100">
+                      <strong>Preferências indisponíveis.</strong> Não foi possível carregar suas preferências; salvar está bloqueado para não sobrescrevê-las.
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => void loadSettings()}
+                    className="px-3 py-1.5 rounded-lg border border-amber-400 dark:border-amber-500 text-sm font-medium text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/40">
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
               <div className="space-y-6">
                 {/* Currency */}
                 <div>
@@ -387,6 +415,7 @@ const Settings = () => {
                         type="button"
                         name={`theme-${themeOption.code}`}
                         aria-label={`Selecionar tema ${themeOption.name}`}
+                        aria-pressed={settings.theme === themeOption.code}
                         className={`settings-theme-card ${
                           settings.theme === themeOption.code
                             ? 'settings-theme-card--selected'
@@ -412,7 +441,7 @@ const Settings = () => {
                     ))}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-dark-text-secondary mt-2">
-                    Aparência da aplicação
+                    Aparência da aplicação. A mudança é aplicada imediatamente.
                   </p>
                 </div>
               </div>
@@ -435,7 +464,7 @@ const Settings = () => {
                     type="text"
                     id="settings-name"
                     name="name"
-                    className="native-input-themed w-full px-4 py-2.5 opacity-75"
+                    className="native-input-themed settings-readonly-field w-full px-4 py-2.5"
                     value={user?.name || ''}
                     disabled
                   />
@@ -447,7 +476,7 @@ const Settings = () => {
                     type="email"
                     id="settings-email"
                     name="email"
-                    className="native-input-themed w-full px-4 py-2.5 opacity-75"
+                    className="native-input-themed settings-readonly-field w-full px-4 py-2.5"
                     value={user?.email || ''}
                     disabled
                   />
@@ -457,7 +486,7 @@ const Settings = () => {
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/50 rounded-lg">
                 <p className="text-sm text-blue-800 dark:text-blue-100 flex items-center gap-2">
                   <i className="bi bi-info-circle-fill"></i>
-                  Para alterar dados da conta, acesse a seção Perfil
+                  Os dados da conta são somente leitura. Para alterar a senha, acesse a seção Perfil.
                 </p>
               </div>
             </div>
@@ -466,9 +495,11 @@ const Settings = () => {
           {/* Save Button */}
           <div className="flex justify-end">
             <button
+              type="button"
               onClick={handleSave}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
+              disabled={saveDisabled}
+              aria-disabled={saveDisabled}
             >
               {loading ? (
                 <>
@@ -522,7 +553,7 @@ const Settings = () => {
                   Tema
                 </h4>
                 <p className="text-xs text-slate-600 dark:text-dark-text-secondary">
-                  Escolha entre tema claro ou escuro. Funcionalidade em desenvolvimento.
+                  Escolha entre tema claro ou escuro. A mudança é aplicada imediatamente.
                 </p>
               </div>
             </div>
@@ -563,9 +594,10 @@ const Settings = () => {
                 Exporte todos os seus dados (categorias, transações e contas) para um arquivo JSON ou importe um backup anterior.
               </p>
             </div>
-            
+
             <div className="flex flex-wrap gap-3">
               <button
+                type="button"
                 onClick={handleExportBackup}
                 disabled={backupLoading}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -584,6 +616,7 @@ const Settings = () => {
               </button>
 
               <button
+                type="button"
                 onClick={() => backupFileInputRef.current?.click()}
                 disabled={importLoading}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -605,7 +638,8 @@ const Settings = () => {
                 type="file"
                 accept=".json"
                 className="hidden"
-                onChange={handleImportBackup}
+                aria-label="Selecionar arquivo de backup"
+                onChange={handleBackupFileSelected}
               />
             </div>
           </div>
@@ -618,9 +652,10 @@ const Settings = () => {
                 Importe categorias de um arquivo JSON ou CSV. O arquivo deve conter as colunas: name, type, color, icon, description.
               </p>
             </div>
-            
+
             <div className="flex flex-wrap gap-3">
               <button
+                type="button"
                 onClick={() => categoryFileInputRef.current?.click()}
                 disabled={categoryImportLoading}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -642,6 +677,7 @@ const Settings = () => {
                 type="file"
                 accept=".json,.csv"
                 className="hidden"
+                aria-label="Selecionar arquivo de categorias"
                 onChange={handleImportCategories}
               />
             </div>
@@ -652,30 +688,41 @@ const Settings = () => {
             <div>
               <h3 className="text-sm font-semibold text-red-600 dark:text-red-300 mb-2">Zona de Perigo</h3>
               <p className="text-xs text-slate-600 dark:text-dark-text-secondary mb-4">
-                <strong className="text-red-600 dark:text-red-300">Atenção:</strong> Esta ação irá deletar permanentemente todas as suas categorias, transações e contas. Esta ação não pode ser desfeita. Certifique-se de ter um backup antes de continuar.
+                <strong className="text-red-600 dark:text-red-300">Atenção:</strong> esta ação apaga permanentemente {clearDataSummary}. A conta de login é mantida. Esta ação não pode ser desfeita; certifique-se de ter um backup antes de continuar.
               </p>
             </div>
-            
+
             <button
-              onClick={handleClearAllData}
-              disabled={clearLoading}
+              type="button"
+              onClick={() => { setError(''); setSuccess(''); setClearDialogOpen(true); }}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {clearLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  Limpando...
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-trash"></i>
-                  Limpar Todos os Dados
-                </>
-              )}
+              <i className="bi bi-trash"></i>
+              Limpar Todos os Dados
             </button>
           </div>
         </div>
       </div>
+
+      {clearDialogOpen && (
+        <ClearDataDialog onConfirm={clearAllData} onClose={() => setClearDialogOpen(false)} />
+      )}
+
+      {pendingBackup && (
+        <ConfirmDialog
+          title="Importar backup"
+          subject={pendingBackup.name}
+          details={BACKUP_SECTIONS.map(section => {
+            const list = pendingBackup.data[section];
+            const labels: Record<keyof BackupPayload, string> = { categories: 'Categorias', accounts: 'Contas', transactions: 'Transações' };
+            return [labels[section], Array.isArray(list) ? String(list.length) : '0'] as [string, React.ReactNode];
+          })}
+          consequence={<p>Os dados do backup serão adicionados à sua conta. Categorias e contas com o mesmo nome serão ignoradas; transações duplicadas podem ser criadas.</p>}
+          confirmLabel="Importar"
+          onConfirm={confirmImportBackup}
+          onClose={() => { if (!importLoading) setPendingBackup(null); }}
+        />
+      )}
     </div>
   );
 };

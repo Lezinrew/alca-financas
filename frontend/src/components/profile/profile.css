@@ -1,0 +1,12 @@
+/* Perfil: campos somente leitura mantêm contraste (sem opacity) e erros inline. */
+.profile-readonly-field[readonly] {
+  cursor: default;
+  background-color: #f1f5f9;
+  color: #334155;
+}
+.dark .profile-readonly-field[readonly] {
+  background-color: #22293a;
+  color: #cbd5e1;
+}
+.profile-field-error { margin: .375rem 0 0; font-size: .875rem; color: #b91c1c; }
+.dark .profile-field-error { color: #fecaca; }

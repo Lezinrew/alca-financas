@@ -1,0 +1,24 @@
+/* Configurações: campos somente leitura mantêm contraste (sem opacity) e diálogo de limpeza. */
+.settings-readonly-field:disabled {
+  opacity: 1;
+  cursor: default;
+  background-color: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.dark .settings-readonly-field:disabled {
+  background-color: #22293a;
+  color: #cbd5e1;
+  border-color: #526079;
+}
+
+.settings-clear-list { margin: 0 0 .75rem; padding-left: 1.25rem; }
+.settings-clear-list li { margin: .125rem 0; }
+.settings-clear-label { display: block; margin-top: 1rem; margin-bottom: .375rem; font-weight: 600; }
+.settings-clear-input {
+  width: 100%; min-height: 44px; padding: .5rem .75rem;
+  border: 1px solid var(--dialog-border); border-radius: 8px;
+  background: var(--dialog-surface); color: var(--dialog-text);
+  font-size: 1rem; letter-spacing: .05em;
+}
+.settings-clear-input:disabled { cursor: not-allowed; background: var(--dialog-surface-soft); }
