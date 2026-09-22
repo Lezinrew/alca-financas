@@ -18,7 +18,9 @@ on:
 concurrency:
   # Serializa os deploys para evitar concorrência sobre /apps/alca-financas.
   group: production-deploy
-  cancel-in-progress: true
+  # Não cancelar um deploy em andamento: interromper entre o git reset e o
+  # recreate deixaria o servidor com código e containers de versões diferentes.
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -62,6 +64,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           password: ${{ secrets.PROD_PASSWORD }}
+          timeout: 120s
           source: "backend-images.tar.gz"
           target: "/tmp/"
 
@@ -71,6 +74,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           password: ${{ secrets.PROD_PASSWORD }}
+          timeout: 120s
           script: |
             set -e
             gunzip -c /tmp/backend-images.tar.gz | docker load
@@ -103,6 +107,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           password: ${{ secrets.PROD_PASSWORD }}
+          timeout: 120s
           envs: VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY
           script: |
             set -e
@@ -181,7 +186,7 @@ jobs:
       - name: Notify on failure
         if: failure()
         continue-on-error: true
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@214f06cfa3d3a588c1472116889437e7c6fd29b1 # v1.1.1
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
