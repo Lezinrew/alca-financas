@@ -1,225 +1,146 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useId } from 'react';
 import { accountsAPI } from '../../utils/api';
+import { AppDialog } from '../shared/AppDialog';
+import { apiErrorMessage } from './creditCardUtils';
+import './credit-cards.css';
 
 interface CreditCardImportModalProps {
-  show: boolean;
   onHide: () => void;
+  /** Chamado ao fechar após uma importação concluída, para recarregar os dados. */
   onSuccess: () => void;
   cardId: string;
 }
 
-const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({
-  show,
-  onHide,
-  onSuccess,
-  cardId
-}) => {
+interface ImportResult {
+  imported_count?: number;
+  duplicates_skipped?: number;
+  categories_created?: number;
+  categories_created_list?: string[];
+}
+
+const VALID_EXTENSIONS = ['.pdf', '.ofx', '.csv'];
+
+/** Diálogo de importação de fatura. Monte apenas enquanto estiver aberto. */
+const CreditCardImportModal: React.FC<CreditCardImportModalProps> = ({ onHide, onSuccess, cardId }) => {
+  const prefix = useId();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const submitting = useRef(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  const close = () => {
+    if (busy) return;
+    if (success) { onSuccess(); return; }
+    if (selectedFile && !window.confirm('Fechar sem importar o arquivo selecionado?')) return;
+    onHide();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const filename = file.name.toLowerCase();
-      const validExtensions = ['.pdf', '.ofx', '.csv'];
-      const isValid = validExtensions.some(ext => filename.endsWith(ext));
-
-      if (!isValid) {
-        setError('Apenas arquivos PDF, OFX e CSV são aceitos');
-        setSelectedFile(null);
-        return;
-      }
-
-      setSelectedFile(file);
-      setError('');
-      setSuccess('');
+    if (!file) return;
+    const filename = file.name.toLowerCase();
+    if (!VALID_EXTENSIONS.some(ext => filename.endsWith(ext))) {
+      setError('Apenas arquivos PDF, OFX e CSV são aceitos');
+      setSelectedFile(null);
+      return;
     }
+    setSelectedFile(file);
+    setError('');
   };
 
   const handleImport = async () => {
-    if (!selectedFile) {
-      setError('Selecione um arquivo para importar');
-      return;
-    }
-
-    setLoading(true);
+    if (submitting.current) return;
+    if (!selectedFile) { setError('Selecione um arquivo para importar'); return; }
+    submitting.current = true;
+    setBusy(true);
     setError('');
-    setSuccess('');
-
     try {
       const response = await accountsAPI.import(cardId, selectedFile);
-      const result = response.data;
+      const result: ImportResult = response.data || {};
       const imported = result.imported_count || 0;
       const skipped = result.duplicates_skipped || 0;
-      let successMessage = `Fatura importada com sucesso! ${imported} transação(ões) adicionada(s).`;
-      if (skipped > 0) {
-        successMessage += ` ${skipped} duplicada(s) ignorada(s).`;
-      }
-      
+      let message = `Fatura importada com sucesso: ${imported} transação(ões) adicionada(s).`;
+      if (skipped > 0) message += ` ${skipped} duplicada(s) ignorada(s).`;
       if (result.categories_created && result.categories_created > 0) {
-        const categoriesList = result.categories_created_list?.join(', ') || '';
-        successMessage += ` ${result.categories_created} ${result.categories_created === 1 ? 'categoria foi criada' : 'categorias foram criadas'} automaticamente${categoriesList ? `: ${categoriesList}` : ''}.`;
+        const list = result.categories_created_list?.join(', ') || '';
+        message += ` ${result.categories_created} ${result.categories_created === 1 ? 'categoria foi criada' : 'categorias foram criadas'} automaticamente${list ? `: ${list}` : ''}.`;
       }
-      
-      setSuccess(successMessage);
-      
-      setTimeout(() => {
-        onSuccess();
-      }, 3000);
-    } catch (err: any) {
-      const apiMsg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message;
-      setError(apiMsg || 'Erro ao importar fatura');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClose = () => {
-    if (!loading) {
+      setSuccess(message);
       setSelectedFile(null);
-      setError('');
-      setSuccess('');
-      onHide();
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Não foi possível importar a fatura. Confira o arquivo e tente novamente.'));
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
   };
-
-  if (!show) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in"
-        onClick={handleClose}
-      ></div>
+    <AppDialog title="Importar fatura do cartão" onClose={close} busy={busy} initialFocus={success ? closeRef : fileRef} size="sm">
+      <div className="app-dialog-body cc">
+        {error && <p className="app-dialog-error mb-4" role="alert" style={{ marginTop: 0 }}>{error}</p>}
 
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="modal-content pointer-events-auto max-w-lg w-full animate-scale-in">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700/50">
-            <h2 className="text-xl font-semibold text-primary">
-              Importar Fatura do Cartão
-            </h2>
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={loading}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
-              aria-label="Fechar"
-            >
-              <i className="bi bi-x-lg text-xl"></i>
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="p-6">
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 animate-shake">
-                <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400"></i>
-                <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
-              </div>
-            )}
-
-            {success && (
-              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 animate-fade-in">
-                <i className="bi bi-check-circle-fill text-green-600 dark:text-green-400"></i>
-                <span className="text-green-800 dark:text-green-200 text-sm">{success}</span>
-              </div>
-            )}
-
+        {success ? (
+          <>
+            <p className="cc-success" role="status">{success}</p>
+            <div className="app-dialog-actions">
+              <button ref={closeRef} type="button" className="app-dialog-button app-dialog-button-primary" onClick={onSuccess}>Fechar</button>
+            </div>
+          </>
+        ) : (
+          <>
             <div className="space-y-4">
-              <div>
-                <label htmlFor="import-file" className="block text-sm font-medium text-secondary mb-2">
-                  Selecione o arquivo da fatura
-                </label>
+              <div className="cc-field">
+                <label htmlFor={`${prefix}-file`}>Selecione o arquivo da fatura</label>
                 <input
+                  ref={fileRef}
                   type="file"
-                  id="import-file"
+                  id={`${prefix}-file`}
                   name="file"
                   className="input-base"
                   accept=".pdf,.ofx,.csv"
                   onChange={handleFileChange}
-                  disabled={loading}
+                  disabled={busy}
+                  aria-describedby={`${prefix}-formats`}
                 />
-                <div className="text-xs text-tertiary mt-2">
-                  Formatos aceitos: PDF, OFX e CSV
-                </div>
+                <span id={`${prefix}-formats`} className="cc-field-hint">Formatos aceitos: PDF, OFX e CSV</span>
               </div>
 
               {selectedFile && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 animate-fade-in">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                      <i className="bi bi-file-earmark text-blue-600 dark:text-blue-400 text-lg"></i>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                        {selectedFile.name}
-                      </p>
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
-                        {(selectedFile.size / 1024).toFixed(2)} KB
-                      </p>
-                    </div>
-                    <i className="bi bi-check-circle-fill text-blue-600 dark:text-blue-400"></i>
+                <div className="cc-file-summary">
+                  <i className="bi bi-file-earmark text-blue-600 dark:text-blue-400 text-lg" aria-hidden="true"></i>
+                  <div className="min-w-0">
+                    <p className="font-medium break-all m-0">{selectedFile.name}</p>
+                    <p className="cc-field-hint m-0">{(selectedFile.size / 1024).toFixed(2)} KB</p>
                   </div>
                 </div>
               )}
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <p className="text-sm font-medium text-secondary mb-2">
-                  <i className="bi bi-info-circle me-2"></i>
-                  Como importar:
-                </p>
-                <ul className="text-xs text-tertiary space-y-1 list-disc list-inside">
+              <div className="cc-help">
+                <p className="font-medium m-0">Como importar:</p>
+                <ul>
                   <li>Baixe a fatura do seu cartão no formato PDF, OFX ou CSV</li>
-                  <li>Selecione o arquivo usando o botão acima</li>
-                  <li>Clique em "Importar" para processar a fatura</li>
+                  <li>Selecione o arquivo usando o campo acima</li>
+                  <li>Clique em &ldquo;Importar&rdquo; para processar a fatura</li>
                   <li>As transações serão adicionadas automaticamente</li>
                 </ul>
               </div>
             </div>
-          </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700/50">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={loading}
-              className="btn-secondary"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleImport}
-              disabled={loading || !selectedFile}
-              className="btn-base bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <i className="bi bi-hourglass-split animate-spin mr-2"></i>
-                  Importando...
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-upload mr-2"></i>
-                  Importar
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+            <div className="app-dialog-actions">
+              <button type="button" onClick={close} disabled={busy} className="app-dialog-button">Cancelar</button>
+              <button type="button" onClick={() => void handleImport()} disabled={busy || !selectedFile} className="app-dialog-button app-dialog-button-primary">
+                {busy ? 'Importando…' : 'Importar'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </>
+    </AppDialog>
   );
 };
 
 export default CreditCardImportModal;
-
