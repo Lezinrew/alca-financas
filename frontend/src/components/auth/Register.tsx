@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Eye, EyeOff, Loader2, Wallet } from 'lucide-react';
+import { GradientButton } from '../ui/gradient-button';
+import { Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import LoginVisualPanel from './LoginVisualPanel';
 
-const Register = () => {
+type FieldName = 'name' | 'email' | 'password' | 'confirmPassword';
+
+const iconClass = 'absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none';
+const inputClass =
+  'h-11 pl-10 border-slate-200 dark:border-slate-600 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all';
+const toggleClass =
+  'absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors';
+
+const Register: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -17,51 +26,41 @@ const Register = () => {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState<FieldName | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const errorId = 'register-error-message';
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
+    setErrorField(null);
+  };
+
+  const fail = (message: string, field: FieldName | null) => {
+    setError(message);
+    setErrorField(field);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
+    if (loading) return;
     setError('');
-
-    // Validação de senha
-    if (formData.password !== formData.confirmPassword) {
-      setError('As senhas não coincidem');
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
-      setLoading(false);
-      return;
-    }
+    setErrorField(null);
 
     const nameTrim = formData.name.trim();
     const emailTrim = formData.email.trim();
-    if (!nameTrim || !emailTrim) {
-      setError('Preencha nome e e-mail.');
-      setLoading(false);
-      return;
-    }
+    if (!nameTrim) return fail('Informe seu nome.', 'name');
+    if (!emailTrim) return fail('Informe seu e-mail.', 'email');
+    if (formData.password.length < 6) return fail('A senha deve ter pelo menos 6 caracteres.', 'password');
+    if (formData.password !== formData.confirmPassword) return fail('As senhas não coincidem.', 'confirmPassword');
 
+    setLoading(true);
     try {
-      const result = await register({
-        name: nameTrim,
-        email: emailTrim,
-        password: formData.password,
-      });
+      const result = await register({ name: nameTrim, email: emailTrim, password: formData.password });
 
       if (result.success) {
         // Sem sessão (ex.: confirmação de e-mail): não enviar para área autenticada.
@@ -71,103 +70,108 @@ const Register = () => {
           navigate('/dashboard', { replace: true });
         }
       } else {
-        setError(result.message || 'Erro no cadastro');
+        fail(result.message || 'Não foi possível concluir o cadastro. Tente novamente.', null);
       }
-    } catch (err) {
-      setError('Erro inesperado. Tente novamente.');
+    } catch {
+      fail('Erro inesperado. Tente novamente.', null);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-[#0f172a] dark:to-[#1a1d29] p-4 transition-colors duration-200">
-      <div className="w-full max-w-md">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-2xl shadow-lg">
-              <Wallet className="w-10 h-10 text-white" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 transition-colors">Alça Finanças</h1>
-          <p className="text-slate-600 dark:text-slate-300 transition-colors">Controle financeiro inteligente</p>
-        </div>
+  const fieldA11y = (field: FieldName) => ({
+    'aria-invalid': errorField === field || undefined,
+    'aria-describedby': errorField === field ? errorId : undefined,
+  });
 
-        <Card className="shadow-lg border-0 card-base">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl font-semibold text-center">Criar Conta</CardTitle>
-            <CardDescription className="text-center">
-              Preencha os dados abaixo para criar sua conta
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+  return (
+    <div className="login-page">
+      <LoginVisualPanel />
+
+      <div className="login-form-panel">
+        <div className="login-form-panel__inner">
+          <div className="login-form-panel__brand-mobile login-stagger-1">
+            <span className="login-logo-badge">
+              <img src="/alcahub-logo.png" alt="Alça Finanças" className="login-form-panel__logo-mobile" />
+            </span>
+          </div>
+
+          <div className="login-glass-card login-stagger-2">
+            <div className="login-glass-card__header">
+              <h2 className="login-glass-card__title">Criar conta</h2>
+              <p className="login-glass-card__subtitle">Preencha os dados abaixo para começar</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="login-glass-card__form" noValidate>
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Nome completo
                 </label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  required
-                  placeholder="Seu nome completo"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="h-11"
-                  disabled={loading}
-                />
+                <div className={cn('relative rounded-lg input-with-icon', errorField === 'name' && 'input-error')}>
+                  <User className={iconClass} aria-hidden="true" />
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    placeholder="Seu nome completo"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={inputClass}
+                    {...fieldA11y('name')}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   E-mail
                 </label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="seu@email.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="h-11"
-                  disabled={loading}
-                />
+                <div className={cn('relative rounded-lg input-with-icon', errorField === 'email' && 'input-error')}>
+                  <Mail className={iconClass} aria-hidden="true" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    placeholder="seu@email.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={inputClass}
+                    {...fieldA11y('email')}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Senha
                 </label>
-                <div className="relative">
+                <div className={cn('relative rounded-lg input-with-icon', errorField === 'password' && 'input-error')}>
+                  <Lock className={iconClass} aria-hidden="true" />
                   <Input
                     id="password"
                     name="password"
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     required
+                    minLength={6}
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="h-11 pr-10"
-                    minLength={6}
-                    disabled={loading}
+                    className={cn(inputClass, 'pr-12')}
+                    {...fieldA11y('password')}
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowPassword(!showPassword)}
-                    tabIndex={-1}
+                    className={toggleClass}
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={showPassword}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-slate-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-slate-400" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -176,73 +180,64 @@ const Register = () => {
                 <label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Confirmar senha
                 </label>
-                <div className="relative">
+                <div className={cn('relative rounded-lg input-with-icon', errorField === 'confirmPassword' && 'input-error')}>
+                  <Lock className={iconClass} aria-hidden="true" />
                   <Input
                     id="confirmPassword"
                     name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
+                    type={showConfirmPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     required
+                    minLength={6}
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="h-11 pr-10"
-                    minLength={6}
-                    disabled={loading}
+                    className={cn(inputClass, 'pr-12')}
+                    {...fieldA11y('confirmPassword')}
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    tabIndex={-1}
+                    className={toggleClass}
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
+                    aria-pressed={showConfirmPassword}
                   >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4 text-slate-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-slate-400" />
-                    )}
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
               </div>
 
               {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-md text-sm transition-colors">
+                <div
+                  id={errorId}
+                  className="text-sm text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5 animate-shake"
+                  role="alert"
+                >
+                  <i className="bi bi-exclamation-triangle-fill text-amber-600 dark:text-amber-400 mr-2" aria-hidden="true"></i>
                   {error}
                 </div>
               )}
 
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                className="w-full"
-                disabled={loading}
-              >
+              <GradientButton type="submit" variant="default" className="w-full" disabled={loading}>
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     Criando conta...
                   </>
                 ) : (
                   'Criar conta'
                 )}
-              </Button>
+              </GradientButton>
             </form>
 
-            {/* Login link */}
-            <div className="text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Já tem uma conta?{' '}
-                <Link
-                  to="/login"
-                  className="font-medium text-primary hover:text-primary-dark dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Fazer login
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            <p className="login-glass-card__footer">
+              Já tem uma conta?{' '}
+              <Link to="/login" className="login-glass-card__link">
+                Entrar
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

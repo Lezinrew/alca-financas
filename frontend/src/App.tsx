@@ -131,14 +131,9 @@ const AppRoutes: React.FC = () => {
             </PublicRoute>
           }
         />
-        <Route
-          path="/reset-password"
-          element={
-            <PublicRoute>
-              <ResetPassword />
-            </PublicRoute>
-          }
-        />
+        {/* Exceção ao PublicRoute: o link de recuperação cria sessão antes de a
+            senha ser definida; a tela precisa renderizar mesmo autenticada. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Rotas Protegidas */}
         <Route

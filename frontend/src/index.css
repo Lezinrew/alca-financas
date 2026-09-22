@@ -733,10 +733,10 @@
   @apply transition-colors duration-200;
 }
 .input-with-icon:focus-within {
-  @apply ring-2 ring-emerald-500/50 border-emerald-500;
+  @apply border-emerald-500;
 }
 .input-with-icon.input-error {
-  @apply border-amber-500 ring-1 ring-amber-500/30;
+  @apply border-amber-500;
 }
 
 /* ============================================
@@ -1215,6 +1215,29 @@
 
 .dark .login-glass-card__link {
   color: #34d399;
+}
+
+/* ---- Foco visível unificado (3px) nas páginas de auth ---- */
+.login-page :is(input, button, a, [tabindex]):focus-visible {
+  outline: 3px solid #059669;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.dark .login-page :is(input, button, a, [tabindex]):focus-visible {
+  outline-color: #34d399;
+}
+
+.login-page .input-base:focus-visible {
+  outline: 3px solid #059669;
+  outline-offset: 2px;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+.dark .login-page .input-base:focus-visible {
+  outline-color: #34d399;
 }
 
 /* ---- Microinterações de entrada (stagger) ---- */

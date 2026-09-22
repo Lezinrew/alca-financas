@@ -6,19 +6,20 @@ import { GradientButton } from '../ui/gradient-button';
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import LoginVisualPanel from './LoginVisualPanel';
+import { AUTH_ERROR_NETWORK } from '../../utils/supabaseAuthErrors';
+
+type InvalidFields = { email: boolean; password: boolean };
+const NO_INVALID: InvalidFields = { email: false, password: false };
 
 const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false,
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [invalid, setInvalid] = useState<InvalidFields>(NO_INVALID);
   const [postRegisterInfo, setPostRegisterInfo] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -31,42 +32,37 @@ const Login: React.FC = () => {
   }, [location.pathname, location.state, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
-    setPostRegisterInfo('');
+    setInvalid(NO_INVALID);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
+    if (loading) return;
     setError('');
+    setInvalid(NO_INVALID);
     setPostRegisterInfo('');
 
-    if (!formData.email?.trim() || !formData.password) {
+    const emailEmpty = !formData.email.trim();
+    const passwordEmpty = !formData.password;
+    if (emailEmpty || passwordEmpty) {
+      setInvalid({ email: emailEmpty, password: passwordEmpty });
       setError('Preencha e-mail e senha.');
-      setLoading(false);
       return;
     }
 
+    setLoading(true);
     try {
-      const result = await login(
-        { email: formData.email.trim(), password: formData.password },
-        formData.rememberMe
-      );
+      // "Lembrar-me" não tem efeito real hoje (AuthContext ignora o flag).
+      const result = await login({ email: formData.email.trim(), password: formData.password }, false);
 
       if (result.success) {
         navigate('/dashboard');
       } else {
         const msg = result.message || 'Erro no login';
-        setError(
-          msg === 'Network Error'
-            ? 'Não foi possível conectar. Verifique sua internet ou se o servidor está ativo.'
-            : msg
-        );
+        setError(msg === 'Network Error' ? AUTH_ERROR_NETWORK : msg);
       }
     } catch {
       setError('Erro inesperado. Tente novamente.');
@@ -115,7 +111,7 @@ const Login: React.FC = () => {
                 <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   E-mail
                 </label>
-                <div className={cn('relative rounded-lg input-with-icon', error && 'input-error')}>
+                <div className={cn('relative rounded-lg input-with-icon', invalid.email && 'input-error')}>
                   <Mail
                     className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
                     aria-hidden="true"
@@ -129,9 +125,9 @@ const Login: React.FC = () => {
                     placeholder="seu@email.com"
                     value={formData.email}
                     onChange={handleChange}
-                    className="h-11 pl-10 border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
-                    aria-invalid={!!error}
-                    aria-describedby={error ? errorId : undefined}
+                    className="h-11 pl-10 border-slate-200 dark:border-slate-600 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
+                    aria-invalid={invalid.email || undefined}
+                    aria-describedby={invalid.email ? errorId : undefined}
                   />
                 </div>
               </div>
@@ -140,7 +136,7 @@ const Login: React.FC = () => {
                 <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Senha
                 </label>
-                <div className={cn('relative rounded-lg input-with-icon', error && 'input-error')}>
+                <div className={cn('relative rounded-lg input-with-icon', invalid.password && 'input-error')}>
                   <Lock
                     className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
                     aria-hidden="true"
@@ -154,16 +150,16 @@ const Login: React.FC = () => {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="h-11 pl-10 pr-10 border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
-                    aria-invalid={!!error}
-                    aria-describedby={error ? errorId : undefined}
+                    className="h-11 pl-10 pr-12 border-slate-200 dark:border-slate-600 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
+                    aria-invalid={invalid.password || undefined}
+                    aria-describedby={invalid.password ? errorId : undefined}
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                    tabIndex={-1}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    onClick={() => setShowPassword((v) => !v)}
                     aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={showPassword}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -174,21 +170,10 @@ const Login: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none py-1">
-                  <input
-                    id="remember-me"
-                    name="rememberMe"
-                    type="checkbox"
-                    checked={formData.rememberMe}
-                    onChange={handleChange}
-                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span className="text-sm text-slate-600 dark:text-slate-300">Lembrar-me</span>
-                </label>
+              <div className="flex items-center justify-end">
                 <Link
                   to="/forgot-password"
-                  className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline py-1"
+                  className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline py-1 rounded"
                 >
                   Esqueci a senha
                 </Link>
@@ -196,7 +181,7 @@ const Login: React.FC = () => {
 
               {postRegisterInfo && (
                 <div
-                  className="text-sm text-slate-700 dark:text-slate-200 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2.5 animate-fade-in"
+                  className="text-sm text-slate-800 dark:text-slate-100 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2.5 animate-fade-in"
                   role="status"
                 >
                   {postRegisterInfo}
@@ -206,10 +191,10 @@ const Login: React.FC = () => {
               {error && (
                 <div
                   id={errorId}
-                  className="text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5 animate-shake"
+                  className="text-sm text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5 animate-shake"
                   role="alert"
                 >
-                  <i className="bi bi-exclamation-triangle-fill text-amber-500 dark:text-amber-400 mr-2" aria-hidden="true"></i>
+                  <i className="bi bi-exclamation-triangle-fill text-amber-600 dark:text-amber-400 mr-2" aria-hidden="true"></i>
                   {error}
                 </div>
               )}
@@ -234,7 +219,7 @@ const Login: React.FC = () => {
             <p className="login-glass-card__footer">
               Não tem uma conta?{' '}
               <Link to="/register" className="login-glass-card__link">
-                Cadastre-se
+                Criar conta
               </Link>
             </p>
           </div>

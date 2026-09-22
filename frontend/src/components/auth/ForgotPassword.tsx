@@ -1,60 +1,81 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { GradientButton } from '../ui/gradient-button';
 import { ArrowLeft, Loader2, Mail } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { supabase } from '../../utils/supabaseClient';
 import { formatSupabaseAuthError } from '../../utils/supabaseAuthErrors';
+import LoginVisualPanel from './LoginVisualPanel';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailInvalid, setEmailInvalid] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const errorId = 'forgot-error-message';
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
+    if (loading) return;
     setError('');
+    setEmailInvalid(false);
+
+    const emailTrim = email.trim();
+    if (!emailTrim) {
+      setEmailInvalid(true);
+      setError('Informe seu e-mail.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      const emailTrim = email.trim();
       const redirectTo = `${window.location.origin}/reset-password`;
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(emailTrim, {
-        redirectTo,
-      });
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(emailTrim, { redirectTo });
       if (resetError) throw resetError;
       setSent(true);
-    } catch (err: any) {
-      setError(formatSupabaseAuthError(err));
+    } catch (err) {
+      setError(formatSupabaseAuthError(err as { message?: string }, 'Não foi possível enviar o link. Tente novamente.'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-login-page p-4">
-      <div className="w-full max-w-md">
-        <Card className="card-login">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl font-semibold text-center text-slate-900 dark:text-white">
-              Esqueci a senha
-            </CardTitle>
-            <CardDescription className="text-center text-slate-600 dark:text-slate-400">
-              {sent
-                ? 'Se existir uma conta com esse e-mail, você receberá um link para redefinir sua senha.'
-                : 'Informe seu e-mail e enviaremos um link para redefinir sua senha.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+    <div className="login-page">
+      <LoginVisualPanel />
+
+      <div className="login-form-panel">
+        <div className="login-form-panel__inner">
+          <div className="login-form-panel__brand-mobile login-stagger-1">
+            <span className="login-logo-badge">
+              <img src="/alcahub-logo.png" alt="Alça Finanças" className="login-form-panel__logo-mobile" />
+            </span>
+          </div>
+
+          <div className="login-glass-card login-stagger-2">
+            <div className="login-glass-card__header">
+              <h2 className="login-glass-card__title">Esqueci a senha</h2>
+              <p className="login-glass-card__subtitle">
+                {sent
+                  ? 'Se existir uma conta com esse e-mail, você receberá um link para redefinir sua senha.'
+                  : 'Informe seu e-mail e enviaremos um link para redefinir sua senha.'}
+              </p>
+            </div>
+
             {!sent ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="login-glass-card__form" noValidate>
                 <div className="space-y-2">
                   <label htmlFor="forgot-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     E-mail
                   </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <div className={cn('relative rounded-lg input-with-icon', emailInvalid && 'input-error')}>
+                    <Mail
+                      className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
+                      aria-hidden="true"
+                    />
                     <Input
                       id="forgot-email"
                       name="email"
@@ -63,50 +84,61 @@ const ForgotPassword: React.FC = () => {
                       required
                       placeholder="seu@email.com"
                       value={email}
-                      onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                      className="input-with-icon pl-10 h-11"
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setError('');
+                        setEmailInvalid(false);
+                      }}
+                      className="h-11 pl-10 border-slate-200 dark:border-slate-600 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all"
+                      aria-invalid={emailInvalid || undefined}
+                      aria-describedby={emailInvalid ? errorId : undefined}
                     />
                   </div>
                 </div>
+
                 {error && (
-                  <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+                  <div
+                    id={errorId}
+                    className="text-sm text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 border-l-4 border-l-amber-500 dark:border-l-amber-400 rounded-lg px-3 py-2.5 animate-shake"
+                    role="alert"
+                  >
+                    <i className="bi bi-exclamation-triangle-fill text-amber-600 dark:text-amber-400 mr-2" aria-hidden="true"></i>
                     {error}
-                  </p>
+                  </div>
                 )}
-                <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
+
+                <GradientButton type="submit" variant="default" className="w-full" disabled={loading}>
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                       Enviando...
                     </>
                   ) : (
                     'Enviar link'
                   )}
-                </Button>
+                </GradientButton>
               </form>
             ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+              <div className="login-glass-card__form">
+                <p className="text-sm text-slate-600 dark:text-slate-300 text-center" role="status">
                   Verifique sua caixa de entrada e o spam. O link expira em 1 hora.
                 </p>
-                <Button asChild variant="outline" className="w-full" size="lg">
+                <GradientButton asChild variant="default" className="w-full">
                   <Link to="/login">Voltar ao login</Link>
-                </Button>
+                </GradientButton>
               </div>
             )}
+
             {!sent && (
-              <div className="text-center">
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" />
+              <p className="login-glass-card__footer">
+                <Link to="/login" className="login-glass-card__link inline-flex items-center gap-2">
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   Voltar ao login
                 </Link>
-              </div>
+              </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
