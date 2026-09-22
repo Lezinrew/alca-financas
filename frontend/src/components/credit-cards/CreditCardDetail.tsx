@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency, formatDate, categoriesAPI, accountsAPI, transactionsAPI } from '../../utils/api';
+import { formatCurrency, formatDate, categoriesAPI, accountsAPI, transactionsAPI, TransactionTotals } from '../../utils/api';
 import { useKeyedRequest } from '../../hooks/useKeyedRequest';
 import CreditCardExpenseForm, { CreditCardExpenseSubmit } from './CreditCardExpenseForm';
 import CreditCardImportModal from './CreditCardImportModal';
@@ -76,9 +76,24 @@ const CreditCardDetail: React.FC = () => {
     const total = Number(body?.pagination?.total ?? items.length);
     return { data: { items, total } };
   }, [cardId, period]);
-  const expenses = useKeyedRequest<ExpensesPage>(
-    `expenses:${cardId}:${period?.dateFrom}:${period?.dateTo}:${revision}`, enabled && !!period, expensesRequest,
-  );
+  const periodKey = `${cardId}:${period?.dateFrom}:${period?.dateTo}:${revision}`;
+  const expenses = useKeyedRequest<ExpensesPage>(`expenses:${periodKey}`, enabled && !!period, expensesRequest);
+
+  // Valor da fatura vem do servidor, somado sobre TODOS os lançamentos do período (pendentes
+  // incluídos, cancelados fora) — independente da lista, que é paginada.
+  const totalsRequest = useCallback(async (signal: AbortSignal) => {
+    const response = await transactionsAPI.getTotals({
+      account_ids: cardId,
+      date_from: period!.dateFrom,
+      date_to: period!.dateTo,
+    }, { signal });
+    const body = response.data;
+    if (!body || body.complete !== true || !Number.isFinite(Number(body.expense_total))) {
+      throw new Error('Total da fatura não confirmado');
+    }
+    return { data: body };
+  }, [cardId, period]);
+  const totals = useKeyedRequest<TransactionTotals>(`totals:${periodKey}`, enabled && !!period, totalsRequest);
 
   const categoriesRequest = useCallback(async (signal: AbortSignal) => {
     const response = await categoriesAPI.getAll({ signal });
@@ -138,9 +153,7 @@ const CreditCardDetail: React.FC = () => {
     } else if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear(selectedYear + 1); } else setSelectedMonth(selectedMonth + 1);
   };
 
-  // Valor da fatura = soma dos lançamentos carregados no período. A API pagina; quando há mais
-  // lançamentos do que os carregados, o total é parcial e isso é informado ao usuário.
-  const totalExpenses = loadedExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  // A lista é paginada (PAGE_LIMIT); quando há mais lançamentos do que os carregados, a lista avisa.
   const expensesTotalCount = expenses.data?.total ?? 0;
   const isPartialTotal = !!expenses.data && expensesTotalCount > loadedExpenses.length;
 
@@ -376,17 +389,19 @@ const CreditCardDetail: React.FC = () => {
             <div className="relative flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Valor da fatura</p>
-                {expenses.error ? (
+                {totals.error ? (
                   <p className="text-base font-semibold text-red-600 dark:text-red-400">Indisponível</p>
-                ) : expenses.loading ? (
+                ) : totals.loading || !totals.data ? (
                   <p className="text-base font-semibold text-slate-500 dark:text-slate-400" role="status">Carregando…</p>
                 ) : (
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalExpenses)}</p>
-                )}
-                {isPartialTotal && !expenses.error && !expenses.loading && (
-                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1.5" role="status">
-                    Total calculado sobre os {loadedExpenses.length} lançamentos carregados (de {expensesTotalCount}).
-                  </p>
+                  <>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Number(totals.data.expense_total))}</p>
+                    {Number(totals.data.income_total) > 0 && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                        Estornos/créditos no período: {formatCurrency(Number(totals.data.income_total))}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-none">

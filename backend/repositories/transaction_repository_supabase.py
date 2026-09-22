@@ -142,9 +142,12 @@ class TransactionRepository(BaseRepository):
         user_id: str,
         params: Dict[str, Any],
         tenant_id: Optional[str] = None,
+        raise_on_error: bool = False,
     ) -> Dict[str, Any]:
         """
         Busca transações com filtros avançados e paginação.
+        raise_on_error=True propaga falhas do banco em vez de devolver página vazia
+        (usado por agregações que não podem confundir erro com "sem dados").
         Suporta:
         - page, limit, sort
         - date_from, date_to OU month/year
@@ -315,6 +318,8 @@ class TransactionRepository(BaseRepository):
             }
         except Exception as e:
             logging.error(f"Erro ao buscar transações (find_advanced): {e}")
+            if raise_on_error:
+                raise
             return {
                 "data": [],
                 "pagination": {

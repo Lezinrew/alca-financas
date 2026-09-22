@@ -7,7 +7,7 @@ from datetime import datetime
 from utils.auth_utils import require_auth
 from utils.tenant_context import require_tenant
 from services.transaction_service import TransactionService
-from utils.exceptions import ValidationException, NotFoundException
+from utils.exceptions import AppException, ValidationException, NotFoundException
 
 bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
 
@@ -46,6 +46,19 @@ def _build_transaction_summary(data, category_map):
         ),
     }
 
+# Filtros de negócio da listagem GET /transactions, compartilhados com GET /transactions/totals.
+_LIST_FILTER_KEYS = (
+    'date_preset', 'month', 'year', 'date_from', 'date_to',
+    'type', 'types', 'account_id', 'account_ids', 'category_id', 'category_ids',
+    'min_amount', 'max_amount', 'search', 'status', 'is_recurring',
+)
+
+
+def _listing_filters(args):
+    values = {key: args.get(key) for key in _LIST_FILTER_KEYS}
+    return {k: v for k, v in values.items() if v not in (None, '', [])}
+
+
 @bp.route('', methods=['GET', 'POST'])
 @require_auth
 @require_tenant
@@ -60,29 +73,14 @@ def transactions():
         # Limite padrão mais profissional
         per_page = int(request.args.get('limit', 50))
         
-        # Coleta filtros em formato avançado
+        # Coleta filtros em formato avançado (mesmos de /totals) + paginação/ordenação
         filters = {
             'page': page,
             'limit': per_page,
-            'date_preset': request.args.get('date_preset'),
-            'month': request.args.get('month'),
-            'year': request.args.get('year'),
-            'date_from': request.args.get('date_from'),
-            'date_to': request.args.get('date_to'),
-            'type': request.args.get('type'),
-            'types': request.args.get('types'),
-            'account_id': request.args.get('account_id'),
-            'account_ids': request.args.get('account_ids'),
-            'category_id': request.args.get('category_id'),
-            'category_ids': request.args.get('category_ids'),
-            'min_amount': request.args.get('min_amount'),
-            'max_amount': request.args.get('max_amount'),
-            'search': request.args.get('search'),
-            'status': request.args.get('status'),
-            'is_recurring': request.args.get('is_recurring'),
             'sort': request.args.get('sort'),
+            **_listing_filters(request.args),
         }
-        
+
         # Remove chaves com valores vazios para não poluir o repositório
         filters = {k: v for k, v in filters.items() if v not in (None, '', [])}
         
@@ -106,6 +104,29 @@ def transactions():
         )
         return jsonify({'message': f"{result['count']} transação(ões) criada(s) com sucesso", 'count': result['count']}), 201
     except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
+
+
+@bp.route('/totals', methods=['GET'])
+@require_auth
+@require_tenant
+def transactions_totals():
+    """
+    Totais do conjunto filtrado completo (mesmos filtros de GET /transactions, sem paginação).
+    Nunca devolve total parcial: em falha/inconsistência responde 503.
+    """
+    service = TransactionService(
+        current_app.config['TRANSACTIONS'],
+        current_app.config['CATEGORIES'],
+        current_app.config['ACCOUNTS'],
+    )
+    try:
+        return jsonify(service.get_totals(
+            request.user_id,
+            _listing_filters(request.args),
+            tenant_id=request.tenant_id,
+        ))
+    except AppException as e:
         return jsonify(e.to_dict()), e.status_code
 
 

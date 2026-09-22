@@ -289,6 +289,24 @@ interface ReportOverviewParams {
   account_id?: string;
 }
 
+export interface TransactionStatusTotals {
+  count: number;
+  expense_total: number;
+  income_total: number;
+}
+
+export interface TransactionTotals {
+  count: number;
+  /** Soma dos valores absolutos das despesas, exceto canceladas. */
+  expense_total: number;
+  /** Soma das receitas/estornos, exceto canceladas. */
+  income_total: number;
+  net_total: number;
+  by_status: Record<'paid' | 'pending' | 'overdue' | 'cancelled', TransactionStatusTotals>;
+  excluded_statuses: string[];
+  complete: boolean;
+}
+
 // Funções de transações
 export const transactionsAPI = {
   getAll: (filters: Record<string, any> = {}, config?: { signal?: AbortSignal }) => {
@@ -311,6 +329,20 @@ export const transactionsAPI = {
       }
     });
     return api.get(`/transactions/facets?${params.toString()}`, config);
+  },
+  /**
+   * GET /transactions/totals: totais do conjunto filtrado completo (mesmos filtros de getAll,
+   * sem paginação). Cancelados ficam fora de expense_total/income_total. 503 = total não confirmado.
+   */
+  getTotals: (filters: Record<string, any> = {}, config?: { signal?: AbortSignal }) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach((key) => {
+      const value = filters[key];
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    return api.get<TransactionTotals>(`/transactions/totals?${params.toString()}`, config);
   },
   create: (transactionData: any) => api.post('/transactions', transactionData),
   update: (id: string, transactionData: any) => api.put(`/transactions/${id}`, transactionData),

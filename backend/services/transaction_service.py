@@ -1,8 +1,9 @@
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 import uuid
 import logging
-from utils.exceptions import ValidationException, NotFoundException
+from utils.exceptions import AppException, ValidationException, NotFoundException
 from utils.money_utils import parse_money_value
 from utils.date_utils import parse_date_value
 
@@ -83,6 +84,19 @@ def _resolve_transaction_tenant_ids(
     return (account_tenant_id, category_tenant_id)
 
 
+TOTALS_PAGE_SIZE = 500
+TOTALS_STATUSES = ('paid', 'pending', 'overdue', 'cancelled')
+_TOTALS_INCOMPLETE = 'Não foi possível confirmar o total completo. Tente novamente.'
+
+
+def _totals_unavailable(message: str = _TOTALS_INCOMPLETE) -> AppException:
+    return AppException(message, status_code=503)
+
+
+def _status_bucket() -> Dict[str, Any]:
+    return {'count': 0, 'expense_total': Decimal('0'), 'income_total': Decimal('0')}
+
+
 class TransactionService:
     def __init__(self, transaction_repo, categories_repo, accounts_repo):
         self.transaction_repo = transaction_repo
@@ -122,6 +136,93 @@ class TransactionService:
             transaction.pop('_id', None)
         result['data'] = data
         return result
+
+    def get_totals(
+        self,
+        user_id: str,
+        filters: Dict[str, Any],
+        tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Agrega o conjunto filtrado COMPLETO (mesmos filtros da listagem, sem paginação).
+
+        Valores são armazenados positivos e o sinal vem de `type`; somamos abs(amount)
+        por segurança. Cancelados entram em `count`/`by_status` mas não nos totais.
+        Pagina internamente com ordem estável (id) e confere total/ids a cada página:
+        qualquer inconsistência ou falha vira 503 — nunca um total parcial.
+        """
+        base = {k: v for k, v in (filters or {}).items() if k not in ('page', 'limit', 'sort')}
+        base['sort'] = 'id:asc'
+        by_status = {status: _status_bucket() for status in TOTALS_STATUSES}
+        seen = set()
+        total = None
+        page = 1
+        while True:
+            try:
+                result = self.transaction_repo.find_advanced(
+                    user_id,
+                    {**base, 'page': page, 'limit': TOTALS_PAGE_SIZE},
+                    tenant_id=tenant_id,
+                    raise_on_error=True,
+                )
+            except AppException:
+                raise
+            except Exception as exc:
+                logger.error(f'Falha ao agregar transações (página {page}): {exc}', exc_info=True)
+                raise _totals_unavailable()
+            rows = (result or {}).get('data') or []
+            reported_total = ((result or {}).get('pagination') or {}).get('total')
+            if not isinstance(reported_total, int) or isinstance(reported_total, bool) or reported_total < 0:
+                raise _totals_unavailable()
+            if total is None:
+                total = reported_total
+            elif reported_total != total:
+                raise _totals_unavailable('As transações mudaram durante a consulta. Atualize o total.')
+            for row in rows:
+                row_id = row.get('id') or row.get('_id')
+                if not row_id or row_id in seen:
+                    raise _totals_unavailable()
+                seen.add(row_id)
+                status = str(row.get('status') or 'pending').strip().lower()
+                if status == 'canceled':
+                    status = 'cancelled'
+                tx_type = row.get('type')
+                if status not in by_status or tx_type not in ('income', 'expense'):
+                    raise _totals_unavailable('Transação com situação ou tipo inválido no total.')
+                try:
+                    amount = abs(Decimal(str(row.get('amount') or 0)))
+                except (InvalidOperation, ValueError, TypeError):
+                    raise _totals_unavailable('Transação com valor inválido no total.')
+                if not amount.is_finite():
+                    raise _totals_unavailable('Transação com valor inválido no total.')
+                bucket = by_status[status]
+                bucket['count'] += 1
+                bucket['expense_total' if tx_type == 'expense' else 'income_total'] += amount
+            if len(seen) > total or (len(seen) < total and len(rows) != TOTALS_PAGE_SIZE):
+                raise _totals_unavailable()
+            if len(seen) == total:
+                break
+            page += 1
+
+        counted = [by_status[s] for s in TOTALS_STATUSES if s != 'cancelled']
+        expense_total = sum((b['expense_total'] for b in counted), Decimal('0'))
+        income_total = sum((b['income_total'] for b in counted), Decimal('0'))
+        return {
+            'count': total,
+            'expense_total': float(expense_total),
+            'income_total': float(income_total),
+            'net_total': float(income_total - expense_total),
+            'by_status': {
+                status: {
+                    'count': bucket['count'],
+                    'expense_total': float(bucket['expense_total']),
+                    'income_total': float(bucket['income_total']),
+                }
+                for status, bucket in by_status.items()
+            },
+            'excluded_statuses': ['cancelled'],
+            'complete': True,
+        }
 
     def create_transaction(self, user_id: str, data: Dict[str, Any], tenant_id: Optional[str] = None) -> Dict[str, Any]:
         if not tenant_id:
