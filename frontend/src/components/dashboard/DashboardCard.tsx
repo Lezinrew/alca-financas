@@ -1,3 +1,4 @@
+import type React from 'react';
 interface DashboardCardProps {
   title: string;
   value: string;

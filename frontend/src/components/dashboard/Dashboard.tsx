@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { KPICard } from './KPICard';
@@ -22,8 +22,9 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatCurrency, formatDate, dashboardAPI, accountsAPI } from '../../utils/api';
-import { fetchPayablesSummary, type PayablesSummary } from '../../utils/payablesSummary';
+import { loadPayablesSummary, formatMonthLabel } from '../../utils/payablesSummary';
 import { PayablesSummaryBlock } from '../shared/PayablesSummaryBlock';
+import { useKeyedRequest } from '../../hooks/useKeyedRequest';
 
 // Custom tooltip for line chart
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -59,37 +60,7 @@ const PieTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-const iconMap = {
-  wallet: Wallet,
-  'trending-up': TrendingUp,
-  'trending-down': TrendingDown,
-  'credit-card': CreditCard,
-};
-
-const variantMap = ['primary', 'success', 'danger', 'warning'] as const;
-
-// Cache curto (30s) para evitar requisições duplicadas ao trocar de aba ou por Strict Mode
-const CACHE_TTL_MS = 30_000;
-function getCachedDashboard(month: number, year: number): any {
-  const c = (window as any).__dashboardCache;
-  if (!c) return null;
-  if (c.key !== `${year}-${month}`) return null;
-  if (Date.now() - c.ts > CACHE_TTL_MS) return null;
-  return c.data;
-}
-function setCachedDashboard(month: number, year: number, data: any) {
-  (window as any).__dashboardCache = { key: `${year}-${month}`, data, ts: Date.now() };
-}
-
 // Tipos locais
-interface FinanceKPI {
-  title: string;
-  value: number;
-  change: number;
-  changeType: 'increase' | 'decrease';
-  icon: string;
-}
-
 interface MonthlyData {
   month: string;
   income: number;
@@ -104,195 +75,121 @@ interface CategoryExpense {
   percentage: number;
 }
 
+interface RecentTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: string;
+  category: string;
+  date: string;
+}
+
+interface DashboardView {
+  income: number;
+  expense: number;
+  monthlyData: MonthlyData[];
+  categories: CategoryExpense[];
+  recentTransactions: RecentTransaction[];
+}
+
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+const isAccountActive = (acc: any) => acc?.is_active !== false && acc?.active !== false;
+
+function mapDashboard(raw: any): DashboardView {
+  return {
+    income: raw?.summary?.total_income || 0,
+    expense: raw?.summary?.total_expense || 0,
+    monthlyData: (raw?.monthly_evolution || []).map((item: any) => ({
+      month: MONTH_NAMES[new Date(item.year, item.month - 1, 1).getMonth()],
+      income: item.income || 0,
+      expenses: item.expense || 0,
+      net: (item.income || 0) - (item.expense || 0),
+    })),
+    categories: (raw?.expense_by_category || []).map((item: any) => ({
+      name: item.category_name || 'Sem categoria',
+      value: item.total || 0,
+      color: item.category_color || '#6b7280',
+      percentage: item.percentage || 0,
+    })),
+    recentTransactions: (raw?.recent_transactions || []).map((tx: any) => ({
+      id: tx.id || tx._id,
+      description: tx.description,
+      amount: tx.amount,
+      type: tx.type,
+      category: tx.category?.name || 'Sem categoria',
+      date: tx.date,
+    })),
+  };
+}
+
+/** Texto de indisponibilidade com ação de retry, usado dentro de cada bloco. */
+const Unavailable = ({ onRetry, className = '' }: { onRetry: () => void; className?: string }) => (
+  <span role="alert" className={`inline-flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-200 ${className}`}>
+    Indisponível.
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onRetry(); }}
+      className="min-h-[32px] rounded-md border border-slate-300 px-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+    >
+      Tentar novamente
+    </button>
+  </span>
+);
+
+const BlockSkeleton = ({ className }: { className: string }) => (
+  <div role="status" aria-busy="true" aria-label="Carregando" className={`animate-pulse bg-slate-200 dark:bg-slate-700 rounded-xl ${className}`} />
+);
+
+const NEW_TRANSACTION_OPTIONS = [
+  { type: 'expense', label: 'Despesa', hint: 'Nova despesa', icon: 'bi-arrow-down-circle', color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
+  { type: 'income', label: 'Receita', hint: 'Nova receita', icon: 'bi-arrow-up-circle', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
+  { type: 'card_expense', label: 'Despesa de Cartão', hint: 'Nova despesa no cartão', icon: 'bi-credit-card', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
+  { type: 'transfer', label: 'Transferência', hint: 'Transferir entre contas', icon: 'bi-arrow-left-right', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
+] as const;
+
+type NewTransactionType = (typeof NEW_TRANSACTION_OPTIONS)[number]['type'];
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [showNewMenu, setShowNewMenu] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [financeData, setFinanceData] = useState<{
-    kpis: FinanceKPI[];
-    monthlyData: MonthlyData[];
-    categories: CategoryExpense[];
-    recentTransactions: any[];
-  } | null>(null);
-  const [payablesSummary, setPayablesSummary] = useState<PayablesSummary | null>(null);
-  const cancelledRef = useRef(false);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const firstMenuItemRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!isAuthenticated || authLoading) return;
+  // Mês exibido: fixado na montagem para que os três blocos usem a mesma competência.
+  const [{ month, year }] = useState(() => {
+    const now = new Date();
+    return { month: now.getMonth() + 1, year: now.getFullYear() };
+  });
+  const [revision, setRevision] = useState(0);
+  const retry = () => setRevision((r) => r + 1);
 
-    cancelledRef.current = false;
-    const month = new Date().getMonth() + 1;
-    const year = new Date().getFullYear();
+  const enabled = isAuthenticated && !authLoading;
+  const key = `${year}-${month}:${revision}`;
 
-    // Usa cache se tiver dados recentes (evita duplicar requisições no Strict Mode / navegação)
-    const cached = getCachedDashboard(month, year);
-    if (cached) {
-      if (cached.financeData) {
-        setFinanceData(cached.financeData);
-        setPayablesSummary(cached.payablesSummary ?? null);
-      } else {
-        setFinanceData(cached);
-        setPayablesSummary(null);
-      }
-      setLoading(false);
-      setError('');
-      return;
-    }
+  const dashboard = useKeyedRequest<any>(key, enabled, (signal) =>
+    dashboardAPI.getAdvanced(month.toString(), year.toString(), true, { signal }),
+  );
+  const accounts = useKeyedRequest<any[]>(key, enabled, (signal) => accountsAPI.getAll({ signal }));
+  const payables = useKeyedRequest(key, enabled, async (signal) => ({ data: await loadPayablesSummary(month, year, signal) }));
 
-    const controller = new AbortController();
-    loadDashboardData(month, year, controller.signal, () => cancelledRef.current);
-
-    return () => {
-      cancelledRef.current = true;
-      controller.abort();
+  const view = useMemo(() => (dashboard.data ? mapDashboard(dashboard.data) : null), [dashboard.data]);
+  const accountsView = useMemo(() => {
+    if (!accounts.data) return null;
+    const list = Array.isArray(accounts.data) ? accounts.data : [];
+    const active = list.filter(isAccountActive);
+    return {
+      totalBalance: active
+        .filter((acc: any) => acc.type !== 'credit_card')
+        .reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0),
+      creditCardCount: active.filter((acc: any) => acc.type === 'credit_card').length,
     };
-  }, [isAuthenticated, authLoading]);
+  }, [accounts.data]);
 
-  const loadDashboardData = async (
-    month: number,
-    year: number,
-    signal: AbortSignal,
-    isCancelled: () => boolean
-  ) => {
-    try {
-      setLoading(true);
-      setError('');
+  const monthLabel = formatMonthLabel(month, year);
 
-      // Dashboard + contas + resumo contas a pagar (competência do mês)
-      const [dashboardRes, accountsRes, payablesSnap] = await Promise.all([
-        dashboardAPI.getAdvanced(month.toString(), year.toString(), true, { signal }),
-        accountsAPI.getAll({ signal }).then((res) => res.data).catch(() => []),
-        fetchPayablesSummary(month, year),
-      ]);
-
-      if (isCancelled()) return;
-      setPayablesSummary(payablesSnap);
-
-      const dashboardData = dashboardRes.data;
-      const accounts = Array.isArray(accountsRes) ? accountsRes : [];
-
-      const isAccountActive = (acc: any) => acc?.is_active !== false && acc?.active !== false;
-
-      // Filtrar apenas cartões de crédito ativos
-      const creditCards = accounts.filter((acc: any) => 
-        acc.type === 'credit_card' && isAccountActive(acc)
-      );
-
-      // Calcula saldo total das contas ativas (excluindo cartões de crédito)
-      const totalBalance = accounts
-        .filter((acc: any) => isAccountActive(acc) && acc.type !== 'credit_card')
-        .reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0);
-
-      // Calcula variação de receitas e despesas (comparando com mês anterior)
-      const currentIncome = dashboardData.summary?.total_income || 0;
-      const currentExpense = dashboardData.summary?.total_expense || 0;
-
-      // Para calcular variação, precisaríamos dos dados do mês anterior
-      // Por enquanto, deixamos como 0
-      const incomeChange = 0;
-      const expenseChange = 0;
-
-      // Mapeia KPIs
-      const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
-        month: 'short',
-        year: 'numeric',
-      });
-      const kpis: FinanceKPI[] = [
-        {
-          title: 'Saldo atual (contas)',
-          value: totalBalance,
-          change: 0,
-          changeType: 'increase',
-          icon: 'wallet',
-        },
-        {
-          title: `Receitas (${monthLabel})`,
-          value: currentIncome,
-          change: incomeChange,
-          changeType: 'increase',
-          icon: 'trending-up',
-        },
-        {
-          title: `Despesas (${monthLabel})`,
-          value: currentExpense,
-          change: expenseChange,
-          changeType: 'decrease',
-          icon: 'trending-down',
-        },
-        {
-          title: 'Cartões de Crédito',
-          value: Math.max(0, creditCards.length), // Garante que seja sempre um número não-negativo
-          change: 0,
-          changeType: 'increase',
-          icon: 'credit-card',
-        },
-      ];
-
-      // Mapeia dados mensais (últimos 12 meses)
-      const monthlyData: MonthlyData[] = (dashboardData.monthly_evolution || []).map((item: any) => {
-        const date = new Date(item.year, item.month - 1, 1);
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        return {
-          month: monthNames[date.getMonth()],
-          income: item.income || 0,
-          expenses: item.expense || 0,
-          net: (item.income || 0) - (item.expense || 0),
-        };
-      });
-
-      // Mapeia categorias de despesas para o gráfico de pizza
-      const categories: CategoryExpense[] = (dashboardData.expense_by_category || []).map((item: any) => ({
-        name: item.category_name || 'Sem categoria',
-        value: item.total || 0,
-        color: item.category_color || '#6b7280',
-        percentage: item.percentage || 0,
-      }));
-
-      // Mapeia transações recentes
-      const recentTransactions = (dashboardData.recent_transactions || []).map((tx: any) => ({
-        id: tx.id || tx._id,
-        description: tx.description,
-        amount: tx.amount,
-        type: tx.type,
-        category: tx.category?.name || 'Sem categoria',
-        date: tx.date,
-      }));
-
-      const nextData = { kpis, monthlyData, categories, recentTransactions };
-      if (isCancelled()) return;
-      setCachedDashboard(month, year, { financeData: nextData, payablesSummary: payablesSnap });
-      setFinanceData(nextData);
-    } catch (err: any) {
-      if (isCancelled()) return;
-      // Ignora erro de cancelamento (navegação ou Strict Mode)
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
-      const url = err?.config?.url ?? err?.request?.responseURL ?? '?';
-      const status = err?.response?.status;
-      console.error('Load dashboard error:', err);
-      if (url !== '?') console.warn(`[Dashboard] Requisição falhou (${status ?? 'network'}):`, url);
-      setError('Erro ao carregar dados do dashboard');
-
-      // Define dados vazios em caso de erro
-      setPayablesSummary(null);
-      setFinanceData({
-        kpis: [
-          { title: 'Saldo atual (contas)', value: 0, change: 0, changeType: 'increase', icon: 'wallet' },
-          { title: 'Receitas', value: 0, change: 0, changeType: 'increase', icon: 'trending-up' },
-          { title: 'Despesas', value: 0, change: 0, changeType: 'decrease', icon: 'trending-down' },
-          { title: 'Cartões de Crédito', value: 0, change: 0, changeType: 'increase', icon: 'credit-card' },
-        ],
-        monthlyData: [],
-        categories: [],
-        recentTransactions: [],
-      });
-    } finally {
-      if (!isCancelled()) setLoading(false);
-    }
-  };
-
-  const handleNewTransaction = (type: 'expense' | 'income' | 'card_expense' | 'transfer') => {
+  const handleNewTransaction = (type: NewTransactionType) => {
     setShowNewMenu(false);
     // Navega para a página de transações com o tipo pré-selecionado
     navigate('/transactions', {
@@ -305,21 +202,28 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Fecha o menu ao clicar fora
+  // Fecha o menu ao clicar fora ou com Escape; foco vai para o primeiro item ao abrir e volta ao botão ao fechar
   useEffect(() => {
+    if (!showNewMenu) return;
+    firstMenuItemRef.current?.focus();
     const handleClickOutside = (event: MouseEvent) => {
-      if (showNewMenu && !(event.target as HTMLElement).closest('.new-transaction-menu')) {
+      if (!(event.target as HTMLElement).closest('.new-transaction-menu')) setShowNewMenu(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         setShowNewMenu(false);
+        fabRef.current?.focus();
       }
     };
-
-    if (showNewMenu) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [showNewMenu]);
 
-  if (authLoading || loading || !financeData) {
+  if (authLoading) {
     return (
       <div className="animate-pulse space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -327,42 +231,26 @@ const Dashboard: React.FC = () => {
             <div key={i} className="h-32 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="h-96 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-          <div className="h-96 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-        </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="card-base p-6">
-        <div className="text-center">
-          <i className="bi bi-exclamation-triangle text-4xl text-red-500 mb-3 block"></i>
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button
-            onClick={() => {
-              const currentMonth = new Date().getMonth() + 1;
-              const currentYear = new Date().getFullYear();
-              const controller = new AbortController();
-              loadDashboardData(currentMonth, currentYear, controller.signal, () => false);
-            }}
-            className="mt-4 btn-base bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const openTransactions = (filterType: 'income' | 'expense') =>
+    navigate('/transactions', { state: { filterType, datePreset: 'this_month' } });
+
+  const accountsNote = accounts.error
+    ? <span role="alert" className="inline-flex flex-wrap items-center gap-2">Contas indisponíveis. <button type="button" onClick={(e) => { e.stopPropagation(); retry(); }} className="min-h-[32px] rounded-md border border-slate-300 px-2 text-sm font-medium dark:border-slate-600">Tentar novamente</button></span>
+    : undefined;
+  const dashboardNote = dashboard.error ? <Unavailable onRetry={retry} /> : undefined;
+  const pending = '…';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-40">
       {/* Botão Novo - Fixo no canto inferior direito (ajustado para não sobrepor o chatbot) */}
       <div className="fixed bottom-24 right-8 z-40 new-transaction-menu">
         <div className="relative">
           <button
+            ref={fabRef}
             type="button"
             onClick={(e) => {
               e.preventDefault();
@@ -371,83 +259,36 @@ const Dashboard: React.FC = () => {
             }}
             className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110"
             aria-label="Nova transação"
+            aria-haspopup="menu"
+            aria-expanded={showNewMenu}
           >
             <i className="bi bi-plus-lg text-2xl"></i>
           </button>
 
           {showNewMenu && (
-            <div className="dropdown-menu absolute bottom-full right-0 mb-3 w-56 py-2 z-50">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleNewTransaction('expense');
-                }}
-                className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                  <i className="bi bi-arrow-down-circle text-red-600 dark:text-red-400 text-lg"></i>
-                </div>
-                <div>
-                  <div className="font-medium">Despesa</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Nova despesa</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleNewTransaction('income');
-                }}
-                className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
-                  <i className="bi bi-arrow-up-circle text-emerald-600 dark:text-emerald-400 text-lg"></i>
-                </div>
-                <div>
-                  <div className="font-medium">Receita</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Nova receita</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleNewTransaction('card_expense');
-                }}
-                className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                  <i className="bi bi-credit-card text-blue-600 dark:text-blue-400 text-lg"></i>
-                </div>
-                <div>
-                  <div className="font-medium">Despesa de Cartão</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Nova despesa no cartão</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleNewTransaction('transfer');
-                }}
-                className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
-                  <i className="bi bi-arrow-left-right text-purple-600 dark:text-purple-400 text-lg"></i>
-                </div>
-                <div>
-                  <div className="font-medium">Transferência</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Transferir entre contas</div>
-                </div>
-              </button>
+            <div role="menu" aria-label="Nova transação" className="dropdown-menu absolute bottom-full right-0 mb-3 w-56 py-2 z-50">
+              {NEW_TRANSACTION_OPTIONS.map((option, index) => (
+                <button
+                  key={option.type}
+                  ref={index === 0 ? firstMenuItemRef : undefined}
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleNewTransaction(option.type);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                >
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${option.color}`}>
+                    <i className={`bi ${option.icon} text-lg`}></i>
+                  </div>
+                  <div>
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{option.hint}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -455,49 +296,41 @@ const Dashboard: React.FC = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {financeData.kpis.map((kpi, index) => {
-          const titleLower = kpi.title.toLowerCase();
-          let onClickHandler: (() => void) | undefined;
-
-          if (titleLower.includes('saldo')) {
-            onClickHandler = () => navigate('/accounts');
-          } else if (titleLower.includes('receita')) {
-            onClickHandler = () =>
-              navigate('/transactions', {
-                state: { filterType: 'income', datePreset: 'year_to_date' },
-              });
-          } else if (titleLower.includes('despesa')) {
-            onClickHandler = () =>
-              navigate('/transactions', {
-                state: { filterType: 'expense', datePreset: 'year_to_date' },
-              });
-          } else if (titleLower.includes('cartão') || titleLower.includes('cartões') || titleLower.includes('cartao') || titleLower.includes('cartaes') || (titleLower.includes('cart') && titleLower.includes('crédito'))) {
-            onClickHandler = () => navigate('/credit-cards');
-          }
-
-          // Determina se é contagem (cartões) ou valor monetário
-          const isCount =
-            titleLower.includes('cartão') ||
-            titleLower.includes('cartões') ||
-            titleLower.includes('cartao') ||
-            titleLower.includes('cartaes');
-          
-          return (
-            <KPICard
-              key={kpi.title}
-              title={kpi.title}
-              value={isCount ? Math.floor(kpi.value).toString() : formatCurrency(kpi.value)}
-              change={kpi.change}
-              changeType={kpi.changeType}
-              icon={iconMap[kpi.icon as keyof typeof iconMap] || Wallet}
-              variant={variantMap[index]}
-              onClick={onClickHandler}
-            />
-          );
-        })}
+        <KPICard
+          title="Saldo hoje (contas)"
+          value={accounts.error ? '—' : accountsView ? formatCurrency(accountsView.totalBalance) : pending}
+          note={accountsNote}
+          icon={Wallet}
+          variant="primary"
+          onClick={() => navigate('/accounts')}
+        />
+        <KPICard
+          title={`Receitas · ${monthLabel}`}
+          value={dashboard.error ? '—' : view ? formatCurrency(view.income) : pending}
+          note={dashboardNote}
+          icon={TrendingUp}
+          variant="success"
+          onClick={() => openTransactions('income')}
+        />
+        <KPICard
+          title={`Despesas · ${monthLabel}`}
+          value={dashboard.error ? '—' : view ? formatCurrency(view.expense) : pending}
+          note={dashboardNote}
+          icon={TrendingDown}
+          variant="danger"
+          onClick={() => openTransactions('expense')}
+        />
+        <KPICard
+          title="Cartões de crédito"
+          value={accounts.error ? '—' : accountsView ? String(accountsView.creditCardCount) : pending}
+          note={accountsNote}
+          icon={CreditCard}
+          variant="warning"
+          onClick={() => navigate('/credit-cards')}
+        />
       </div>
 
-      <PayablesSummaryBlock summary={payablesSummary} titleId="dashboard-payables-title" />
+      <PayablesSummaryBlock summary={payables.data} loading={payables.loading} onRetry={retry} titleId="dashboard-payables-title" />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -508,7 +341,11 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-slate-600 dark:text-slate-400">Últimos 12 meses</p>
           </div>
           <div>
-            {financeData.monthlyData.length === 0 ? (
+            {dashboard.loading ? (
+              <BlockSkeleton className="h-80" />
+            ) : dashboard.error || !view ? (
+              <div className="h-80 flex items-center justify-center"><Unavailable onRetry={retry} /></div>
+            ) : view.monthlyData.length === 0 ? (
               <div className="h-80 flex items-center justify-center">
                 <div className="text-center">
                   <i className="bi bi-graph-up text-4xl text-slate-300 dark:text-slate-600 mb-3 block"></i>
@@ -519,7 +356,7 @@ const Dashboard: React.FC = () => {
             ) : (
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={financeData.monthlyData}>
+                  <AreaChart data={view.monthlyData}>
                     <defs>
                       <linearGradient id="income" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -546,7 +383,7 @@ const Dashboard: React.FC = () => {
                       className="dark:[&_text]:fill-slate-400"
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend />
+                    <Legend formatter={(value) => <span className="text-sm text-slate-700 dark:text-slate-300">{value}</span>} />
                     <Area
                       type="monotone"
                       dataKey="income"
@@ -577,7 +414,11 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-slate-600 dark:text-slate-400">Distribuição das despesas</p>
           </div>
           <div>
-            {financeData.categories.length === 0 ? (
+            {dashboard.loading ? (
+              <BlockSkeleton className="h-80" />
+            ) : dashboard.error || !view ? (
+              <div className="h-80 flex items-center justify-center"><Unavailable onRetry={retry} /></div>
+            ) : view.categories.length === 0 ? (
               <div className="h-80 flex items-center justify-center">
                 <div className="text-center">
                   <i className="bi bi-pie-chart text-4xl text-slate-300 dark:text-slate-600 mb-3 block"></i>
@@ -590,7 +431,7 @@ const Dashboard: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={financeData.categories}
+                      data={view.categories}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -598,7 +439,7 @@ const Dashboard: React.FC = () => {
                       paddingAngle={2}
                       dataKey="value"
                     >
-                      {financeData.categories.map((entry, index) => (
+                      {view.categories.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -607,8 +448,8 @@ const Dashboard: React.FC = () => {
                       verticalAlign="bottom"
                       height={36}
                       formatter={(value, entry: any) => (
-                        <span className="text-sm text-slate-600">
-                          {value} ({entry.payload.percentage.toFixed(1)}%)
+                        <span className="text-sm text-slate-700 dark:text-slate-300">
+                          {value} ({Number(entry?.payload?.percentage ?? 0).toFixed(1)}%)
                         </span>
                       )}
                     />
@@ -627,32 +468,42 @@ const Dashboard: React.FC = () => {
           <p className="text-sm text-slate-600 dark:text-slate-400">Últimas movimentações da conta</p>
         </div>
         <div>
-          <div className="space-y-2">
-            {financeData.recentTransactions.slice(0, 5).map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${transaction.type === 'income' ? 'bg-emerald-50' : 'bg-red-50'
+          {dashboard.loading ? (
+            <BlockSkeleton className="h-40" />
+          ) : dashboard.error || !view ? (
+            <div className="py-6 flex justify-center"><Unavailable onRetry={retry} /></div>
+          ) : view.recentTransactions.length === 0 ? (
+            <p className="py-6 text-center text-slate-500 dark:text-slate-400">Nenhuma transação recente</p>
+          ) : (
+            <div className="space-y-2">
+              {view.recentTransactions.slice(0, 5).map((transaction) => (
+                <div key={transaction.id} className="flex items-center justify-between p-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      transaction.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-900/30' : 'bg-red-50 dark:bg-red-900/30'
                     }`}>
-                    {transaction.type === 'income' ? (
-                      <TrendingUp className="w-5 h-5 text-emerald-600" />
-                    ) : (
-                      <TrendingDown className="w-5 h-5 text-red-600" />
-                    )}
+                      {transaction.type === 'income' ? (
+                        <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.description}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {transaction.category} • {formatDate(transaction.date)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.description}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {transaction.category} • {formatDate(transaction.date)}
-                    </p>
-                  </div>
-                </div>
-                <div className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+                  <div className={`text-lg font-semibold ${
+                    transaction.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
                   }`}>
-                  {transaction.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(Number(transaction.amount) || 0))}
+                    {transaction.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(Number(transaction.amount) || 0))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
