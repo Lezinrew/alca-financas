@@ -25,7 +25,7 @@ const AppShell = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [sidebarHidden, setSidebarHidden] = useState(() => window.innerWidth < 1024);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const navItems = [

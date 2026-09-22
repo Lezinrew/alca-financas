@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
-from utils.exceptions import NotFoundException, ValidationException
+from utils.exceptions import AppException, NotFoundException, ValidationException
 from utils.financial_expense_category_map import map_category_name_to_payable
 from services.transaction_service import _category_for
 
@@ -90,11 +90,31 @@ class FinancialExpenseService:
         page: int = 1,
         per_page: int = 50,
     ) -> Dict[str, Any]:
+        filters = self._list_filters(query)
+        result = self.repo.list_for_tenant(
+            user_id, tenant_id, filters, page=page, per_page=per_page
+        )
+        data = [enrich_expense(r) for r in result.get("data") or []]
+        return {"data": data, "pagination": result.get("pagination") or {}}
+
+    @staticmethod
+    def _period_value(value: Any, field: str, minimum: int, maximum: int) -> int:
+        try:
+            parsed = int(str(value))
+        except (TypeError, ValueError):
+            raise ValidationException(f"{field} inválido")
+        if not minimum <= parsed <= maximum:
+            raise ValidationException(f"{field} deve estar entre {minimum} e {maximum}")
+        return parsed
+
+    def _list_filters(self, query: Dict[str, Any]) -> Dict[str, Any]:
         filters: Dict[str, Any] = {}
-        if query.get("month"):
-            filters["month"] = query["month"]
-        if query.get("year"):
-            filters["year"] = query["year"]
+        if query.get("month") not in (None, ""):
+            filters["month"] = self._period_value(query["month"], "month", 1, 12)
+            if not query.get("year"):
+                raise ValidationException("year é obrigatório quando month é informado")
+        if query.get("year") not in (None, ""):
+            filters["year"] = self._period_value(query["year"], "year", 2000, 2100)
         if query.get("status"):
             st = str(query["status"]).strip().lower()
             if st == "overdue":
@@ -115,11 +135,106 @@ class FinancialExpenseService:
         if query.get("outstanding_only") in (True, "true", "1", "yes"):
             filters["outstanding_only"] = True
 
-        result = self.repo.list_for_tenant(
-            user_id, tenant_id, filters, page=page, per_page=per_page
+        return filters
+
+    def get_overview(
+        self, user_id: str, tenant_id: str, query: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Aggregate the complete filtered population, independently of table pagination."""
+        filters = self._list_filters(query)
+        today = _today_iso()
+        reference_month = self._period_value(
+            query.get("reference_month") or filters.get("month") or today[5:7],
+            "reference_month", 1, 12,
         )
-        data = [enrich_expense(r) for r in result.get("data") or []]
-        return {"data": data, "pagination": result.get("pagination") or {}}
+        reference_year = self._period_value(
+            query.get("reference_year") or filters.get("year") or today[:4],
+            "reference_year", 2000, 2100,
+        )
+        reference = f"{reference_year:04d}-{reference_month:02d}"
+        # Freeze the date used by overdue filtering across every page.
+        filters["as_of"] = today
+        filters["stable_order"] = True
+        counts = {status: 0 for status in ("pending", "partial", "paid", "canceled", "overdue")}
+        groups = {
+            key: {"count": 0, "remaining": Decimal("0")}
+            for key in ("before", "month", "after", "undated")
+        }
+        competency_groups = {
+            key: {"count": 0, "remaining": Decimal("0")}
+            for key in ("before", "month", "after", "undated")
+        }
+        expected = paid = remaining = Decimal("0")
+        seen = set()
+        total = None
+        page = 1
+        page_size = 200
+        while True:
+            result = self.repo.list_for_tenant(
+                user_id, tenant_id, filters, page=page, per_page=page_size
+            )
+            rows = result.get("data") or []
+            reported_total = result.get("pagination", {}).get("total")
+            if not isinstance(reported_total, int) or reported_total < 0:
+                raise AppException("Não foi possível confirmar o resumo completo", status_code=503)
+            if total is None:
+                total = reported_total
+            if reported_total != total:
+                raise AppException("As contas mudaram durante a consulta. Atualize o resumo", status_code=503)
+            for row in rows:
+                row_id = row.get("id")
+                if not row_id or row_id in seen:
+                    raise AppException("Não foi possível confirmar o resumo completo", status_code=503)
+                seen.add(row_id)
+                status = row.get("status") or "pending"
+                if status not in STORED_STATUSES:
+                    raise AppException("Conta com situação inválida no resumo", status_code=503)
+                counts[status] += 1
+                if status == "canceled":
+                    continue
+                row_expected = _to_decimal(row.get("amount_expected"), "amount_expected")
+                row_paid = _to_decimal(row.get("amount_paid"), "amount_paid")
+                if not row_expected.is_finite() or not row_paid.is_finite():
+                    raise AppException("Conta com valor inválido no resumo", status_code=503)
+                expected += row_expected
+                paid += row_paid
+                if status in ("pending", "partial"):
+                    row_remaining = max(Decimal("0"), row_expected - row_paid)
+                    remaining += row_remaining
+                    due = row.get("due_date")
+                    if due and str(due) < today:
+                        counts["overdue"] += 1
+                    due_month = str(due)[:7] if due else None
+                    group = ("undated" if not due_month else
+                             "before" if due_month < reference else
+                             "after" if due_month > reference else "month")
+                    groups[group]["count"] += 1
+                    groups[group]["remaining"] += row_remaining
+                    cm, cy = row.get("competency_month"), row.get("competency_year")
+                    competency = f"{int(cy):04d}-{int(cm):02d}" if cm and cy else None
+                    competency_group = ("undated" if not competency else
+                                        "before" if competency < reference else
+                                        "after" if competency > reference else "month")
+                    competency_groups[competency_group]["count"] += 1
+                    competency_groups[competency_group]["remaining"] += row_remaining
+            if len(seen) > total or (len(seen) < total and len(rows) != page_size):
+                raise AppException("Não foi possível confirmar o resumo completo", status_code=503)
+            if len(seen) == total:
+                break
+            page += 1
+        return {
+            "expected": float(expected), "paid": float(paid), "remaining": float(remaining),
+            "total": total, "counts": counts,
+            "due_groups": {
+                key: {"count": group["count"], "remaining": float(group["remaining"])}
+                for key, group in groups.items()
+            },
+            "competency_groups": {
+                key: {"count": group["count"], "remaining": float(group["remaining"])}
+                for key, group in competency_groups.items()
+            },
+            "complete": True, "as_of": today,
+        }
 
     def get_summary(
         self,
@@ -134,6 +249,8 @@ class FinancialExpenseService:
         OTIMIZAÇÃO: Faz 1 query única ao invés de 5 queries separadas.
         Retorna contadores (paid, open, overdue, canceled) e somas agregadas.
         """
+        month = self._period_value(month, "month", 1, 12)
+        year = self._period_value(year, "year", 2000, 2100)
         # Busca todas as despesas do mês/ano (limite alto para pegar tudo)
         filters = {"month": str(month), "year": str(year)}
         result = self.repo.list_for_tenant(
@@ -302,7 +419,8 @@ class FinancialExpenseService:
         payload.pop("tenant_id", None)
         payload.pop("id", None)
         payload.pop("created_at", None)
-        self.repo.update_row(expense_id, payload)
+        if not self.repo.update_row(expense_id, payload):
+            raise AppException("Não foi possível atualizar a conta", status_code=503)
         row = self.repo.find_by_id_for_tenant(expense_id, user_id, tenant_id)
         return enrich_expense(row or existing)
 
@@ -310,7 +428,8 @@ class FinancialExpenseService:
         existing = self.repo.find_by_id_for_tenant(expense_id, user_id, tenant_id)
         if not existing:
             raise NotFoundException("Despesa não encontrada")
-        self.repo.delete_row(expense_id)
+        if not self.repo.delete_row(expense_id):
+            raise AppException("Não foi possível excluir a conta", status_code=503)
 
     def mark_paid(
         self,
@@ -349,7 +468,8 @@ class FinancialExpenseService:
             "paid_at": paid_at_val,
             "status": new_status,
         }
-        self.repo.update_row(expense_id, update_payload)
+        if not self.repo.update_row(expense_id, update_payload):
+            raise AppException("Não foi possível registrar o pagamento", status_code=503)
         row = self.repo.find_by_id_for_tenant(expense_id, user_id, tenant_id)
         return enrich_expense(row or existing)
 

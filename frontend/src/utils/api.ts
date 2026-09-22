@@ -523,8 +523,22 @@ export interface FinancialExpenseListResponse {
   pagination: { total: number; page: number; per_page: number; pages: number };
 }
 
+export interface ExpenseOverview {
+  expected: number;
+  paid: number;
+  remaining: number;
+  total: number;
+  counts: Record<FinancialExpenseStoredStatus | 'overdue', number>;
+  due_groups: Record<'before' | 'month' | 'after' | 'undated', { count: number; remaining: number }>;
+  competency_groups: Record<'before' | 'month' | 'after' | 'undated', { count: number; remaining: number }>;
+  complete: boolean;
+  as_of: string;
+}
+
+export type ExpenseQuery = Record<string, string | number | boolean | undefined>;
+
 export const financialExpensesAPI = {
-  list: (filters: Record<string, string | number | boolean | undefined> = {}) => {
+  list: (filters: ExpenseQuery = {}, config?: { signal?: AbortSignal }) => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
@@ -532,8 +546,10 @@ export const financialExpensesAPI = {
       }
     });
     const q = params.toString();
-    return api.get<FinancialExpenseListResponse>(`/financial-expenses${q ? `?${q}` : ''}`);
+    return api.get<FinancialExpenseListResponse>(`/financial-expenses${q ? `?${q}` : ''}`, config);
   },
+  overview: (filters: ExpenseQuery, config?: { signal?: AbortSignal }) =>
+    api.get<ExpenseOverview>('/financial-expenses/overview', { ...config, params: filters }),
   get: (id: string) => api.get<FinancialExpense>(`/financial-expenses/${id}`),
   create: (data: Record<string, unknown>) => api.post<FinancialExpense>('/financial-expenses', data),
   update: (id: string, data: Record<string, unknown>) =>

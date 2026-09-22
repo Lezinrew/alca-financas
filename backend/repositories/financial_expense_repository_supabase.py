@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from database.connection import get_supabase
+from utils.exceptions import AppException
 from .base_repository_supabase import BaseRepository
 
 
@@ -31,8 +32,8 @@ class FinancialExpenseRepository(BaseRepository):
             if res.data:
                 return res.data[0]
             return None
-        except Exception:
-            return None
+        except Exception as exc:
+            raise AppException("Não foi possível consultar a conta", status_code=503) from exc
 
     def list_for_tenant(
         self,
@@ -76,7 +77,7 @@ class FinancialExpenseRepository(BaseRepository):
                     ir = ir.lower() in ("1", "true", "yes")
                 query = query.eq("is_recurring", bool(ir))
 
-            today_iso = date.today().isoformat()
+            today_iso = filters.get("as_of") or date.today().isoformat()
             if filters.get("overdue_only"):
                 query = query.in_("status", ["pending", "partial"]).lt(
                     "due_date", today_iso
@@ -85,10 +86,14 @@ class FinancialExpenseRepository(BaseRepository):
             if filters.get("outstanding_only"):
                 query = query.in_("status", ["pending", "partial"])
 
-            if filters.get("outstanding_only"):
+            if filters.get("stable_order"):
+                query = query.order("id", desc=False)
+            elif filters.get("outstanding_only"):
                 query = query.order("due_date", desc=False)
+                query = query.order("id", desc=False)
             else:
                 query = query.order("created_at", desc=True)
+                query = query.order("id", desc=False)
 
             offset = (page - 1) * per_page
             query = query.range(offset, offset + per_page - 1)
@@ -110,15 +115,7 @@ class FinancialExpenseRepository(BaseRepository):
             import logging
 
             logging.error("Erro ao listar financial_expenses: %s", e)
-            return {
-                "data": [],
-                "pagination": {
-                    "total": 0,
-                    "page": page,
-                    "per_page": per_page,
-                    "pages": 0,
-                },
-            }
+            raise AppException("Não foi possível consultar as contas. Tente novamente", status_code=503) from e
 
     def create_row(self, data: Dict[str, Any]) -> str:
         return self.create(data)

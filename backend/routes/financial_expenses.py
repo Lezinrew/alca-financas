@@ -103,6 +103,29 @@ def create_from_transactions():
 
 # IMPORTANTE: Rotas específicas devem vir ANTES de rotas com parâmetros variáveis
 # para evitar conflitos de roteamento (ex: /summary seria capturado por /<expense_id>)
+@bp.route("/overview", methods=["GET"])
+@require_auth
+@limiter.limit("200 per hour")
+@require_tenant
+def get_overview():
+    """Complete aggregates for the same filters as the list, without pagination."""
+    svc = _service()
+    if not svc:
+        return jsonify({"error": "Módulo de despesas não disponível"}), 503
+    query = {
+        key: request.args.get(key)
+        for key in (
+            "month", "year", "status", "category", "responsible", "is_recurring",
+            "outstanding_only", "reference_month", "reference_year",
+        )
+        if request.args.get(key) not in (None, "")
+    }
+    try:
+        return jsonify(svc.get_overview(request.user_id, request.tenant_id, query))
+    except ValidationException as e:
+        return jsonify(e.to_dict()), e.status_code
+
+
 @bp.route("/summary", methods=["GET"])
 @require_auth
 @limiter.limit("200 per hour")
