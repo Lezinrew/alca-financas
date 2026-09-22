@@ -116,6 +116,12 @@ const Profile = () => {
     confirmPassword: ''
   });
 
+  // Conferência em tempo real: só avalia depois que a confirmação começa a ser digitada.
+  const confirmStatus: 'empty' | 'mismatch' | 'match' = !passwordData.confirmPassword
+    ? 'empty'
+    : passwordData.confirmPassword === passwordData.newPassword ? 'match' : 'mismatch';
+  const confirmError = fieldErrors.confirmPassword || (confirmStatus === 'mismatch' ? 'As senhas não coincidem.' : '');
+
   const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
     const name = e.target.name as keyof PasswordData;
     setPasswordData(prev => ({ ...prev, [name]: e.target.value }));
@@ -302,6 +308,9 @@ const Profile = () => {
             </div>
             <div className="p-6">
               <form onSubmit={handlePasswordSubmit} noValidate aria-busy={passwordLoading}>
+                {/* Campo de usuário oculto: permite ao navegador e ao gerenciador de senhas
+                    associar a nova senha à conta correta. */}
+                <input type="text" name="username" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
                 <div className="space-y-4">
                   <div>
                     <label htmlFor="profile-current-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Senha Atual</label>
@@ -350,19 +359,20 @@ const Profile = () => {
                         id="profile-confirm-password"
                         name="confirmPassword"
                         autoComplete="new-password"
-                        className="input-base w-full"
+                        className={`input-base w-full ${confirmError ? 'profile-input-invalid' : confirmStatus === 'match' ? 'profile-input-valid' : ''}`}
                         value={passwordData.confirmPassword}
                         onChange={handlePasswordChange}
                         required
                         disabled={passwordLoading}
                         minLength={MIN_PASSWORD_LENGTH}
                         placeholder="Confirme a nova senha"
-                        aria-invalid={Boolean(fieldErrors.confirmPassword)}
-                        aria-describedby={fieldErrors.confirmPassword ? 'profile-confirm-password-error' : undefined}
+                        aria-invalid={Boolean(confirmError)}
+                        aria-describedby="profile-confirm-password-status"
                       />
-                      {fieldErrors.confirmPassword && (
-                        <p id="profile-confirm-password-error" className="profile-field-error" role="alert">{fieldErrors.confirmPassword}</p>
-                      )}
+                      <p id="profile-confirm-password-status" aria-live="polite"
+                        className={confirmError ? 'profile-field-error' : confirmStatus === 'match' ? 'profile-field-ok' : 'sr-only'}>
+                        {confirmError || (confirmStatus === 'match' ? 'As senhas conferem.' : '')}
+                      </p>
                     </div>
                   </div>
                 </div>

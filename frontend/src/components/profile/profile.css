@@ -10,3 +10,10 @@
 }
 .profile-field-error { margin: .375rem 0 0; font-size: .875rem; color: #b91c1c; }
 .dark .profile-field-error { color: #fecaca; }
+/* Confirmação de senha: vermelho enquanto diferente, verde quando confere (cor + texto, não só cor). */
+.profile-input-invalid, .profile-input-invalid:focus { border-color: #dc2626 !important; box-shadow: 0 0 0 1px #dc2626; }
+.dark .profile-input-invalid, .dark .profile-input-invalid:focus { border-color: #f87171 !important; box-shadow: 0 0 0 1px #f87171; }
+.profile-input-valid, .profile-input-valid:focus { border-color: #059669 !important; box-shadow: 0 0 0 1px #059669; }
+.dark .profile-input-valid, .dark .profile-input-valid:focus { border-color: #34d399 !important; box-shadow: 0 0 0 1px #34d399; }
+.profile-field-ok { margin: .375rem 0 0; font-size: .875rem; color: #047857; }
+.dark .profile-field-ok { color: #6ee7b7; }

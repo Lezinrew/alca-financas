@@ -110,6 +110,24 @@ describe('Profile', () => {
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 
+  it('destaca a confirmação em vermelho enquanto difere e em verde quando confere', async () => {
+    render(<Profile />);
+    const confirm = screen.getByLabelText('Confirmar Nova Senha');
+    expect(confirm).not.toHaveAttribute('aria-invalid', 'true');
+    await userEvent.type(screen.getByLabelText('Nova Senha'), 'segredo1');
+    await userEvent.type(confirm, 'segr');
+    expect(confirm).toHaveAttribute('aria-invalid', 'true');
+    expect(confirm).toHaveClass('profile-input-invalid');
+    expect(confirm).toHaveAccessibleDescription('As senhas não coincidem.');
+    await userEvent.type(confirm, 'edo1');
+    expect(confirm).toHaveAttribute('aria-invalid', 'false');
+    expect(confirm).toHaveClass('profile-input-valid');
+    expect(confirm).toHaveAccessibleDescription('As senhas conferem.');
+    await userEvent.type(screen.getByLabelText('Nova Senha'), 'X');
+    expect(confirm).toHaveClass('profile-input-invalid');
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
   it('bloqueia envio duplicado enquanto a troca de senha está em andamento', async () => {
     let resolve!: () => void;
     vi.mocked(supabase.auth.signInWithPassword).mockImplementation(() => new Promise(done => { resolve = () => done({ error: null } as never); }));
