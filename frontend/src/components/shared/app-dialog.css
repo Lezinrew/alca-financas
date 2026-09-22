@@ -1,0 +1,69 @@
+/* Diálogo compartilhado. Tokens neutros: não dependem de nenhuma página. */
+.app-dialog-backdrop {
+  --dialog-surface: #fff;
+  --dialog-surface-soft: #f1f5f9;
+  --dialog-text: #0f172a;
+  --dialog-muted: #475569;
+  --dialog-border: #cbd5e1;
+  --dialog-primary: #4338ca;
+  --dialog-primary-hover: #3730a3;
+  --dialog-danger: #b91c1c;
+  --dialog-focus: #4338ca;
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: .75rem; background: rgba(0, 0, 0, .6);
+  color: var(--dialog-text); font-size: 1rem; line-height: 1.5;
+}
+.dark .app-dialog-backdrop {
+  --dialog-surface: #1a1d29;
+  --dialog-surface-soft: #22293a;
+  --dialog-text: #f8fafc;
+  --dialog-muted: #cbd5e1;
+  --dialog-border: #526079;
+  --dialog-danger: #fecaca;
+  --dialog-focus: #c7d2fe;
+}
+@media (min-width: 640px) { .app-dialog-backdrop { padding: 1.5rem; } }
+.app-dialog-backdrop *, .app-dialog-backdrop *::before, .app-dialog-backdrop *::after { box-sizing: border-box; }
+.app-dialog-backdrop :is(button, input, select, textarea, a, summary):focus-visible { outline: 3px solid var(--dialog-focus); outline-offset: 3px; }
+.app-dialog-panel {
+  width: 100%; max-height: 90vh; overflow-y: auto;
+  background: var(--dialog-surface); color: var(--dialog-text);
+  border: 1px solid var(--dialog-border); border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.app-dialog-panel:focus-visible { outline: 3px solid var(--dialog-focus); }
+.app-dialog-sm { max-width: 32rem; }
+.app-dialog-md { max-width: 42rem; }
+.app-dialog-lg { max-width: 56rem; }
+.app-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: 1rem; border-bottom: 1px solid var(--dialog-border); }
+.app-dialog-heading { min-width: 0; }
+.app-dialog-title { margin: 0; font-size: 1.125rem; font-weight: 600; overflow-wrap: anywhere; }
+.app-dialog-description { margin: .25rem 0 0; font-size: .875rem; color: var(--dialog-muted); }
+.app-dialog-close { flex: none; min-height: 44px; min-width: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--dialog-text); font-size: 1rem; cursor: pointer; }
+.app-dialog-close:hover { background: var(--dialog-surface-soft); }
+.app-dialog-close:disabled { opacity: .5; cursor: not-allowed; }
+.app-dialog-body { padding: 1rem; }
+.app-dialog-subject { margin: 0 0 1rem; font-size: 1.125rem; font-weight: 600; overflow-wrap: anywhere; }
+.app-dialog-details { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; margin: 0 0 1rem; }
+.app-dialog-details dt { color: var(--dialog-muted); }
+.app-dialog-details dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.app-dialog-consequence { margin: 0; }
+.app-dialog-consequence p { margin: 0 0 .5rem; }
+.app-dialog-muted { color: var(--dialog-muted); font-size: .875rem; }
+.app-dialog-error { margin: 1rem 0 0; padding: 1rem; border: 1px solid #b91c1c; border-radius: 10px; color: #991b1b; background: #fef2f2; }
+.dark .app-dialog-error { color: #fecaca; background: #401c29; border-color: #f87171; }
+.app-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .75rem; margin-top: 1.5rem; }
+.app-dialog-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: 44px; min-width: 44px; padding: .5rem .75rem;
+  font-size: .875rem; font-weight: 600; line-height: 1.4;
+  border: 1px solid var(--dialog-border); border-radius: 8px;
+  background: var(--dialog-surface); color: var(--dialog-text); cursor: pointer;
+}
+.app-dialog-button:hover { background: var(--dialog-surface-soft); }
+.app-dialog-button:disabled { opacity: .6; cursor: not-allowed; }
+.app-dialog-button-primary { background: var(--dialog-primary); border-color: var(--dialog-primary); color: #fff; }
+.app-dialog-button-primary:hover { background: var(--dialog-primary-hover); }
+.app-dialog-button-danger { color: var(--dialog-danger); border-color: var(--dialog-danger); }
+.dark .app-dialog-button-danger { border-color: #f87171; }

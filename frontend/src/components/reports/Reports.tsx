@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, reportsAPI, ReportOverviewResponse, accountsAPI } from '../../utils/api';
-import { fetchPayablesSummary, type PayablesSummary } from '../../utils/payablesSummary';
+import { loadPayablesSummary, type PayablesSummary } from '../../utils/payablesSummary';
+import { useKeyedRequest } from '../../hooks/useKeyedRequest';
 import { PayablesSummaryBlock } from '../shared/PayablesSummaryBlock';
 import ReportChart, { ChartDisplayType } from './ReportChart';
 import ReportFilters from './ReportFilters';
@@ -38,7 +39,6 @@ const Reports = () => {
   });
 
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [payablesSummary, setPayablesSummary] = useState<PayablesSummary | null>(null);
 
   const reportTypes: Array<{ value: ReportTypeOption; label: string; icon: string }> = [
     { value: 'expenses_by_category', label: 'Despesas por categorias', icon: 'bi-arrow-down-circle' },
@@ -69,17 +69,12 @@ const Reports = () => {
     }
   }, [filters, isAuthenticated, authLoading]);
 
-  useEffect(() => {
-    if (!isAuthenticated || authLoading) return;
-    setPayablesSummary(null);
-    let cancelled = false;
-    void fetchPayablesSummary(filters.month, filters.year).then((s) => {
-      if (!cancelled) setPayablesSummary(s);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, authLoading, filters.month, filters.year]);
+  const [payablesRevision, setPayablesRevision] = useState(0);
+  const payables = useKeyedRequest<PayablesSummary>(
+    `${filters.year}-${filters.month}:${payablesRevision}`,
+    isAuthenticated && !authLoading,
+    async (signal) => ({ data: await loadPayablesSummary(filters.month, filters.year, signal) }),
+  );
 
   const loadAccounts = async () => {
     try {
@@ -308,7 +303,7 @@ const Reports = () => {
             </div>
 
             <div className="mb-6">
-              <PayablesSummaryBlock summary={payablesSummary} titleId="reports-payables-title" />
+              <PayablesSummaryBlock summary={payables.data} loading={payables.loading} onRetry={() => setPayablesRevision((v) => v + 1)} />
             </div>
 
             {/* Chart and Legend */}
