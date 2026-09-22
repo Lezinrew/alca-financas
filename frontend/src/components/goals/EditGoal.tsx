@@ -1,31 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { goalsAPI, type Goal } from '../../utils/api';
+import { useKeyedRequest } from '../../hooks/useKeyedRequest';
 import GoalForm from './GoalForm';
+import { GoalLoadError } from './GoalLoadError';
+import { GOAL_LOAD_ERROR, isNotFound } from './goalCurrency';
 
 const EditGoal: React.FC = () => {
   const { goalId } = useParams<{ goalId: string }>();
   const navigate = useNavigate();
-  const [goal, setGoal] = useState<Goal | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!goalId) return;
-    goalsAPI
-      .get(goalId)
-      .then((res) => {
-        const g = res?.data;
-        setGoal(g && typeof g === 'object' ? (g as Goal) : null);
-      })
-      .catch(() => setGoal(null))
-      .finally(() => setLoading(false));
-  }, [goalId]);
+  const [revision, setRevision] = useState(0);
+  const request = useKeyedRequest<Goal | null>(`${goalId ?? ''}:${revision}`, Boolean(goalId), async () => {
+    try {
+      const res = await goalsAPI.get(goalId!);
+      const g = res?.data;
+      return { data: g && typeof g === 'object' ? (g as Goal) : null };
+    } catch (err) {
+      if (isNotFound(err)) return { data: null };
+      throw err;
+    }
+  });
+  const { loading, error } = request;
+  const goal = request.data;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
+      <div className="flex items-center justify-center min-h-[200px]" role="status" aria-busy="true">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <GoalLoadError
+        title="Meta indisponível"
+        message={GOAL_LOAD_ERROR}
+        onRetry={() => setRevision((value) => value + 1)}
+        onBack={() => navigate('/goals')}
+      />
     );
   }
 
@@ -36,7 +49,7 @@ const EditGoal: React.FC = () => {
         <button
           type="button"
           onClick={() => navigate('/goals')}
-          className="mt-4 text-indigo-600 dark:text-indigo-400 hover:underline"
+          className="mt-4 inline-flex min-h-[44px] items-center text-indigo-600 dark:text-indigo-400 hover:underline"
         >
           Voltar às metas
         </button>

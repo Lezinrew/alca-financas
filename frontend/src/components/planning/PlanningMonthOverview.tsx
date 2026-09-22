@@ -43,27 +43,27 @@ export const PlanningMonthOverview: React.FC<PlanningMonthOverviewProps> = ({
           <button
             type="button"
             onClick={onPrevMonth}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
             aria-label="Mês anterior"
           >
-            <i className="bi bi-chevron-left" />
+            <i className="bi bi-chevron-left" aria-hidden="true" />
           </button>
-          <span className="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium">
+          <span aria-live="polite" className="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium">
             {MONTH_LABELS[month - 1]} {year}
           </span>
           <button
             type="button"
             onClick={onNextMonth}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
             aria-label="Próximo mês"
           >
-            <i className="bi bi-chevron-right" />
+            <i className="bi bi-chevron-right" aria-hidden="true" />
           </button>
         </div>
         <button
           type="button"
           onClick={onOpenForm}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          className="min-h-[44px] px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
         >
           <i className="bi bi-pencil" />
           Definir planejamento

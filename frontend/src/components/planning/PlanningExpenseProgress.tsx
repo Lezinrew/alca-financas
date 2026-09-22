@@ -41,13 +41,13 @@ export const PlanningExpenseProgress: React.FC<PlanningExpenseProgressProps> = (
           <button
             type="button"
             onClick={onEdit}
-            className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+            className="inline-flex min-h-[44px] items-center px-2 text-sm text-purple-600 dark:text-purple-400 hover:underline"
           >
             Editar
           </button>
         )}
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full">
           <thead className="table-header">
             <tr>
@@ -107,6 +107,50 @@ export const PlanningExpenseProgress: React.FC<PlanningExpenseProgressProps> = (
           </tbody>
         </table>
       </div>
+      <ul className="sm:hidden divide-y divide-slate-200 dark:divide-slate-700/50">
+        {categories.map((cat) => {
+          const config = STATUS_CONFIG[cat.status];
+          const progressPct = Math.min(cat.progress_percent, 100);
+          return (
+            <li key={cat.category_id} className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+                    style={{ backgroundColor: cat.category_color || '#6b7280' }}
+                  >
+                    <i className={`bi bi-${cat.category_icon || 'circle'} text-base`} aria-hidden="true" />
+                  </div>
+                  <span className="font-medium text-slate-900 dark:text-white break-words">{cat.category_name}</span>
+                </div>
+                <span className={`text-xs font-medium text-right ${config.color}`}>{config.label}</span>
+              </div>
+              <dl className="grid grid-cols-3 gap-2 text-sm">
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Planejado</dt>
+                  <dd className="font-medium text-slate-900 dark:text-white">{formatCurrency(cat.planned_amount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Gasto</dt>
+                  <dd className="font-medium text-slate-900 dark:text-white">{formatCurrency(cat.spent_amount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Restante</dt>
+                  <dd className="font-medium text-slate-900 dark:text-white">{formatCurrency(cat.remaining_amount)}</dd>
+                </div>
+              </dl>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className={`h-full ${config.bar} rounded-full transition-all`} style={{ width: `${progressPct}%` }} />
+                </div>
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 w-10 text-right">
+                  {cat.planned_amount > 0 ? cat.progress_percent.toFixed(0) : '—'}%
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 };

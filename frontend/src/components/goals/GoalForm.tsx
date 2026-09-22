@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { goalsAPI, type Goal } from '../../utils/api';
+import { GOAL_AMOUNT_ERROR, GOAL_SAVE_ERROR, goalApiMessage, parseGoalAmount } from './goalCurrency';
 
 type GoalStatus = 'active' | 'completed' | 'paused';
 
@@ -22,6 +23,10 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
   const [status, setStatus] = useState<GoalStatus>(goal?.status ?? 'active');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const submitLock = useRef(false);
+  const ids = {
+    title: useId(), description: useId(), amount: useId(), date: useId(), image: useId(), status: useId(), error: useId(),
+  };
 
   useEffect(() => {
     if (goal) {
@@ -34,27 +39,22 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
     }
   }, [goal]);
 
-  const parseAmount = (v: string) => {
-    if (!v || !v.trim()) return 0;
-    const normalized = v.trim().replace(/\./g, '').replace(',', '.');
-    const n = parseFloat(normalized);
-    return isNaN(n) ? 0 : n;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current) return;
     setError('');
-    const amount = parseAmount(targetAmount) || parseFloat(targetAmount) || 0;
+    const amount = parseGoalAmount(targetAmount);
     if (!title.trim()) {
       setError('Título é obrigatório');
       return;
     }
     if (amount <= 0) {
-      setError('Valor da meta deve ser maior que zero');
+      setError(GOAL_AMOUNT_ERROR);
       return;
     }
+    submitLock.current = true;
+    setLoading(true);
     try {
-      setLoading(true);
       if (goal?.id) {
         const res = await goalsAPI.update(goal.id, {
           title: title.trim(),
@@ -79,31 +79,33 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
         const created = res?.data as Goal;
         if (created) onSuccess(created);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Erro ao salvar');
+    } catch (err) {
+      setError(goalApiMessage(err) || GOAL_SAVE_ERROR);
     } finally {
+      submitLock.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card-base p-6 space-y-5 max-w-xl shadow-lg">
+    <form onSubmit={handleSubmit} noValidate className="card-base p-6 space-y-5 max-w-xl shadow-lg">
       <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
         {goal ? 'Editar meta' : 'Nova meta'}
       </h2>
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 text-sm flex items-center gap-2 animate-shake">
-          <i className="bi bi-exclamation-triangle-fill"></i>
+        <div id={ids.error} role="alert" className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 text-sm flex items-center gap-2 animate-shake">
+          <i className="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
           {error}
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <label htmlFor={ids.title} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Título *
         </label>
         <div className="relative">
           <i className="bi bi-bullseye absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
           <input
+            id={ids.title}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -114,12 +116,13 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <label htmlFor={ids.description} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Descrição (opcional)
         </label>
         <div className="relative">
           <i className="bi bi-chat-left-text absolute left-3 top-3 text-slate-400 pointer-events-none"></i>
           <textarea
+            id={ids.description}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
@@ -129,28 +132,33 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <label htmlFor={ids.amount} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Valor da meta (R$) *
         </label>
         <div className="relative">
           <i className="bi bi-currency-dollar absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
           <input
+            id={ids.amount}
             type="text"
             value={targetAmount}
             onChange={(e) => setTargetAmount(e.target.value)}
             placeholder="0,00"
+            inputMode="decimal"
+            aria-invalid={error === GOAL_AMOUNT_ERROR ? true : undefined}
+            aria-describedby={error ? ids.error : undefined}
             className="native-input-themed w-full h-11 pl-10 pr-4 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
             required
           />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <label htmlFor={ids.date} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Data alvo (opcional)
         </label>
         <div className="relative">
           <i className="bi bi-calendar3 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
           <input
+            id={ids.date}
             type="date"
             value={targetDate}
             onChange={(e) => setTargetDate(e.target.value)}
@@ -159,12 +167,13 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <label htmlFor={ids.image} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           URL da imagem inspiracional (opcional)
         </label>
         <div className="relative">
           <i className="bi bi-image absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
           <input
+            id={ids.image}
             type="url"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
@@ -175,15 +184,16 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
       </div>
       {goal && (
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          <label htmlFor={ids.status} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Status
           </label>
           <div className="relative">
             <i className="bi bi-flag absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
             <select
+              id={ids.status}
               value={status}
               onChange={(e) => setStatus(e.target.value as GoalStatus)}
-              className="native-select-themed !w-full py-2.5 pl-10 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400"
+              className="native-select-themed !w-full min-h-[44px] py-2.5 pl-10 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400"
             >
               <option value="active">Em andamento</option>
               <option value="paused">Pausada</option>
@@ -196,7 +206,7 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 disabled:shadow-none flex items-center gap-2"
+          className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 disabled:shadow-none flex items-center gap-2"
         >
           {loading ? (
             <>
@@ -213,7 +223,8 @@ export const GoalForm: React.FC<GoalFormProps> = ({ goal, onSuccess, onCancel })
         <button
           type="button"
           onClick={onCancel}
-          className="px-6 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium transition-all"
+          disabled={loading}
+          className="min-h-[44px] px-6 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium transition-all"
         >
           Cancelar
         </button>

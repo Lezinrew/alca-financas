@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { AppDialog } from '../shared/AppDialog';
 import { formatCurrency } from '../../utils/api';
 import { parseCurrencyString } from '../../lib/utils';
 import CurrencyInput from '../ui/CurrencyInput';
@@ -36,6 +37,8 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
+  const submitLock = useRef(false);
+  const incomeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (budget) {
@@ -82,34 +85,34 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (submitLock.current) return;
     setError('');
 
+    // Parse do valor de renda mensal
+    const monthlyIncomeValue = parseCurrencyString(formData.monthly_income);
+
+    if (step === 1) {
+      if (monthlyIncomeValue <= 0) {
+        setError('A renda mensal deve ser maior que zero');
+        return;
+      }
+      // Validação de percentual de economia (0-100%)
+      if (formData.savings_percentage < 0 || formData.savings_percentage > 100) {
+        setError('Percentual de economia deve estar entre 0% e 100%');
+        return;
+      }
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      setStep(3);
+      return;
+    }
+
+    submitLock.current = true;
+    setLoading(true);
     try {
-      // Parse do valor de renda mensal
-      const monthlyIncomeValue = parseCurrencyString(formData.monthly_income);
-
-      if (step === 1) {
-        if (monthlyIncomeValue <= 0) {
-          throw new Error('A renda mensal deve ser maior que zero');
-        }
-
-        // Validação de percentual de economia (0-100%)
-        if (formData.savings_percentage < 0 || formData.savings_percentage > 100) {
-          throw new Error('Percentual de economia deve estar entre 0% e 100%');
-        }
-
-        setStep(2);
-        setLoading(false);
-        return;
-      }
-
-      if (step === 2) {
-        setStep(3);
-        setLoading(false);
-        return;
-      }
-
       await onSubmit({
         ...formData,
         monthly_income: monthlyIncomeValue,
@@ -117,8 +120,9 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
     } catch (err: any) {
       const apiError = err?.response?.data?.error;
       const apiDetail = err?.response?.data?.detail;
-      setError(apiDetail || apiError || err.message || 'Erro ao salvar planejamento');
+      setError(apiDetail || apiError || 'Não foi possível salvar o planejamento. Tente novamente.');
     } finally {
+      submitLock.current = false;
       setLoading(false);
     }
   };
@@ -130,60 +134,41 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
 
   if (!show) return null;
 
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="modal-backdrop fixed inset-0 z-40"
-        onClick={onHide}
-      ></div>
+  const stepLabel = step === 1
+    ? 'Etapa 1 de 3: renda mensal'
+    : step === 2
+      ? 'Etapa 2 de 3: categorização de gastos'
+      : 'Etapa 3 de 3: visualização das despesas do cartão';
 
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="modal-content w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-700/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={step === 1 ? onHide : () => setStep(1)}
-                  aria-label={step === 1 ? 'Voltar e fechar planejamento' : 'Voltar para etapa anterior'}
-                  title={step === 1 ? 'Voltar e fechar planejamento' : 'Voltar para etapa anterior'}
-                  className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <i className="bi bi-arrow-left text-xl"></i>
-                </button>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                    Criação do planejamento mensal
-                  </h2>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    {step === 1 
-                      ? 'Renda mensal' 
-                      : step === 2 
-                        ? 'Categorização de gastos' 
-                        : 'Visualização das despesas do cartão'}
-                  </p>
-                </div>
-              </div>
+  return (
+    <AppDialog
+      title="Criação do planejamento mensal"
+      description={stepLabel}
+      onClose={onHide}
+      busy={loading}
+      size="lg"
+      initialFocus={incomeRef}
+    >
+      <div className="flex flex-col">
+          {step > 1 && (
+            <div className="px-6 pt-4">
               <button
                 type="button"
-                onClick={onHide}
-                aria-label="Fechar planejamento"
-                title="Fechar planejamento"
-                className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                onClick={() => setStep(step - 1)}
+                disabled={loading}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 disabled:opacity-50"
               >
-                <i className="bi bi-x-lg"></i>
+                <i className="bi bi-arrow-left" aria-hidden="true" />
+                Voltar para etapa anterior
               </button>
             </div>
-          </div>
+          )}
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-auto">
+          <form onSubmit={handleSubmit} noValidate>
             <div className="p-6">
               {error && (
-                <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div role="alert" className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                   <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
                 </div>
               )}
@@ -205,6 +190,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                         </p>
                       )}
                       <CurrencyInput
+                        ref={incomeRef}
                         id="monthly_income_input"
                         name="monthly_income"
                         value={formData.monthly_income}
@@ -294,6 +280,7 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
                           <div className="relative w-36">
                             <CurrencyInput
                               name={`category-${category.id}`}
+                              aria-label={`Limite para ${category.name}`}
                               value={categoryBudget ? categoryBudget.amount.toString() : ''}
                               onValueChange={(value) => handleCategoryBudgetChange(category.id, value)}
                               className="w-full px-3 py-2 text-lg font-semibold text-purple-600 dark:text-purple-400 bg-transparent border-b-2 border-purple-600 dark:border-purple-400 focus:outline-none focus:border-purple-700 dark:focus:border-purple-300 text-right"
@@ -421,14 +408,15 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
               <button
                 type="button"
                 onClick={onHide}
-                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                disabled={loading}
+                className="min-h-[44px] px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="min-h-[44px] px-6 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {loading ? (
                   <>
@@ -446,9 +434,8 @@ const PlanningForm: React.FC<PlanningFormProps> = ({
               </button>
             </div>
           </form>
-        </div>
       </div>
-    </>
+    </AppDialog>
   );
 };
 

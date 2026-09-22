@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency, formatDate, goalsAPI, type Goal } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useKeyedRequest } from '../../hooks/useKeyedRequest';
+import { GoalLoadError } from './GoalLoadError';
+import { GOALS_LOAD_ERROR } from './goalCurrency';
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Em andamento',
@@ -12,31 +15,23 @@ const STATUS_LABELS: Record<string, string> = {
 const Goals: React.FC = () => {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [goals, setGoals] = useState<Goal[]>([]);
   const [filter, setFilter] = useState<string>('');
+  const [revision, setRevision] = useState(0);
+  const filterId = useId();
 
-  const loadGoals = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
+  const request = useKeyedRequest<Goal[]>(
+    `${filter}:${revision}`,
+    isAuthenticated && !authLoading,
+    async () => {
       const res = await goalsAPI.list(filter || undefined);
       const data = res?.data;
-      setGoals(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Erro ao carregar metas');
-      setGoals([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
-
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      loadGoals();
-    }
-  }, [isAuthenticated, authLoading, loadGoals]);
+      return { data: Array.isArray(data) ? data : [] };
+    },
+  );
+  const loading = request.loading;
+  const error = request.error;
+  const goals = request.data ?? [];
+  const reload = () => setRevision((value) => value + 1);
 
   const handleCreate = () => {
     navigate('/goals/new');
@@ -48,7 +43,7 @@ const Goals: React.FC = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px]" role="status" aria-busy="true">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-3" />
           <p className="text-slate-600 dark:text-slate-400">Carregando metas...</p>
@@ -67,10 +62,12 @@ const Goals: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor={filterId} className="sr-only">Filtrar por status</label>
           <select
+            id={filterId}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="native-select-themed !w-auto min-w-[10rem] py-2 px-3 text-sm"
+            className="native-select-themed !w-auto min-h-[44px] min-w-[10rem] py-2 px-3 text-sm"
           >
             <option value="">Todas</option>
             <option value="active">Em andamento</option>
@@ -80,7 +77,7 @@ const Goals: React.FC = () => {
           <button
             type="button"
             onClick={handleCreate}
-            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 flex items-center gap-2"
+            className="min-h-[44px] px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-600 dark:hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 flex items-center gap-2"
           >
             <i className="bi bi-plus-lg" />
             Nova meta
@@ -88,14 +85,9 @@ const Goals: React.FC = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
-          <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400" />
-          <span className="text-red-800 dark:text-red-200">{error}</span>
-        </div>
-      )}
-
-      {goals.length === 0 ? (
+      {error ? (
+        <GoalLoadError title="Metas indisponíveis" message={GOALS_LOAD_ERROR} onRetry={reload} />
+      ) : goals.length === 0 ? (
         <div className="card-base p-12 text-center shadow-sm">
           <div className="max-w-md mx-auto">
             <div className="relative mb-8">
