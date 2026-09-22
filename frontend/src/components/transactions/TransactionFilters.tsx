@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { ChangeEvent, FC, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TransactionFilterState } from '../../hooks/useTransactionFilters';
 
@@ -20,13 +20,19 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
   const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState(filters.search || '');
   const [showMore, setShowMore] = useState(false);
+  const ids = useId();
+  const periodId = `${ids}-period`;
+  const accountId = `${ids}-account`;
+  const categoryId = `${ids}-category`;
 
-  // Debounce da busca
+  // Debounce da busca; só dispara quando o texto difere do filtro aplicado (evita reset de página ao montar).
   useEffect(() => {
+    if ((searchInput || undefined) === (filters.search || undefined)) return;
     const handler = setTimeout(() => {
       onChange({ search: searchInput || undefined, page: 1 });
     }, 400);
     return () => clearTimeout(handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
   useEffect(() => {
@@ -56,33 +62,34 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
     onChange({ types: next as any, page: 1 });
   };
 
-  const handleAccountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleAccountChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     onChange({ accountIds: value ? [value] : [], page: 1 });
   };
 
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     onChange({ categoryIds: value ? [value] : [], page: 1 });
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
   };
 
   return (
-    <div className="card-base mb-4">
-      <div className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <div className="p-1 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-3 items-center">
           {/* Período */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-secondary uppercase">
+            <label htmlFor={periodId} className="text-xs font-medium text-secondary uppercase">
               {(() => {
                 const label = t('transactions.period');
                 return label === 'transactions.period' ? 'Período' : label;
               })()}
-            </span>
+            </label>
             <select
+              id={periodId}
               className="select-base h-9"
               value={filters.datePreset}
               onChange={(e) => handleDatePresetChange(e.target.value)}
@@ -98,13 +105,14 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
 
           {/* Conta (multi em UX simples: still single select, mas pronto para evoluir) */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-secondary uppercase">
+            <label htmlFor={accountId} className="text-xs font-medium text-secondary uppercase">
               {(() => {
                 const label = t('accounts.title');
                 return label === 'accounts.title' ? 'Conta' : label;
               })()}
-            </span>
+            </label>
             <select
+              id={accountId}
               className="select-base h-9 min-w-[160px]"
               value={filters.accountIds[0] || ''}
               onChange={handleAccountChange}
@@ -126,13 +134,14 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
 
           {/* Categoria */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-secondary uppercase">
+            <label htmlFor={categoryId} className="text-xs font-medium text-secondary uppercase">
               {(() => {
                 const label = t('categories.title');
                 return label === 'categories.title' ? 'Categoria' : label;
               })()}
-            </span>
+            </label>
             <select
+              id={categoryId}
               className="select-base h-9 min-w-[160px]"
               value={filters.categoryIds[0] || ''}
               onChange={handleCategoryChange}
@@ -156,10 +165,10 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
 
           {/* Tipo */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-secondary uppercase">
+            <span id={`${ids}-type`} className="text-xs font-medium text-secondary uppercase">
               {t('transactions.type') || 'Tipo'}
             </span>
-            <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div role="group" aria-labelledby={`${ids}-type`} className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
               <button
                 type="button"
                 className={
@@ -168,6 +177,7 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                     ? 'bg-emerald-500 text-white dark:bg-emerald-400 dark:text-slate-900'
                     : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-white')
                 }
+                aria-pressed={filters.types.includes('income')}
                 onClick={() => handleTypeToggle('income')}
               >
                 Receita
@@ -180,6 +190,7 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                     ? 'bg-red-500 text-white dark:bg-red-400 dark:text-slate-900'
                     : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-white')
                 }
+                aria-pressed={filters.types.includes('expense')}
                 onClick={() => handleTypeToggle('expense')}
               >
                 Despesa
@@ -191,21 +202,23 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
         {/* Search + Mais filtros + Limpar */}
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:flex-none md:w-64">
-            <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-sm" />
+            <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-sm" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
               className="input-base pl-8 h-9"
+              aria-label="Buscar por descrição"
               placeholder={t('common.search') || 'Buscar descrição...'}
-              value={filters.search || ''}
+              value={searchInput}
               onChange={handleSearchChange}
             />
           </div>
           <button
             type="button"
             onClick={() => setShowMore((prev) => !prev)}
+            aria-expanded={showMore}
             className="h-9 px-3 text-xs font-medium text-slate-600 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1"
           >
-            <i className="bi bi-funnel" />
+            <i className="bi bi-funnel" aria-hidden="true" />
             Mais filtros
           </button>
           <button
@@ -222,10 +235,11 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 mt-3">
             {/* Valor mínimo */}
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1">
+              <label htmlFor={`${ids}-min`} className="block text-xs font-medium text-secondary mb-1">
                 Valor mínimo
               </label>
               <input
+                id={`${ids}-min`}
                 type="number"
                 className="input-base h-9"
                 value={filters.minAmount ?? ''}
@@ -239,10 +253,11 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
             </div>
             {/* Valor máximo */}
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1">
+              <label htmlFor={`${ids}-max`} className="block text-xs font-medium text-secondary mb-1">
                 Valor máximo
               </label>
               <input
+                id={`${ids}-max`}
                 type="number"
                 className="input-base h-9"
                 value={filters.maxAmount ?? ''}
@@ -256,10 +271,11 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
             </div>
             {/* Status */}
             <div>
-              <label className="block text-xs font-medium text-secondary mb-1">
-                Status
+              <label htmlFor={`${ids}-status`} className="block text-xs font-medium text-secondary mb-1">
+                Situação
               </label>
               <select
+                id={`${ids}-status`}
                 className="select-base h-9"
                 value={filters.status || ''}
                 onChange={(e) =>
@@ -293,10 +309,11 @@ export const TransactionFilters: FC<TransactionFiltersProps> = ({
                 Somente recorrentes
               </label>
               <div>
-                <label className="block text-xs font-medium text-secondary mb-1">
+                <label htmlFor={`${ids}-sort`} className="block text-xs font-medium text-secondary mb-1">
                   Ordenação
                 </label>
                 <select
+                  id={`${ids}-sort`}
                   className="select-base h-9"
                   value={filters.sort}
                   onChange={(e) =>

@@ -1,14 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { transactionsAPI, categoriesAPI, accountsAPI, formatCurrency } from '../../utils/api';
+import { transactionsAPI, categoriesAPI, accountsAPI, formatCurrency, formatDate } from '../../utils/api';
+import { ConfirmDialog } from '../shared/ConfirmDialog';
 import TransactionForm from './TransactionForm';
 import TransactionList from './TransactionList';
 import { TransactionFilters as TransactionFiltersBar } from './TransactionFilters';
 import { FilterChipsBar } from './FilterChipsBar';
 import { QuickFilters } from './QuickFilters';
+import { useTransactions, type TransactionFacets } from './useTransactions';
 import {
   TransactionCategory,
   TransactionRecord,
@@ -16,6 +18,93 @@ import {
   TransactionType,
 } from '../../types/transaction';
 import { useTransactionFilters } from '../../hooks/useTransactionFilters';
+import './transactions.css';
+
+type LookupAccount = { id: string; name: string; count?: number; [key: string]: unknown };
+type LookupCategory = TransactionCategory & { count?: number };
+
+const toArray = (payload: unknown): unknown[] => {
+  if (Array.isArray(payload)) return payload;
+  const nested = (payload as { data?: unknown } | null)?.data;
+  return Array.isArray(nested) ? nested : [];
+};
+
+/** Categorias válidas (com tipo receita/despesa e sem campos de conta). */
+const normalizeCategories = (payload: unknown): TransactionCategory[] => toArray(payload)
+  .filter((c): c is TransactionCategory & { account_id?: unknown } => {
+    const item = c as { type?: string; account_id?: unknown };
+    return (item.type === 'income' || item.type === 'expense') && !item.account_id;
+  })
+  .map((c) => ({ ...c, id: String(c.id) }));
+
+/** Contas ativas com id e nome, sem duplicatas. */
+const normalizeAccounts = (payload: unknown): LookupAccount[] => {
+  const seen = new Set<string>();
+  return toArray(payload).flatMap((raw) => {
+    const acc = raw as { id?: unknown; _id?: unknown; name?: unknown; is_active?: unknown };
+    const id = String(acc.id || acc._id || '');
+    const name = String(acc.name || '').trim();
+    if (acc.is_active === false || !id || !name || seen.has(id)) return [];
+    seen.add(id);
+    return [{ ...(raw as object), id, name }];
+  });
+};
+
+const withCounts = <T extends { id: string }>(items: T[], facet?: Array<{ id: string; count: number }>) =>
+  facet?.length ? items.map((item) => {
+    const match = facet.find((f) => f.id === item.id);
+    return match ? { ...item, count: match.count } : item;
+  }) : items;
+
+function SummaryBlock({ facets, fallbackCount, loading, error, retry }: {
+  facets: TransactionFacets | null; fallbackCount?: number; loading: boolean; error: string; retry: () => void;
+}) {
+  const summary = facets?.summary;
+  const value = (amount?: number) => (error || amount == null) ? '—' : formatCurrency(amount);
+  const net = summary?.net_paid ?? 0;
+  const cards = [
+    { label: 'Entradas recebidas', value: value(summary?.paid_income), icon: 'arrow-down-left', valueClass: 'text-emerald-600 dark:text-emerald-400', iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300', hint: 'Receitas pagas no filtro' },
+    { label: 'Total pago', value: value(summary?.paid_expense), icon: 'check2-circle', valueClass: 'text-blue-600 dark:text-blue-400', iconClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300', hint: 'Despesas efetivadas no filtro' },
+    { label: 'Saldo líquido', value: value(summary?.net_paid), icon: 'activity', valueClass: net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400', iconClass: net >= 0 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300', hint: 'Entradas menos pagamentos' },
+  ];
+  return (
+    <section aria-label="Resumo das transações filtradas" aria-busy={loading} className="tx space-y-3">
+      {error && (
+        <div className="tx-error" role="alert">
+          <span>Resumo indisponível. {error}</span>
+          <button type="button" className="tx-button" onClick={retry}>Tentar novamente</button>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {cards.map((item) => (
+          <article key={item.label} className="card-base p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
+                <p className={`mt-2 truncate text-xl font-bold ${item.valueClass}`}>{item.value}</p>
+              </div>
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.iconClass}`}>
+                <i className={`bi bi-${item.icon}`} aria-hidden="true" />
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p>
+          </article>
+        ))}
+        <article className="card-base p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Transações</p>
+          <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">{summary?.transaction_count ?? fallbackCount ?? '—'}</p>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">No período e filtros atuais</p>
+        </article>
+        <article className="card-base border-amber-200 p-4 sm:p-5 dark:border-amber-800/50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Revisar categoria</p>
+          <p className="mt-2 text-xl font-bold text-amber-700 dark:text-amber-300">{error || !summary ? '—' : summary.uncategorized_count}</p>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Sem classificação confiável</p>
+        </article>
+      </div>
+      <p role="status" aria-live="polite" className="sr-only">{loading ? 'Atualizando resumo…' : error ? 'Resumo indisponível' : ''}</p>
+    </section>
+  );
+}
 
 const Transactions = () => {
   const { t } = useTranslation();
@@ -23,246 +112,58 @@ const Transactions = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { filters, updateFilters, clearFilters } = useTransactionFilters();
-  const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
-  const [categories, setCategories] = useState<TransactionCategory[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
-  const [facets, setFacets] = useState<{
-    categories: Array<{ id: string; name: string; count: number }>;
-    accounts: Array<{ id: string; name: string; count: number }>;
-    types: Array<{ type: string; count: number }>;
-    responsible_persons?: Array<{ name: string; count: number }>;
-    summary?: {
-      paid_income: number;
-      paid_expense: number;
-      net_paid: number;
-      transaction_count: number;
-      uncategorized_count: number;
-    };
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [lookups, setLookups] = useState<{ categories: TransactionCategory[]; accounts: LookupAccount[] }>({ categories: [], accounts: [] });
   const [showForm, setShowForm] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
   const [initialTransactionType, setInitialTransactionType] = useState<TransactionType | null>(null);
-  const requestSeqRef = useRef(0);
-  const lookupCacheRef = useRef<{ categories: TransactionCategory[]; accounts: any[] } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<TransactionRecord | null>(null);
+  const enabled = isAuthenticated && !authLoading;
+  const { list, facets } = useTransactions(filters, revision, enabled);
+  const refresh = () => setRevision((value) => value + 1);
 
-  const buildFilterParams = () => ({
-    date_preset: filters.datePreset,
-    date_from: filters.dateFrom,
-    date_to: filters.dateTo,
-    types: filters.types.join(','),
-    type: filters.types.length === 1 ? filters.types[0] : undefined,
-    account_ids: filters.accountIds.join(','),
-    category_ids: filters.categoryIds.join(','),
-    min_amount: filters.minAmount,
-    max_amount: filters.maxAmount,
-    search: filters.search,
-    status: filters.status,
-    is_recurring: filters.isRecurring,
-  });
-
-  const loadData = async (includeFacets = true) => {
-    const requestId = ++requestSeqRef.current;
-    try {
-      setLoading(true);
-      setError('');
-      const filterParams = buildFilterParams();
-
-      const shouldFetchLookups = !lookupCacheRef.current;
-      const [transactionsRes, categoriesRes, accountsResponse, facetsData] = await Promise.all([
-        transactionsAPI.getAll({
-          ...filterParams,
-          page: filters.page,
-          limit: filters.limit,
-          sort: filters.sort,
-        }),
-        shouldFetchLookups ? categoriesAPI.getAll() : Promise.resolve({ data: lookupCacheRef.current?.categories ?? [] }),
-        shouldFetchLookups
-          ? accountsAPI.getAll().then(res => res.data).catch(() => [])
-          : Promise.resolve(lookupCacheRef.current?.accounts ?? []),
-        includeFacets
-          ? transactionsAPI.getFacets(filterParams).then((res) => res.data).catch(() => null)
-          : Promise.resolve(null),
-      ]);
-
-      // Ignora respostas antigas quando o usuário troca filtros rapidamente.
-      if (requestId !== requestSeqRef.current) return;
-
-      if (includeFacets) {
-        setFacets(facetsData);
-      }
-
-      const facetsForCounts = includeFacets ? facetsData : facets;
-
-      // Carrega contas separadamente (não crítico - se falhar, não quebra a página)
-      const accountsRes: any[] = Array.isArray(accountsResponse) ? accountsResponse : [];
-
-      // Garante que transactions seja sempre um array
-      // O backend retorna {data: [...], pagination: {...}}
-      const transactionsData = transactionsRes.data;
-      let transactionsArray: TransactionRecord[] = [];
-      
-      if (Array.isArray(transactionsData)) {
-        // Se já é um array direto
-        transactionsArray = transactionsData;
-      } else if (transactionsData?.data && Array.isArray(transactionsData.data)) {
-        // Se está dentro de um objeto com propriedade 'data'
-        transactionsArray = transactionsData.data;
-      } else {
-        // Se não encontrou dados, usa array vazio
-        transactionsArray = [];
-      }
-
-      setTransactions(transactionsArray as TransactionRecord[]);
-
-      // Captura total de resultados para UX
-      const pagination = (transactionsData as any)?.pagination;
-      if (pagination && typeof pagination.total === 'number') {
-        setTotalCount(pagination.total);
-      } else {
-        setTotalCount(transactionsArray.length);
-      }
-
-      // Garante que categories seja sempre um array
-      const categoriesData = categoriesRes.data;
-      const categoriesArray = Array.isArray(categoriesData)
-        ? categoriesData
-        : (categoriesData?.data && Array.isArray(categoriesData.data))
-          ? categoriesData.data
-          : [];
-
-      // Filtra apenas categorias válidas (não contas)
-      const validCategories = categoriesArray
-        .filter((c: any) => {
-          // Categorias devem ter type (income ou expense) e não devem ter campos de conta
-          return c.type && (c.type === 'income' || c.type === 'expense') && !c.account_id;
-        })
-        .map((c: TransactionCategory) => ({
-          ...c,
-          id: String(c.id),
-        }));
-
-      // Enriquecer categorias com contagem (facets)
-      if (facetsForCounts?.categories?.length) {
-        const withCounts = validCategories.map((cat: TransactionCategory) => {
-          const facet = facetsForCounts.categories.find((f: any) => f.id === cat.id);
-          return facet ? { ...cat, count: facet.count } : cat;
-        });
-        setCategories(withCounts as any);
-      } else {
-        setCategories(validCategories);
-      }
-
-      // Processa contas (se foram carregadas com sucesso)
-      if (accountsRes) {
-        const accountsArray = Array.isArray(accountsRes) ? accountsRes : [];
-        // Filtra apenas contas ativas (incluindo cartões de crédito para o filtro)
-        // E garante que não há contas duplicadas ou inválidas
-        const activeAccounts = accountsArray
-          .filter((acc: any) => {
-            // Filtra contas ativas e válidas
-            const isActive = acc.is_active !== false;
-            const hasId = acc.id || acc._id;
-            const hasName = acc.name && acc.name.trim() !== '';
-            return isActive && hasId && hasName;
-          })
-          .map((acc: any) => ({
-            ...acc,
-            id: String(acc.id || acc._id || ''),
-            name: String(acc.name || 'Sem nome').trim()
-          }))
-          .filter((acc: any) => acc.id && acc.name !== 'Sem nome')
-          // Remove duplicatas baseado no ID
-          .filter((acc: any, index: number, self: any[]) => 
-            index === self.findIndex((a: any) => a.id === acc.id)
-          );
-        
-        // Enriquecer contas com contagem (facets)
-        if (facetsForCounts?.accounts?.length) {
-          const withCounts = activeAccounts.map((acc: any) => {
-            const facet = facetsForCounts.accounts.find((f: any) => f.id === acc.id);
-            return facet ? { ...acc, count: facet.count } : acc;
-          });
-          setAccounts(withCounts);
-        } else {
-          setAccounts(activeAccounts);
-        }
-
-        if (shouldFetchLookups) {
-          lookupCacheRef.current = {
-            categories: validCategories,
-            accounts: activeAccounts,
-          };
-        }
-      } else {
-        // Se não conseguiu carregar, mantém o array vazio
-        setAccounts([]);
-      }
-    } catch (err) {
-      if (requestId !== requestSeqRef.current) return;
-      setError('Erro ao carregar transações');
-      console.error('Load transactions error:', err);
-      // Garante que transactions seja um array vazio em caso de erro
-      setTransactions([]);
-      // Mantém contas vazias em caso de erro
-      setAccounts([]);
-    } finally {
-      if (requestId === requestSeqRef.current) {
-        setLoading(false);
-      }
-    }
-  };
-
+  // Categorias e contas são carregadas uma vez; o resumo (facets) apenas enriquece as contagens.
   useEffect(() => {
-    // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
-    if (isAuthenticated && !authLoading) {
-      loadData(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, isAuthenticated, authLoading]);
+    if (!enabled) return;
+    let active = true;
+    void Promise.all([
+      categoriesAPI.getAll().then((res) => res.data).catch(() => []),
+      accountsAPI.getAll().then((res) => res.data).catch(() => []),
+    ]).then(([categoriesData, accountsData]) => {
+      if (active) setLookups({ categories: normalizeCategories(categoriesData), accounts: normalizeAccounts(accountsData) });
+    });
+    return () => { active = false; };
+  }, [enabled]);
+
+  const categories = useMemo<LookupCategory[]>(() => withCounts(lookups.categories, facets.data?.categories), [lookups.categories, facets.data]);
+  const accounts = useMemo<LookupAccount[]>(() => withCounts(lookups.accounts, facets.data?.accounts), [lookups.accounts, facets.data]);
+  const accountNames = useMemo(() => Object.fromEntries(lookups.accounts.map((acc) => [acc.id, acc.name])), [lookups.accounts]);
 
   // Verifica se veio da dashboard com instrução para abrir o formulário ou aplicar filtro
   useEffect(() => {
     if (location.state) {
-      const state = location.state as any;
+      const state = location.state as { openForm?: boolean; transactionType?: TransactionType; datePreset?: string; filterType?: string };
 
-      // Se veio com instrução para abrir o formulário
       if (state.openForm) {
         setInitialTransactionType(state.transactionType || 'expense');
         setShowForm(true);
       }
 
-      const allowedPresets = [
-        'today',
-        '7d',
-        'this_month',
-        'last_month',
-        'last_90_days',
-        'year_to_date',
-      ] as const;
-      const nextPreset =
-        state.datePreset && allowedPresets.includes(state.datePreset) ? state.datePreset : undefined;
+      const allowedPresets = ['today', '7d', 'this_month', 'last_month', 'last_90_days', 'year_to_date'] as const;
+      type Preset = typeof allowedPresets[number];
+      const nextPreset = allowedPresets.find((preset) => preset === state.datePreset) as Preset | undefined;
 
-      // Filtro vindo da dashboard (tipo e/ou período)
-      if (state.filterType && (state.filterType === 'income' || state.filterType === 'expense')) {
-        updateFilters({
-          types: [state.filterType],
-          page: 1,
-          ...(nextPreset ? { datePreset: nextPreset } : {}),
-        } as any);
+      if (state.filterType === 'income' || state.filterType === 'expense') {
+        updateFilters({ types: [state.filterType], page: 1, ...(nextPreset ? { datePreset: nextPreset } : {}) });
       } else if (nextPreset) {
-        updateFilters({
-          datePreset: nextPreset,
-          page: 1,
-        } as any);
+        updateFilters({ datePreset: nextPreset, page: 1 });
       }
 
       // Limpa o state para não aplicar novamente ao navegar
       window.history.replaceState({}, document.title);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
   const handleAddTransaction = () => {
@@ -271,90 +172,47 @@ const Transactions = () => {
   };
 
   const handleEditTransaction = (transaction: TransactionRecord) => {
-    console.log('Transactions: Editando transação:', transaction);
     setEditingTransaction(transaction);
     setShowForm(true);
   };
 
-  const handleDeleteTransaction = async (transactionId: string) => {
-    console.log('Transactions: handleDeleteTransaction chamado para:', transactionId);
-
-    if (!window.confirm('Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.')) {
-      return;
-    }
-
-    // Salva estado anterior para possível rollback
-    const previousTransactions = [...transactions];
-
-    try {
-      setLoading(true);
-      setError('');
-      console.log('Deletando transação:', transactionId);
-
-      await transactionsAPI.delete(transactionId);
-      console.log('Transação deletada com sucesso');
-
-      // Optimistic update: Remove da lista imediatamente
-      setTransactions(prev => prev.filter(t => t.id !== transactionId));
-      toast.success('Transação excluída com sucesso!');
-
-      // Tenta recarregar dados completos (para atualizar totais, etc)
-      try {
-        await loadData();
-      } catch (loadErr) {
-        console.warn('Falha ao recarregar dados após delete (UI já atualizada):', loadErr);
-        // UI já foi atualizada com optimistic update, então não é crítico
-      }
-    } catch (err: any) {
-      console.error('Delete transaction error:', err);
-
-      // Rollback: Restaura estado anterior se delete falhou
-      setTransactions(previousTransactions);
-
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Erro ao deletar transação';
-      setError(errorMessage);
-      toast.error(errorMessage);
-
-      // Remove a mensagem de erro após 5 segundos
-      setTimeout(() => setError(''), 5000);
-    } finally {
-      setLoading(false);
-    }
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    await transactionsAPI.delete(pendingDelete.id);
+    toast.success('Transação excluída com sucesso!');
+    setPendingDelete(null);
+    // Ao excluir a última da página, volta uma página; senão apenas recarrega.
+    if (list.data?.rows.length === 1 && filters.page > 1) updateFilters({ page: filters.page - 1 });
+    else refresh();
   };
 
   const handleFormSubmit = async (formData: TransactionSubmitPayload) => {
-    try {
-      setError(''); // Limpa erros anteriores
-      if (editingTransaction) {
-        await transactionsAPI.update(editingTransaction.id, formData);
-        toast.success('Transação atualizada com sucesso!');
-      } else {
-        await transactionsAPI.create(formData);
-        toast.success('Transação criada com sucesso!');
-      }
-
-      // Fecha o modal apenas se a requisição foi bem-sucedida
-      setShowForm(false);
-      setEditingTransaction(null);
-      await loadData(); // Recarrega lista
-    } catch (err: any) {
-      // Propaga o erro para o formulário exibir a mensagem
-      console.error('Erro ao salvar transação:', err);
-      throw err;
+    if (editingTransaction) {
+      await transactionsAPI.update(editingTransaction.id, formData);
+      toast.success('Transação atualizada com sucesso!');
+    } else {
+      await transactionsAPI.create(formData);
+      toast.success('Transação criada com sucesso!');
     }
+    // Fecha o modal apenas se a requisição foi bem-sucedida; o formulário exibe o erro caso contrário.
+    setShowForm(false);
+    setEditingTransaction(null);
+    refresh();
   };
 
-  // Mostra loading enquanto autenticação está sendo verificada ou dados estão carregando
-  if (authLoading || (!transactions.length && loading && isAuthenticated)) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
+        <div className="text-center" role="status">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
           <p className="text-slate-600">{t('common.loading')}</p>
         </div>
       </div>
     );
   }
+
+  const pagination = list.data?.pagination;
+  const totalPages = Math.max(1, pagination?.pages ?? 1);
 
   return (
     <div className="space-y-6">
@@ -366,64 +224,26 @@ const Transactions = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
+            type="button"
             onClick={() => navigate('/import')}
             className="btn-base bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white shadow-sm px-4 py-2.5 flex items-center gap-2"
           >
-            <i className="bi bi-upload"></i>
+            <i className="bi bi-upload" aria-hidden="true"></i>
             Importar dados
           </button>
           <button
+            type="button"
             onClick={handleAddTransaction}
             className="btn-base bg-brand-500 hover:bg-brand-600 text-white shadow-sm px-4 py-2.5 flex items-center gap-2"
           >
-            <i className="bi bi-plus-circle"></i>
+            <i className="bi bi-plus-circle" aria-hidden="true"></i>
             {t('transactions.add')}
           </button>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-error-light border border-error rounded-card p-4 flex items-center gap-2">
-          <i className="bi bi-exclamation-triangle-fill text-error"></i>
-          <span className="text-error-dark">{error}</span>
-        </div>
-      )}
-
-      <section aria-label="Resumo das transações filtradas" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: 'Entradas recebidas', value: facets?.summary?.paid_income ?? 0, icon: 'arrow-down-left', valueClass: 'text-emerald-600 dark:text-emerald-400', iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300', hint: 'Receitas pagas no filtro' },
-          { label: 'Total pago', value: facets?.summary?.paid_expense ?? 0, icon: 'check2-circle', valueClass: 'text-blue-600 dark:text-blue-400', iconClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300', hint: 'Despesas efetivadas no filtro' },
-          { label: 'Saldo líquido', value: facets?.summary?.net_paid ?? 0, icon: 'activity', valueClass: (facets?.summary?.net_paid ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400', iconClass: (facets?.summary?.net_paid ?? 0) >= 0 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300', hint: 'Entradas menos pagamentos' },
-        ].map((item) => (
-          <article key={item.label} className="card-base p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
-                <p className={`mt-2 truncate text-xl font-bold ${item.valueClass}`}>
-                  {formatCurrency(item.value)}
-                </p>
-              </div>
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.iconClass}`}>
-                <i className={`bi bi-${item.icon}`} aria-hidden="true" />
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p>
-          </article>
-        ))}
-        <article className="card-base p-4 sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Transações</p>
-          <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">{facets?.summary?.transaction_count ?? totalCount ?? 0}</p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">No período e filtros atuais</p>
-        </article>
-        <article className="card-base border-amber-200 p-4 sm:p-5 dark:border-amber-800/50">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Revisar categoria</p>
-          <p className="mt-2 text-xl font-bold text-amber-700 dark:text-amber-300">{facets?.summary?.uncategorized_count ?? 0}</p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Sem classificação confiável</p>
-        </article>
-      </section>
-
-      {/* Filtros */}
-      <section className="card-base overflow-hidden">
+      {/* Filtros (antes dos indicadores) */}
+      <section className="card-base overflow-hidden" aria-label="Filtros das transações">
         <button
           type="button"
           onClick={() => setShowFilters((current) => !current)}
@@ -454,16 +274,40 @@ const Transactions = () => {
         filters={filters}
         onChange={updateFilters}
         onClear={clearFilters}
-        total={totalCount}
+        total={pagination?.total}
       />
 
+      {/* Indicadores */}
+      <SummaryBlock facets={facets.data} fallbackCount={pagination?.total} loading={facets.loading} error={facets.error} retry={refresh} />
+
       {/* Lista de Transações */}
-      <TransactionList
-        transactions={transactions}
-        onEdit={handleEditTransaction}
-        onDelete={handleDeleteTransaction}
-        loading={loading}
-      />
+      <section aria-label="Lista de transações" className="tx space-y-4">
+        {list.error ? (
+          <div className="tx-error" role="alert">
+            <span>Lista indisponível. {list.error}</span>
+            <button type="button" className="tx-button" onClick={refresh}>Tentar novamente</button>
+          </div>
+        ) : (
+          <TransactionList
+            transactions={list.data?.rows ?? []}
+            accountNames={accountNames}
+            onEdit={handleEditTransaction}
+            onDelete={setPendingDelete}
+            loading={list.loading}
+          />
+        )}
+        {pagination && pagination.total > 0 && (
+          <nav aria-label="Paginação das transações" className="tx-pagination">
+            <p className="tx-muted text-sm">
+              {pagination.total} {pagination.total === 1 ? 'transação' : 'transações'} · página {filters.page} de {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <button type="button" className="tx-button" disabled={filters.page <= 1 || list.loading} onClick={() => updateFilters({ page: filters.page - 1 })}>Anterior</button>
+              <button type="button" className="tx-button" disabled={filters.page >= totalPages || list.loading} onClick={() => updateFilters({ page: filters.page + 1 })}>Próxima</button>
+            </div>
+          </nav>
+        )}
+      </section>
 
       {/* Modal do Formulário */}
       {showForm && (
@@ -478,7 +322,24 @@ const Transactions = () => {
           categories={categories}
           transaction={editingTransaction}
           defaultType={initialTransactionType ?? 'expense'}
-          responsiblePersons={facets?.responsible_persons ?? []}
+          responsiblePersons={facets.data?.responsible_persons ?? []}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Excluir transação"
+          subject={pendingDelete.description}
+          details={[
+            ['Valor', formatCurrency(Math.abs(Number(pendingDelete.amount) || 0))],
+            ['Data', formatDate(pendingDelete.date)],
+          ]}
+          consequence={<p>Esta ação não pode ser desfeita.</p>}
+          confirmLabel="Excluir"
+          danger
+          errorMessage="Não foi possível excluir a transação. Tente novamente."
+          onConfirm={confirmDelete}
+          onClose={() => setPendingDelete(null)}
         />
       )}
     </div>

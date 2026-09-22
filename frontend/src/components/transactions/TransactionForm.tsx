@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { AppDialog } from '../shared/AppDialog';
 import { useTranslation } from 'react-i18next';
 import CurrencyInput from '../ui/CurrencyInput';
 import {
@@ -10,6 +11,7 @@ import {
 } from '../../types/transaction';
 import { parseCurrencyString, formatNumberToBR } from '../../lib/utils';
 import { accountsAPI } from '../../utils/api';
+import './transactions.css';
 
 interface TransactionFormData {
   description: string;
@@ -61,6 +63,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [accounts, setAccounts] = useState<any[]>([]);
   const [accountsLoading, setAccountsLoading] = useState<boolean>(false);
   const [accountsError, setAccountsError] = useState<string>('');
+  const submitLock = useRef(false);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   // Carrega contas ao montar o componente
   const loadAccounts = async () => {
@@ -94,10 +98,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else {
         setAccountsError('Erro ao carregar contas. Tente novamente.');
       }
-    } catch (err: any) {
-      console.error('Erro ao carregar contas:', err);
+    } catch {
       setAccounts([]); // Garante que accounts seja sempre um array
-      setAccountsError(err.response?.data?.error || err.message || 'Erro ao carregar contas. Verifique sua conexão.');
+      setAccountsError('Erro ao carregar contas. Verifique sua conexão.');
     } finally {
       setAccountsLoading(false);
     }
@@ -128,14 +131,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               // Se falhar, tenta normalizar usando a função normalizeDate
               try {
                 normalizedDate = normalizeDate(transaction.date);
-              } catch (normalizeErr) {
-                console.error('Erro ao normalizar data:', normalizeErr);
+              } catch {
                 normalizedDate = new Date().toISOString().split('T')[0];
               }
             }
           }
-        } catch (err) {
-          console.error('Erro ao processar data:', err);
+        } catch {
           normalizedDate = new Date().toISOString().split('T')[0];
         }
       } else {
@@ -258,7 +259,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           date: normalized,
         }));
         setError('');
-      } catch (err) {
+      } catch {
         setError('Data inválida. Por favor, selecione uma data válida usando o calendário.');
       }
     }
@@ -266,6 +267,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitLock.current) return; // bloqueia duplo envio
+    submitLock.current = true;
     setLoading(true);
     setError('');
 
@@ -320,14 +323,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       // Se chegou aqui, o submit foi bem-sucedido
       // O componente pai (Transactions) deve fechar o modal
     } catch (err: any) {
-      console.error('Erro ao salvar transação:', err);
       const errorMessage = err?.response?.data?.error || err?.message || 'Erro ao salvar transação';
       setError(errorMessage);
       // Não fecha o modal em caso de erro para o usuário ver a mensagem
     } finally {
+      submitLock.current = false;
       setLoading(false);
     }
   };
+
 
   const handleClose = () => {
     if (!loading) {
@@ -337,327 +341,254 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   // Filtra categorias baseado no tipo selecionado
   const filteredCategories = categories.filter(cat => cat.type === formData.type);
+  const selectedAccount = accounts.find((acc: any) => (acc.id || acc._id) === formData.account_id);
+  const accountTypeLabel = (type?: string) => type === 'checking' ? 'Conta Corrente' : type === 'savings' ? 'Poupança' : type === 'wallet' ? 'Carteira' : type === 'investment' ? 'Investimento' : type;
 
   if (!show) return null;
 
   return (
-    <>
-      <div className="modal-backdrop fade show" style={{ position: 'fixed', zIndex: 1040 }}></div>
-      <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex={-1} role="dialog">
-        <div className="modal-dialog modal-lg" role="document">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">
-              {transaction ? t('transactions.edit') : t('transactions.add')}
-            </h5>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={handleClose}
+    <AppDialog title={transaction ? t('transactions.edit') : t('transactions.add')} onClose={handleClose} busy={loading} initialFocus={firstFieldRef} size="lg">
+      <form onSubmit={handleSubmit} className="app-dialog-body tx" noValidate>
+        {error && (
+          <div className="tx-form-error" role="alert">
+            <i className="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> {error}
+          </div>
+        )}
+
+        <div className="tx-form-grid">
+          {/* Tipo */}
+          <fieldset className="tx-field" disabled={loading}>
+            <legend className="tx-legend">{t('transactions.type')}</legend>
+            <div className="tx-type-group">
+              <label className="tx-type-option" htmlFor="income">
+                <input
+                  ref={formData.type === 'income' ? firstFieldRef : undefined}
+                  type="radio"
+                  name="type"
+                  id="income"
+                  value="income"
+                  checked={formData.type === 'income'}
+                  onChange={handleChange}
+                />
+                <i className="bi bi-arrow-up-circle" aria-hidden="true"></i>
+                {t('transactions.income')}
+              </label>
+              <label className="tx-type-option" htmlFor="expense">
+                <input
+                  ref={formData.type !== 'income' ? firstFieldRef : undefined}
+                  type="radio"
+                  name="type"
+                  id="expense"
+                  value="expense"
+                  checked={formData.type === 'expense'}
+                  onChange={handleChange}
+                />
+                <i className="bi bi-arrow-down-circle" aria-hidden="true"></i>
+                {t('transactions.expense')}
+              </label>
+            </div>
+          </fieldset>
+
+          {/* Categoria */}
+          <div className="tx-field">
+            <label htmlFor="transaction-category">{t('transactions.category')}</label>
+            <select
+              id="transaction-category"
+              name="category_id"
+              className="select-base"
+              value={formData.category_id}
+              onChange={handleChange}
+              required
               disabled={loading}
-              aria-label="Fechar"
-            ></button>
+            >
+              <option value="">Selecionar categoria</option>
+              {filteredCategories.map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-              {error && (
-                <div className="alert alert-danger" role="alert">
-                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                  {error}
-                </div>
+          {/* Conta */}
+          <div className="tx-field">
+            <label htmlFor="transaction-account">Conta {formData.account_id && <span className="tx-hint-success" aria-hidden="true">✓</span>}</label>
+            <select
+              id="transaction-account"
+              name="account_id"
+              className="select-base"
+              value={formData.account_id}
+              onChange={handleChange}
+              disabled={loading || accountsLoading}
+              aria-describedby="transaction-account-hint"
+            >
+              <option value="">Selecione uma conta</option>
+              {accountsLoading ? (
+                <option value="" disabled>Carregando contas...</option>
+              ) : accounts.length > 0 ? (
+                accounts.map((account) => (
+                  <option key={account.id || account._id} value={account.id || account._id}>
+                    {account.name} {account.type && `(${accountTypeLabel(account.type)})`}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>Nenhuma conta disponível</option>
               )}
+            </select>
+            {accountsError && (
+              <p className="tx-hint tx-hint-warning" role="alert">
+                <i className="bi bi-exclamation-circle" aria-hidden="true"></i> {accountsError}{' '}
+                <button type="button" onClick={loadAccounts} className="tx-button" disabled={accountsLoading}>
+                  <i className="bi bi-arrow-clockwise" aria-hidden="true"></i> Tentar novamente
+                </button>
+              </p>
+            )}
+            <p id="transaction-account-hint" className={`tx-hint ${formData.account_id ? 'tx-hint-success' : 'tx-hint-warning'}`}>
+              {formData.account_id
+                ? 'Transação será associada à conta selecionada'
+                : 'Recomendado: associe a transação a uma conta para melhor controle'}
+            </p>
+            {selectedAccount && (
+              <p className="tx-hint">
+                <i className={`bi bi-${selectedAccount.icon || 'wallet2'}`} aria-hidden="true"></i>{' '}
+                <strong>{selectedAccount.name}</strong>
+                {selectedAccount.institution && <span> • {selectedAccount.institution}</span>}
+              </p>
+            )}
+          </div>
 
-              <div className="row g-3">
-                {/* Tipo */}
-                <div className="col-md-6">
-                  <label className="form-label">{t('transactions.type')}</label>
-                  <div className="btn-group w-100" role="group">
-                    <input
-                      type="radio"
-                      className="btn-check"
-                      name="type"
-                      id="income"
-                      value="income"
-                      checked={formData.type === 'income'}
-                      onChange={handleChange}
-                      disabled={loading}
-                    />
-                    <label className="btn btn-outline-success" htmlFor="income">
-                      <i className="bi bi-arrow-up-circle me-2"></i>
-                      {t('transactions.income')}
-                    </label>
+          {/* Descrição */}
+          <div className="tx-field tx-form-full">
+            <label htmlFor="transaction-description">{t('transactions.description')}</label>
+            <input
+              type="text"
+              id="transaction-description"
+              name="description"
+              className="input-base"
+              value={formData.description}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              placeholder="Ex: Compras no supermercado"
+              autoComplete="off"
+            />
+          </div>
 
-                    <input
-                      type="radio"
-                      className="btn-check"
-                      name="type"
-                      id="expense"
-                      value="expense"
-                      checked={formData.type === 'expense'}
-                      onChange={handleChange}
-                      disabled={loading}
-                    />
-                    <label className="btn btn-outline-danger" htmlFor="expense">
-                      <i className="bi bi-arrow-down-circle me-2"></i>
-                      {t('transactions.expense')}
-                    </label>
-                  </div>
-                </div>
+          {/* Valor */}
+          <div className="tx-field">
+            <label htmlFor="transaction-amount">{t('transactions.amount')}</label>
+            <CurrencyInput
+              id="transaction-amount"
+              name="amount"
+              className="input-base"
+              value={formData.amount}
+              onValueChange={handleAmountChange}
+              placeholder="0,00"
+              disabled={loading}
+              required
+              autoComplete="off"
+            />
+          </div>
 
-                {/* Categoria */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-category" className="form-label">
-                    <i className="bi bi-tag me-2"></i>
-                    {t('transactions.category')}
-                  </label>
-                  <select
-                    id="transaction-category"
-                    name="category_id"
-                    className="form-select"
-                    value={formData.category_id}
-                    onChange={handleChange}
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Selecionar categoria</option>
-                    {filteredCategories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* Data */}
+          <div className="tx-field">
+            <label htmlFor="transaction-date">{t('transactions.date')}</label>
+            <input
+              type="date"
+              id="transaction-date"
+              name="date"
+              className="input-base"
+              value={formData.date}
+              onChange={handleDateChange}
+              required
+              disabled={loading}
+              max={new Date().toISOString().split('T')[0]}
+            />
+            {formData.date && (
+              <p className="tx-hint">Data selecionada: {new Date(formData.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+            )}
+          </div>
 
-                {/* Conta - Campo destacado */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-account" className="form-label">
-                    <i className="bi bi-wallet2 me-2"></i>
-                    Conta {formData.account_id && <span className="text-success">✓</span>}
-                  </label>
-                  <select
-                    id="transaction-account"
-                    name="account_id"
-                    className={`form-select ${formData.account_id ? 'border-success' : 'border-warning'}`}
-                    value={formData.account_id}
-                    onChange={handleChange}
-                    disabled={loading || accountsLoading}
-                  >
-                    <option value="">Selecione uma conta</option>
-                    {accountsLoading ? (
-                      <option value="" disabled>Carregando contas...</option>
-                    ) : accounts.length > 0 ? (
-                      accounts.map((account) => (
-                        <option key={account.id || account._id} value={account.id || account._id}>
-                          {account.name} {account.type && `(${account.type === 'checking' ? 'Conta Corrente' : account.type === 'savings' ? 'Poupança' : account.type === 'wallet' ? 'Carteira' : account.type === 'investment' ? 'Investimento' : account.type})`}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>Nenhuma conta disponível</option>
-                    )}
-                  </select>
-                  {accountsError && (
-                    <div className="form-text text-danger d-flex align-items-center gap-2">
-                      <i className="bi bi-exclamation-circle"></i>
-                      <span>{accountsError}</span>
-                      <button
-                        type="button"
-                        onClick={loadAccounts}
-                        className="btn btn-sm btn-outline-primary ms-2"
-                        disabled={accountsLoading}
-                      >
-                        <i className="bi bi-arrow-clockwise me-1"></i>
-                        Tentar novamente
-                      </button>
-                    </div>
-                  )}
-                  {formData.account_id ? (
-                    <div className="form-text text-success">
-                      <i className="bi bi-check-circle me-1"></i>
-                      Transação será associada à conta selecionada
-                    </div>
-                  ) : (
-                    <div className="form-text text-warning">
-                      <i className="bi bi-exclamation-triangle me-1"></i>
-                      Recomendado: Associe a transação a uma conta para melhor controle
-                    </div>
-                  )}
-                  {formData.account_id && accounts.find((acc: any) => (acc.id || acc._id) === formData.account_id) && (
-                    <div className="mt-2 p-2 bg-light rounded">
-                      <small className="text-muted">
-                        <i className={`bi bi-${accounts.find((acc: any) => (acc.id || acc._id) === formData.account_id)?.icon || 'wallet2'} me-1`}></i>
-                        <strong>{accounts.find((acc: any) => (acc.id || acc._id) === formData.account_id)?.name}</strong>
-                        {accounts.find((acc: any) => (acc.id || acc._id) === formData.account_id)?.institution && (
-                          <span className="ms-2">• {accounts.find((acc: any) => (acc.id || acc._id) === formData.account_id)?.institution}</span>
-                        )}
-                      </small>
-                    </div>
-                  )}
-                </div>
+          {/* Parcelamento */}
+          <div className="tx-field">
+            <label htmlFor="transaction-installments">{t('transactions.installments')}</label>
+            <input
+              type="number"
+              id="transaction-installments"
+              name="installments"
+              className="input-base"
+              value={formData.installments}
+              onChange={handleChange}
+              min="1"
+              max="60"
+              disabled={loading}
+            />
+            <p className="tx-hint">Para parcelar, defina um valor maior que 1</p>
+          </div>
 
-                {/* Descrição */}
-                <div className="col-12">
-                  <label htmlFor="transaction-description" className="form-label">{t('transactions.description')}</label>
-                  <input
-                    type="text"
-                    id="transaction-description"
-                    name="description"
-                    className="form-control"
-                    value={formData.description}
-                    onChange={handleChange}
-                    required
-                    disabled={loading}
-                    placeholder="Ex: Compras no supermercado"
-                    autoComplete="transaction-description"
-                  />
-                </div>
-
-                {/* Valor */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-amount" className="form-label">{t('transactions.amount')}</label>
-                  <CurrencyInput
-                    id="transaction-amount"
-                    name="amount"
-                    className="form-control"
-                    value={formData.amount}
-                    onValueChange={handleAmountChange}
-                    placeholder="0,00"
-                    disabled={loading}
-                    required
-                    autoComplete="transaction-amount"
-                  />
-                </div>
-
-                {/* Data */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-date" className="form-label">{t('transactions.date')}</label>
-                  <input
-                    type="date"
-                    id="transaction-date"
-                    name="date"
-                    className="form-control"
-                    value={formData.date}
-                    onChange={handleDateChange}
-                    required
-                    disabled={loading}
-                    max={new Date().toISOString().split('T')[0]} // Opcional: limita a data máxima
-                  />
-                  {formData.date && (
-                    <div className="form-text text-muted">
-                      Data selecionada: {new Date(formData.date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    </div>
-                  )}
-                </div>
-
-                {/* Parcelamento */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-installments" className="form-label">{t('transactions.installments')}</label>
-                  <input
-                    type="number"
-                    id="transaction-installments"
-                    name="installments"
-                    className="form-control"
-                    value={formData.installments}
-                    onChange={handleChange}
-                    min="1"
-                    max="60"
-                    disabled={loading}
-                  />
-                  <div className="form-text">
-                    Para parcelar, defina um valor maior que 1
-                  </div>
-                </div>
-
-                {/* Recorrente */}
-                <div className="col-md-6">
-                  <div className="form-check mt-4">
-                    <input
-                      type="checkbox"
-                      name="is_recurring"
-                      className="form-check-input"
-                      id="is_recurring"
-                      checked={formData.is_recurring}
-                      onChange={handleChange}
-                      disabled={loading}
-                    />
-                    <label className="form-check-label" htmlFor="is_recurring">
-                      {t('transactions.recurring')}
-                    </label>
-                  </div>
-                  <div className="form-text">
-                    Transação se repete mensalmente
-                  </div>
-                </div>
-
-                {/* Responsável */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-responsible" className="form-label">Responsável</label>
-                  <input
-                    id="transaction-responsible"
-                    name="responsible_person"
-                    className="form-control"
-                    list="transaction-responsible-suggestions"
-                    value={formData.responsible_person}
-                    onChange={handleChange}
-                    disabled={loading}
-                    placeholder="Quem é o responsável?"
-                  />
-                  <datalist id="transaction-responsible-suggestions">
-                    {responsiblePersons.map((rp) => (
-                      <option key={rp.name} value={rp.name} />
-                    ))}
-                  </datalist>
-                </div>
-
-                {/* Status (apenas visualização por enquanto) */}
-                <div className="col-md-6">
-                  <label htmlFor="transaction-status" className="form-label">Status</label>
-                  <select
-                    id="transaction-status"
-                    name="status"
-                    className="form-select"
-                    value={formData.status}
-                    onChange={handleChange}
-                    disabled={loading}
-                  >
-                    <option value="pending">Pendente</option>
-                    <option value="paid">Pago</option>
-                    <option value="overdue">Atrasado</option>
-                    <option value="cancelled">Cancelado</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleClose}
+          {/* Recorrente */}
+          <div className="tx-field">
+            <label className="tx-check" htmlFor="is_recurring">
+              <input
+                type="checkbox"
+                name="is_recurring"
+                id="is_recurring"
+                checked={formData.is_recurring}
+                onChange={handleChange}
                 disabled={loading}
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="loading-spinner me-2"></span>
-                    {t('common.loading')}
-                  </>
-                ) : (
-                  t('common.save')
-                )}
-              </button>
-            </div>
-          </form>
+              />
+              {t('transactions.recurring')}
+            </label>
+            <p className="tx-hint">Transação se repete mensalmente</p>
+          </div>
+
+          {/* Responsável */}
+          <div className="tx-field">
+            <label htmlFor="transaction-responsible">Responsável</label>
+            <input
+              id="transaction-responsible"
+              name="responsible_person"
+              className="input-base"
+              list="transaction-responsible-suggestions"
+              value={formData.responsible_person}
+              onChange={handleChange}
+              disabled={loading}
+              placeholder="Quem é o responsável?"
+            />
+            <datalist id="transaction-responsible-suggestions">
+              {responsiblePersons.map((rp) => (
+                <option key={rp.name} value={rp.name} />
+              ))}
+            </datalist>
+          </div>
+
+          {/* Status */}
+          <div className="tx-field">
+            <label htmlFor="transaction-status">Situação</label>
+            <select
+              id="transaction-status"
+              name="status"
+              className="select-base"
+              value={formData.status}
+              onChange={handleChange}
+              disabled={loading}
+            >
+              <option value="pending">Pendente</option>
+              <option value="paid">Pago</option>
+              <option value="overdue">Atrasado</option>
+              <option value="cancelled">Cancelado</option>
+            </select>
+          </div>
         </div>
-      </div>
-      </div>
-    </>
+
+        <div className="app-dialog-actions">
+          <button type="button" className="app-dialog-button" onClick={handleClose} disabled={loading}>
+            {t('common.cancel')}
+          </button>
+          <button type="submit" className="app-dialog-button app-dialog-button-primary" disabled={loading}>
+            {loading ? 'Salvando…' : t('common.save')}
+          </button>
+        </div>
+      </form>
+    </AppDialog>
   );
 };
 

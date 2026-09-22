@@ -289,7 +289,7 @@ interface ReportOverviewParams {
 
 // Funções de transações
 export const transactionsAPI = {
-  getAll: (filters: Record<string, any> = {}) => {
+  getAll: (filters: Record<string, any> = {}, config?: { signal?: AbortSignal }) => {
     const params = new URLSearchParams();
     Object.keys(filters).forEach(key => {
       // Só adiciona parâmetros que têm valor (não vazio, não null, não undefined)
@@ -298,9 +298,9 @@ export const transactionsAPI = {
         params.append(key, String(value));
       }
     });
-    return api.get(`/transactions?${params.toString()}`);
+    return api.get(`/transactions?${params.toString()}`, config);
   },
-  getFacets: (filters: Record<string, any> = {}) => {
+  getFacets: (filters: Record<string, any> = {}, config?: { signal?: AbortSignal }) => {
     const params = new URLSearchParams();
     Object.keys(filters).forEach((key) => {
       const value = filters[key];
@@ -308,7 +308,7 @@ export const transactionsAPI = {
         params.append(key, String(value));
       }
     });
-    return api.get(`/transactions/facets?${params.toString()}`);
+    return api.get(`/transactions/facets?${params.toString()}`, config);
   },
   create: (transactionData: any) => api.post('/transactions', transactionData),
   update: (id: string, transactionData: any) => api.put(`/transactions/${id}`, transactionData),
