@@ -1,0 +1,66 @@
+/* Tabela de lotes: em telas estreitas cada linha vira um cartão, sem rolagem horizontal. */
+.import-batches {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.import-batches td,
+.import-batches th {
+  padding: 0.75rem 1rem;
+  vertical-align: top;
+}
+
+@media (max-width: 767.98px) {
+  .import-batches,
+  .import-batches tbody,
+  .import-batches tr,
+  .import-batches td {
+    display: block;
+    width: 100%;
+  }
+
+  .import-batches thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .import-batches tr {
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.75rem;
+  }
+
+  .dark .import-batches tr {
+    border-color: rgb(51 65 85);
+  }
+
+  .import-batches td {
+    padding: 0.375rem 1rem;
+  }
+
+  .import-batches td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(71 85 105);
+    margin-bottom: 0.125rem;
+  }
+
+  .dark .import-batches td::before {
+    color: rgb(148 163 184);
+  }
+
+  .import-batches td.import-batches-action {
+    text-align: left;
+  }
+}

@@ -40,10 +40,12 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
       {/* Navigation Buttons */}
       <button
         className="p-2.5 text-slate-600 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+        type="button"
         onClick={handlePrevMonth}
         title="Mês anterior"
+        aria-label="Mês anterior"
       >
-        <i className="bi bi-chevron-left text-lg"></i>
+        <i className="bi bi-chevron-left text-lg" aria-hidden="true"></i>
       </button>
 
       {/* Current Period Display */}
@@ -53,10 +55,12 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
 
       <button
         className="p-2.5 text-slate-600 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+        type="button"
         onClick={handleNextMonth}
         title="Próximo mês"
+        aria-label="Próximo mês"
       >
-        <i className="bi bi-chevron-right text-lg"></i>
+        <i className="bi bi-chevron-right text-lg" aria-hidden="true"></i>
       </button>
 
       {/* Quick Select Dropdown */}
@@ -65,8 +69,9 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
           className="p-2.5 text-slate-600 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
           type="button"
           title="Selecionar período"
+          aria-label="Selecionar período"
         >
-          <i className="bi bi-calendar3 text-lg"></i>
+          <i className="bi bi-calendar3 text-lg" aria-hidden="true"></i>
         </button>
 
         {/* Dropdown Menu */}
@@ -78,6 +83,8 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
               {months.map((month, index) => (
                 <button
                   key={index}
+                  type="button"
+                  aria-pressed={filters.month === index + 1}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     filters.month === index + 1
                       ? 'bg-blue-50 dark:bg-blue-300 text-blue-700 dark:text-slate-900 font-medium'
@@ -98,6 +105,8 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({ filters, onFilterChange }
               {years.map(year => (
                 <button
                   key={year}
+                  type="button"
+                  aria-pressed={filters.year === year}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     filters.year === year
                       ? 'bg-blue-50 dark:bg-blue-300 text-blue-700 dark:text-slate-900 font-medium'

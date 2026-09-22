@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, reportsAPI, ReportOverviewResponse, accountsAPI } from '../../utils/api';
@@ -23,12 +23,19 @@ interface ReportFiltersState {
   account_id: string;
 }
 
+interface ReportAccountOption {
+  id: string;
+  name: string;
+  type?: string;
+}
+
+type AccountsStatus = 'loading' | 'ready' | 'error';
+
+const REPORT_ERROR_MESSAGE ='Indisponível. Os dados do relatório não foram carregados.';
+
 const Reports = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const [reportData, setReportData] = useState<ReportOverviewResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const [filters, setFilters] = useState<ReportFiltersState>({
     month: new Date().getMonth() + 1,
@@ -38,7 +45,8 @@ const Reports = () => {
     account_id: ''
   });
 
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<ReportAccountOption[]>([]);
+  const [accountsStatus, setAccountsStatus] = useState<AccountsStatus>('loading');
 
   const reportTypes: Array<{ value: ReportTypeOption; label: string; icon: string }> = [
     { value: 'expenses_by_category', label: 'Despesas por categorias', icon: 'bi-arrow-down-circle' },
@@ -49,34 +57,16 @@ const Reports = () => {
   ];
 
   const chartTypes: Array<{ value: ChartDisplayType; label: string; icon: string }> = [
-    { value: 'pie', label: 'Gráfico de Pizza', icon: 'bi-pie-chart-fill' },
-    { value: 'doughnut', label: 'Gráfico Rosca', icon: 'bi-circle-fill' },
-    { value: 'bar', label: 'Gráfico de Barras', icon: 'bi-bar-chart-fill' },
-    { value: 'line', label: 'Gráfico de Linha', icon: 'bi-graph-up' }
+    { value: 'pie', label: 'Gráfico de pizza', icon: 'bi-pie-chart-fill' },
+    { value: 'doughnut', label: 'Gráfico de rosca', icon: 'bi-circle-fill' },
+    { value: 'bar', label: 'Gráfico de barras', icon: 'bi-bar-chart-fill' },
+    { value: 'line', label: 'Gráfico de linha', icon: 'bi-graph-up' }
   ];
 
-  useEffect(() => {
-    // Carrega contas quando autenticado
-    if (isAuthenticated && !authLoading) {
-      loadAccounts();
-    }
-  }, [isAuthenticated, authLoading]);
+  const enabled = isAuthenticated && !authLoading;
 
-  useEffect(() => {
-    // Só carrega dados se o usuário estiver autenticado e a autenticação não estiver carregando
-    if (isAuthenticated && !authLoading) {
-      loadReportData();
-    }
-  }, [filters, isAuthenticated, authLoading]);
-
-  const [payablesRevision, setPayablesRevision] = useState(0);
-  const payables = useKeyedRequest<PayablesSummary>(
-    `${filters.year}-${filters.month}:${payablesRevision}`,
-    isAuthenticated && !authLoading,
-    async (signal) => ({ data: await loadPayablesSummary(filters.month, filters.year, signal) }),
-  );
-
-  const loadAccounts = async () => {
+  const loadAccounts = useCallback(async () => {
+    setAccountsStatus('loading');
     try {
       const response = await accountsAPI.getAll();
       const accountsArray = Array.isArray(response.data) ? response.data : [];
@@ -90,56 +80,53 @@ const Reports = () => {
         }))
         .filter((acc: any) => acc.id);
       setAccounts(activeAccounts);
+      setAccountsStatus('ready');
     } catch (err) {
       console.error('Reports: Erro ao carregar contas:', err);
+      setAccounts([]);
+      setAccountsStatus('error');
     }
-  };
+  }, []);
 
-  const loadReportData = async () => {
-    setLoading(true);
-    setError('');
+  useEffect(() => {
+    // Carrega contas quando autenticado
+    if (enabled) {
+      void loadAccounts();
+    }
+  }, [enabled, loadAccounts]);
 
-    try {
-      const params: any = {
+  // A chave inclui os filtros e uma revisão: qualquer troca descarta a resposta anterior.
+  const [reportRevision, setReportRevision] = useState(0);
+  const report = useKeyedRequest<ReportOverviewResponse>(
+    `${JSON.stringify(filters)}:${reportRevision}`,
+    enabled,
+    async () => {
+      const params: { month: string; year: string; type: string; account_id?: string } = {
         month: filters.month.toString(),
         year: filters.year.toString(),
         type: filters.report_type
       };
-
-      // Adiciona account_id se selecionado
       if (filters.account_id) {
         params.account_id = filters.account_id;
       }
-
       const response = await reportsAPI.getOverview(params);
-
       // Garante que a resposta tenha a estrutura esperada
-      if (response.data) {
-        setReportData(response.data);
-      } else {
+      if (!response?.data || !Array.isArray(response.data.data)) {
         throw new Error('Resposta inválida do servidor');
       }
-    } catch (err: any) {
-      console.error('Report error:', err);
+      return { data: response.data };
+    },
+  );
+  const reportData = report.data;
+  const reportLoading = report.loading;
+  const reportError = report.error !== '';
 
-      // Extrai mensagem de erro mais específica
-      let errorMessage = 'Erro ao carregar dados do relatório';
-
-      if (err?.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      } else if (err?.response?.status === 401) {
-        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
-      } else if (err?.response?.status === 500) {
-        errorMessage = 'Erro no servidor. Tente novamente mais tarde.';
-      }
-
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [payablesRevision, setPayablesRevision] = useState(0);
+  const payables = useKeyedRequest<PayablesSummary>(
+    `${filters.year}-${filters.month}:${payablesRevision}`,
+    enabled,
+    async (signal) => ({ data: await loadPayablesSummary(filters.month, filters.year, signal) }),
+  );
 
   const handleFilterChange = <K extends keyof ReportFiltersState>(field: K, value: ReportFiltersState[K]) => {
     setFilters(prev => ({
@@ -186,10 +173,10 @@ const Reports = () => {
     navigate(`/transactions?${params.toString()}`);
   };
 
-  // Mostra loading enquanto autenticação está sendo verificada ou dados estão carregando
-  if (authLoading || (loading && isAuthenticated)) {
+  // Mostra loading apenas enquanto a autenticação está sendo verificada
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[500px]">
+      <div className="flex items-center justify-center min-h-[500px]" role="status">
         <div className="text-center">
           <div className="relative w-16 h-16 mx-auto mb-4">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 dark:border-blue-800 border-t-blue-600 dark:border-t-blue-400"></div>
@@ -197,12 +184,150 @@ const Reports = () => {
               <i className="bi bi-pie-chart text-blue-600 dark:text-blue-400 text-xl"></i>
             </div>
           </div>
-          <p className="text-slate-700 dark:text-slate-300 font-medium">Gerando relatório...</p>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Aguarde enquanto processamos os dados</p>
+          <p className="text-slate-700 dark:text-slate-300 font-medium">Carregando...</p>
         </div>
       </div>
     );
   }
+
+  const renderReportContent = () => {
+    if (reportLoading) {
+      return (
+        <div className="text-center py-16" role="status" aria-busy="true">
+          <div className="relative w-12 h-12 mx-auto mb-3">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 dark:border-blue-800 border-t-blue-600 dark:border-t-blue-400"></div>
+          </div>
+          <p className="text-slate-700 dark:text-slate-300 font-medium">Gerando relatório...</p>
+        </div>
+      );
+    }
+
+    if (reportError || !reportData) {
+      return (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex flex-wrap items-center gap-3" role="alert">
+          <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400 text-xl" aria-hidden="true"></i>
+          <div className="flex-1 min-w-[200px]">
+            <span className="text-red-800 dark:text-red-200 font-medium block">{REPORT_ERROR_MESSAGE}</span>
+            <span className="text-red-700 dark:text-red-300 text-sm">Verifique sua conexão e tente novamente</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReportRevision((v) => v + 1)}
+            className="min-h-[44px] px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
+
+    if (reportData.data.length === 0) {
+      return (
+        <div className="text-center py-16 animate-in fade-in">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
+            <i className="bi bi-pie-chart text-4xl text-slate-400 dark:text-slate-600"></i>
+          </div>
+          <h5 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">Nenhum dado encontrado</h5>
+          <p className="text-slate-500 dark:text-slate-400 mb-4">
+            Não há transações para o período selecionado
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const today = new Date();
+              setFilters(prev => ({ ...prev, month: today.getMonth() + 1, year: today.getFullYear() }));
+            }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Ver mês atual
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4">
+        <div className="lg:col-span-2">
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
+            <ReportChart
+              data={reportData.data}
+              chartType={filters.chart_type}
+            />
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Detalhes</h3>
+            <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full">
+              {reportData.data.length} {reportData.data.length === 1 ? 'item' : 'itens'}
+            </span>
+          </div>
+          <ul className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar list-none m-0 p-0" aria-label="Itens do relatório">
+            {reportData.data.map((item, index) => {
+              const percentage = item.percentage?.toFixed(1) || '0.0';
+              const value = item.total ?? item.current_balance ?? 0;
+              const color = item.category_color || item.account_color || '#6b7280';
+              const name = item.category_name || item.account_name || 'Sem nome';
+
+              return (
+                <li key={index}>
+                  <button
+                    type="button"
+                    onClick={() => handleItemClick(item)}
+                    className="w-full text-left flex items-start justify-between gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    aria-label={`Ver transações de ${name}`}
+                  >
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0 mt-1 shadow-sm ring-2 ring-white dark:ring-slate-800"
+                        style={{ backgroundColor: color }}
+                        aria-hidden="true"
+                      ></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-sm text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {name}
+                        </div>
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                          {percentage}% · {item.count || 0} {item.count === 1 ? 'transação' : 'transações'}
+                        </div>
+                        {item.percentage != null && (
+                          <div className="mt-2 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" aria-hidden="true">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${Math.min(parseFloat(percentage), 100)}%`,
+                                backgroundColor: color
+                              }}
+                            ></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="font-bold text-sm text-slate-900 dark:text-white">
+                        {formatCurrency(value)}
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {reportData.total_amount != null && (
+            <div className="border-t-2 border-slate-200 dark:border-slate-700 pt-4 mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-slate-900 dark:text-white">Total:</span>
+                <span className="font-bold text-xl text-blue-600 dark:text-blue-400">{formatCurrency(reportData.total_amount)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -214,41 +339,27 @@ const Reports = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-          <i className="bi bi-exclamation-triangle-fill text-red-600 dark:text-red-400 text-xl"></i>
-          <div className="flex-1">
-            <span className="text-red-800 dark:text-red-200 font-medium block">{error}</span>
-            <span className="text-red-600 dark:text-red-300 text-sm">Tente atualizar a página ou verificar sua conexão</span>
-          </div>
-          <button
-            onClick={() => loadReportData()}
-            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart Area */}
         <div className="lg:col-span-2 space-y-6">
           {/* Chart Type Selector */}
           <div className="card-base p-6 transition-all duration-200 hover:shadow-lg">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">{getCurrentReportLabel()}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   Análise detalhada do período selecionado
                 </p>
               </div>
 
               {/* Chart Type Buttons */}
-              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg" role="group" aria-label="Tipo de gráfico">
                 {chartTypes.map((type) => (
                   <button
                     key={type.value}
                     type="button"
+                    aria-label={type.label}
+                    aria-pressed={filters.chart_type === type.value}
                     className={`p-2.5 rounded-md transition-all duration-200 ${filters.chart_type === type.value
                         ? 'bg-blue-600 text-white shadow-md scale-105'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-105'
@@ -256,7 +367,7 @@ const Reports = () => {
                     onClick={() => handleFilterChange('chart_type', type.value)}
                     title={type.label}
                   >
-                    <i className={`${type.icon} text-lg`}></i>
+                    <i className={`${type.icon} text-lg`} aria-hidden="true"></i>
                   </button>
                 ))}
               </div>
@@ -273,7 +384,7 @@ const Reports = () => {
             {/* Account Filter */}
             <div className="mb-6">
               <label htmlFor="report-account-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                <i className="bi bi-wallet2 me-2"></i>
+                <i className="bi bi-wallet2 me-2" aria-hidden="true"></i>
                 Filtrar por conta (opcional)
               </label>
               <select
@@ -281,22 +392,26 @@ const Reports = () => {
                 className="native-select-themed !w-full py-2.5 text-sm"
                 value={filters.account_id}
                 onChange={(e) => handleFilterChange('account_id', e.target.value)}
-                disabled={loading}
+                disabled={reportLoading}
               >
                 <option value="">Todas as contas</option>
-                {accounts.length > 0 ? (
-                  accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} {account.type === 'credit_card' && '(Cartão de Crédito)'}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>Carregando contas...</option>
-                )}
+                {accountsStatus === 'ready' && accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} {account.type === 'credit_card' && '(Cartão de Crédito)'}
+                  </option>
+                ))}
+                {accountsStatus === 'loading' && <option value="" disabled>Carregando contas...</option>}
+                {accountsStatus === 'error' && <option value="" disabled>Contas indisponíveis</option>}
               </select>
+              {accountsStatus === 'error' && (
+                <p className="mt-2 text-sm text-red-700 dark:text-red-300 flex flex-wrap items-center gap-2" role="alert">
+                  <span>Contas indisponíveis. O filtro por conta não pôde ser carregado.</span>
+                  <button type="button" onClick={() => void loadAccounts()} className="underline font-medium">Tentar novamente</button>
+                </p>
+              )}
               {filters.account_id && (
                 <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                  <i className="bi bi-info-circle me-1"></i>
+                  <i className="bi bi-info-circle me-1" aria-hidden="true"></i>
                   Mostrando apenas transações da conta selecionada
                 </p>
               )}
@@ -307,105 +422,7 @@ const Reports = () => {
             </div>
 
             {/* Chart and Legend */}
-            {reportData && reportData.data && reportData.data.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4">
-                <div className="lg:col-span-2">
-                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
-                    <ReportChart
-                      data={reportData.data}
-                      chartType={filters.chart_type}
-                    />
-                  </div>
-                </div>
-
-                {/* Legend */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Detalhes</h3>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full">
-                      {reportData.data.length} {reportData.data.length === 1 ? 'item' : 'itens'}
-                    </span>
-                  </div>
-                  <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                    {reportData.data.map((item, index) => {
-                      const percentage = item.percentage?.toFixed(1) || '0.0';
-                      const value = item.total ?? item.current_balance ?? 0;
-                      const color = item.category_color || item.account_color || '#6b7280';
-                      const name = item.category_name || item.account_name || 'Sem nome';
-
-                      return (
-                        <div
-                          key={index}
-                          onClick={() => handleItemClick(item)}
-                          className="flex items-start justify-between gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
-                          title="Clique para ver as transações"
-                        >
-                          <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div
-                              className="w-4 h-4 rounded-full flex-shrink-0 mt-1 shadow-sm ring-2 ring-white dark:ring-slate-800"
-                              style={{ backgroundColor: color }}
-                            ></div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-sm text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                {name}
-                              </div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                {percentage}% · {item.count || 0} {item.count === 1 ? 'transação' : 'transações'}
-                              </div>
-                              {item.percentage && (
-                                <div className="mt-2 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all duration-500"
-                                    style={{
-                                      width: `${Math.min(parseFloat(percentage), 100)}%`,
-                                      backgroundColor: color
-                                    }}
-                                  ></div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="font-bold text-sm text-slate-900 dark:text-white">
-                              {formatCurrency(value)}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {reportData.total_amount && (
-                    <div className="border-t-2 border-slate-200 dark:border-slate-700 pt-4 mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-slate-900 dark:text-white">Total:</span>
-                        <span className="font-bold text-xl text-blue-600 dark:text-blue-400">{formatCurrency(reportData.total_amount)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-16 animate-in fade-in">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
-                  <i className="bi bi-pie-chart text-4xl text-slate-400 dark:text-slate-600"></i>
-                </div>
-                <h5 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">Nenhum dado encontrado</h5>
-                <p className="text-slate-500 dark:text-slate-400 mb-4">
-                  Não há transações para o período selecionado
-                </p>
-                <button
-                  onClick={() => {
-                    const today = new Date();
-                    handleFilterChange('month', today.getMonth() + 1);
-                    handleFilterChange('year', today.getFullYear());
-                  }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  Ver mês atual
-                </button>
-              </div>
-            )}
+            {renderReportContent()}
           </div>
         </div>
 
@@ -415,25 +432,28 @@ const Reports = () => {
           <div className="card-base overflow-hidden transition-all duration-200 hover:shadow-lg">
             <div className="card-header px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
               <div className="flex items-center gap-2">
-                <i className="bi bi-funnel text-blue-600 dark:text-blue-400"></i>
+                <i className="bi bi-funnel text-blue-600 dark:text-blue-400" aria-hidden="true"></i>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Tipo de Relatório</h3>
               </div>
             </div>
             <div className="p-3">
-              <div className="space-y-1">
+              <div className="space-y-1" role="group" aria-label="Tipo de relatório">
                 {reportTypes.map((type) => (
                   <button
                     key={type.value}
+                    type="button"
+                    aria-label={type.label}
+                    aria-pressed={filters.report_type === type.value}
                     className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 group ${filters.report_type === type.value
                         ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-md scale-[1.02]'
                         : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:scale-[1.01]'
                       }`}
                     onClick={() => handleFilterChange('report_type', type.value)}
                   >
-                    <i className={`bi ${type.icon} text-lg ${filters.report_type === type.value ? 'text-white' : 'text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400'}`}></i>
+                    <i className={`bi ${type.icon} text-lg ${filters.report_type === type.value ? 'text-white' : 'text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400'}`} aria-hidden="true"></i>
                     <span className="text-sm font-medium">{type.label}</span>
                     {filters.report_type === type.value && (
-                      <i className="bi bi-check-circle-fill ml-auto text-white"></i>
+                      <i className="bi bi-check-circle-fill ml-auto text-white" aria-hidden="true"></i>
                     )}
                   </button>
                 ))}
@@ -442,18 +462,18 @@ const Reports = () => {
           </div>
 
           {/* Quick Summary */}
-          {reportData && (
+          {reportData && !reportLoading && !reportError && (
             <div className="card-base overflow-hidden transition-all duration-200 hover:shadow-lg">
               <div className="card-header px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20">
                 <div className="flex items-center gap-2">
-                  <i className="bi bi-info-circle text-emerald-600 dark:text-emerald-400"></i>
+                  <i className="bi bi-info-circle text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Resumo do Período</h3>
                 </div>
               </div>
               <div className="p-6">
                 <div className="space-y-6">
                   <div className="text-center pb-4 border-b border-slate-200 dark:border-slate-700">
-                    <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Período</div>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">Período</div>
                     <div className="font-bold text-lg text-slate-900 dark:text-white">
                       {reportData.period
                         ? `${String(reportData.period.month).padStart(2, '0')}/${reportData.period.year}`
@@ -461,9 +481,9 @@ const Reports = () => {
                     </div>
                   </div>
 
-                  {reportData.total_amount && (
+                  {reportData.total_amount != null && (
                     <div className="text-center pb-4 border-b border-slate-200 dark:border-slate-700">
-                      <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Valor Total</div>
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">Valor Total</div>
                       <div className="font-bold text-3xl text-emerald-600 dark:text-emerald-400">
                         {formatCurrency(reportData.total_amount)}
                       </div>
@@ -471,12 +491,12 @@ const Reports = () => {
                   )}
 
                   <div className="text-center">
-                    <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Itens</div>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">Itens</div>
                     <div className="font-bold text-2xl text-slate-900 dark:text-white">
-                      {reportData.data ? reportData.data.length : 0}
+                      {reportData.data.length}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      {reportData.data && reportData.data.length > 0
+                    <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      {reportData.data.length > 0
                         ? `${reportData.data.reduce((sum, item) => sum + (item.count || 0), 0)} transações`
                         : 'Nenhuma transação'}
                     </div>
