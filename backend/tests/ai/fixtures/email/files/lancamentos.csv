@@ -1,0 +1,5 @@
+date,description,amount,type,category_name
+2026-09-03,Assinatura Streaming Exemplo,39.90,expense,Lazer
+2026-09-04,Venda Produto Digital,250.00,income,Vendas
+2026-09-04,Venda Produto Digital,250.00,income,Vendas
+2026-09-08,Taxa Plataforma Exemplo,25.00,expense,

@@ -17,9 +17,11 @@ import {
   X,
   Shield,
   ChevronDown,
-  Receipt
+  Receipt,
+  ListChecks
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { AI_OPERATOR_ENABLED } from '../ai/featureFlag';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
 
 const FOCUS_RING = 'focus:outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-indigo-400';
@@ -58,6 +60,11 @@ const AppShell = () => {
     { path: '/reports', icon: PieChart, label: 'Relatórios' },
     { path: '/import', icon: Upload, label: 'Importar' },
   ];
+
+  // Operador de IA: o item só existe quando a função foi ligada no build (padrão desligado).
+  if (AI_OPERATOR_ENABLED) {
+    navItems.push({ path: '/ai', icon: ListChecks, label: 'Operador' });
+  }
 
   if (user?.role === 'admin' || user?.is_admin) {
     navItems.push({ path: '/admin/dashboard', icon: Shield, label: 'Administração' });
@@ -121,7 +128,7 @@ const AppShell = () => {
         </div>
 
         {/* Navigation */}
-        <nav className={`flex-1 py-4 space-y-1 ${sidebarHidden ? 'px-2' : 'px-3'}`}>
+        <nav className={`flex-1 overflow-y-auto py-4 space-y-1 ${sidebarHidden ? 'px-2' : 'px-3'}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);

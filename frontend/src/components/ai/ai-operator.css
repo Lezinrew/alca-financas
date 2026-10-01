@@ -1,0 +1,225 @@
+/*
+ * Tela do operador de IA. Escopo próprio (.ai-operator) repetindo os tokens de
+ * financial-expenses.css, para não depender de index.css nem de outra página.
+ * Contraste conferido para WCAG AA nos dois temas; cor nunca é o único sinal:
+ * todo estado tem rótulo em texto e, quando ajuda, um ícone.
+ */
+.ai-operator {
+  --ai-surface: #fff;
+  --ai-surface-soft: #f1f5f9;
+  --ai-text: #0f172a;
+  --ai-muted: #475569;
+  --ai-border: #cbd5e1;
+  --ai-control-border: #64748b;
+  --ai-primary: #4338ca;
+  --ai-primary-hover: #3730a3;
+  --ai-accent: #4338ca;
+  --ai-danger: #b91c1c;
+  --ai-success: #047857;
+  --ai-focus: #4338ca;
+  color: var(--ai-text);
+  min-width: 0;
+  max-width: 100%;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.dark .ai-operator {
+  --ai-surface: #1a1d29;
+  --ai-surface-soft: #22293a;
+  --ai-text: #f8fafc;
+  --ai-muted: #cbd5e1;
+  --ai-border: #526079;
+  --ai-control-border: #94a3b8;
+  --ai-accent: #c7d2fe;
+  --ai-danger: #fecaca;
+  --ai-success: #34d399;
+  --ai-focus: #c7d2fe;
+  /* Controles nativos (lista do select, rádio, barra de rolagem) também no tema escuro. */
+  color-scheme: dark;
+}
+.ai-operator *, .ai-operator *::before, .ai-operator *::after { box-sizing: border-box; }
+.ai-operator :is(button, input, select, textarea, summary, a, [tabindex]):focus-visible { outline: 3px solid var(--ai-focus); outline-offset: 3px; }
+.ai-operator :is(button, select, summary) { min-height: 44px; }
+.ai-operator :is(input, select, textarea) { max-width: 100%; }
+/* index.css dá cor fixa a p/h2/h3; aqui o texto segue o bloco em que está (erro, aviso...). */
+.ai-operator :is(p, dl, dd, ul, ol, h2, h3, h4, fieldset, legend) { margin: 0; color: inherit; }
+.ai-operator :is(ul, ol) { padding: 0; list-style: none; }
+.ai-operator h2 { font-size: 1.125rem; font-weight: 650; line-height: 1.35; }
+.ai-operator h3 { font-size: 1rem; font-weight: 650; line-height: 1.35; }
+.ai-operator h4 { font-size: .9375rem; font-weight: 650; }
+.ai-operator .ai-muted { color: var(--ai-muted); }
+.ai-operator .ai-small { font-size: .875rem; }
+.ai-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/*
+ * Estrutura. O espaçamento vertical vem de `gap` em grades de uma coluna, não de
+ * margens: o reset acima zera margens com especificidade maior que a de uma classe.
+ * `minmax(0, 1fr)` impede que um id ou hash longo alargue a coluna além da tela.
+ */
+.ai-page, .ai-main, .ai-side, .ai-stack, .ai-panel, .ai-block, .ai-context, .ai-operator form { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; min-width: 0; }
+.ai-page { gap: 1rem; }
+.ai-block { gap: .5rem; }
+.ai-operator form { gap: .6rem; }
+.ai-headline { font-size: 1.25rem; font-weight: 650; }
+.ai-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+.ai-main, .ai-side, .ai-stack { gap: 1rem; }
+.ai-panel { gap: .75rem; padding: 1rem; background: var(--ai-surface); border: 1px solid var(--ai-border); border-radius: 12px; overflow-wrap: anywhere; }
+.ai-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; min-width: 0; }
+.ai-row-between { justify-content: space-between; }
+.ai-space-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
+.ai-privacy { display: flex; align-items: flex-start; gap: .5rem; padding: .75rem; border-radius: 10px; background: var(--ai-surface-soft); font-size: .9375rem; }
+.ai-privacy svg { flex: none; margin-top: .2rem; }
+
+/* Controles */
+.ai-label { display: block; font-weight: 600; }
+/* O Bootstrap (carregado pelo index.html do aplicativo) flutua a legenda e aumenta a fonte. */
+.ai-operator legend { float: none; width: auto; padding: 0; margin-bottom: .4rem; font-size: 1rem; font-weight: 600; line-height: 1.5; }
+.ai-select, .ai-textarea { width: 100%; padding: .6rem .75rem; font: inherit; color: var(--ai-text); background: var(--ai-surface); border: 1px solid var(--ai-control-border); border-radius: 8px; }
+.ai-select { width: auto; min-width: min(100%, 14rem); }
+.ai-textarea { display: block; min-height: 5.5rem; resize: vertical; }
+.ai-operator .ai-field-error { color: var(--ai-danger); font-size: .875rem; font-weight: 600; }
+.ai-tasks { display: block; padding: 0; border: 0; min-width: 0; }
+.ai-task-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+.ai-task-option { display: flex; align-items: flex-start; gap: .65rem; min-height: 44px; padding: .65rem .75rem; border: 1px solid var(--ai-border); border-radius: 8px; cursor: pointer; }
+.ai-task-option:has(input:checked) { border-color: var(--ai-accent); box-shadow: inset 0 0 0 1px var(--ai-accent); }
+.ai-task-option:has(input:disabled) { cursor: not-allowed; }
+.ai-task-option input { flex: none; width: 1.25rem; height: 1.25rem; margin-top: .15rem; accent-color: var(--ai-accent); }
+.ai-task-option > span { display: grid; gap: .1rem; min-width: 0; }
+.ai-examples { display: flex; flex-wrap: wrap; gap: .5rem; }
+.ai-chip { display: inline-flex; align-items: center; min-height: 44px; padding: .4rem .8rem; font: inherit; font-size: .875rem; text-align: left; color: var(--ai-text); background: var(--ai-surface-soft); border: 1px solid var(--ai-border); border-radius: 999px; cursor: pointer; }
+.ai-chip:hover { border-color: var(--ai-control-border); }
+.ai-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.ai-actions-end { justify-content: flex-end; }
+.ai-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; min-width: 44px; padding: .5rem .85rem; font: inherit; font-size: .875rem; font-weight: 600; line-height: 1.4; color: var(--ai-text); background: var(--ai-surface); border: 1px solid var(--ai-control-border); border-radius: 8px; cursor: pointer; transition: background-color .15s ease; }
+.ai-button:hover { background: var(--ai-surface-soft); }
+.ai-button-primary { color: #fff; background: var(--ai-primary); border-color: var(--ai-primary); }
+.ai-button-primary:hover { background: var(--ai-primary-hover); }
+/* No tema escuro o índigo quase some no fundo; a borda clara mantém o botão identificável. */
+.dark .ai-button-primary { border-color: #a5b4fc; }
+.ai-button-danger { color: var(--ai-danger); border-color: var(--ai-danger); }
+.dark .ai-button-danger { border-color: #f87171; }
+.ai-button[aria-pressed="true"] { background: var(--ai-surface-soft); border-color: var(--ai-accent); }
+.ai-operator button:disabled { opacity: .6; cursor: not-allowed; }
+.ai-operator .ai-link { color: var(--ai-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Avisos */
+.ai-notice { padding: .75rem 1rem; border: 1px solid var(--ai-border); border-radius: 10px; background: var(--ai-surface-soft); }
+.ai-error { display: grid; gap: .5rem; justify-items: start; padding: 1rem; border: 1px solid #b91c1c; border-radius: 10px; color: #991b1b; background: #fef2f2; }
+.dark .ai-error { color: #fecaca; background: #401c29; border-color: #f87171; }
+.ai-error-title { font-weight: 650; }
+.ai-warning { display: grid; gap: .5rem; padding: 1rem; border: 1px solid #b45309; border-left-width: 4px; border-radius: 10px; color: #78350f; background: #fffbeb; }
+.dark .ai-warning { color: #fde68a; background: #3b2a10; border-color: #f59e0b; }
+.ai-warning-title { display: flex; align-items: flex-start; gap: .5rem; font-weight: 650; }
+.ai-warning-title svg { flex: none; margin-top: .15rem; }
+.ai-warning ul { display: grid; gap: .35rem; padding-left: 1.1rem; list-style: disc; }
+.ai-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8125rem; padding: .1rem .3rem; border-radius: 4px; color: inherit; background: var(--ai-surface-soft); overflow-wrap: anywhere; word-break: break-all; }
+.ai-error .ai-code { background: transparent; padding: 0; }
+.ai-break { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Selos: sempre com texto. */
+.ai-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .5rem; border-radius: 6px; font-size: .8125rem; font-weight: 650; line-height: 1.3; background: #e2e8f0; color: #334155; white-space: nowrap; }
+.dark .ai-badge { background: #334155; color: #f1f5f9; }
+.ai-status-running, .ai-status-needs_reconciliation, .ai-ledger-conferido, .ai-space-personal, .ai-proposal-ready, .ai-proposal-approved { background: #e0e7ff; color: #3730a3; }
+.ai-status-waiting_review, .ai-ledger-registrado_pago, .ai-space-business, .ai-proposal-stale, .ai-proposal-expired { background: #fef3c7; color: #92400e; }
+.ai-status-completed, .ai-ledger-conciliado, .ai-proposal-applied, .ai-operation-applied { background: #d1fae5; color: #065f46; }
+.ai-status-failed, .ai-proposal-rejected { background: #fee2e2; color: #991b1b; }
+.dark :is(.ai-status-running, .ai-status-needs_reconciliation, .ai-ledger-conferido, .ai-space-personal, .ai-proposal-ready, .ai-proposal-approved) { background: #312e81; color: #e0e7ff; }
+.dark :is(.ai-status-waiting_review, .ai-ledger-registrado_pago, .ai-space-business, .ai-proposal-stale, .ai-proposal-expired) { background: #713f12; color: #fef3c7; }
+.dark :is(.ai-status-completed, .ai-ledger-conciliado, .ai-proposal-applied, .ai-operation-applied) { background: #134e4a; color: #a7f3d0; }
+.dark :is(.ai-status-failed, .ai-proposal-rejected) { background: #7f1d1d; color: #fee2e2; }
+/* Os três estados do livro também diferem na borda, além de cor, ícone e texto. */
+.ai-ledger-conferido { border: 1px dashed currentColor; }
+.ai-ledger-registrado_pago { border: 1px solid currentColor; }
+.ai-ledger-conciliado { border: 2px solid currentColor; }
+/* "Desfeito" (compensação) usa o selo neutro: não é um dos três estados acima. */
+.ai-ledger-revertido { border: 1px dotted currentColor; }
+.ai-legend { display: grid; gap: .6rem; }
+.ai-legend dl { display: grid; gap: .65rem; }
+.ai-legend dl > div { display: grid; gap: .25rem; }
+.ai-legend dd { font-size: .9375rem; }
+
+/* Andamento */
+.ai-run-title { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.ai-scope-line { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .9375rem; }
+.ai-quote { padding-left: .75rem; border-left: 3px solid var(--ai-border); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr)); gap: .5rem; }
+.ai-stage { display: flex; align-items: flex-start; gap: .5rem; min-width: 0; padding: .55rem .6rem; border: 1px solid var(--ai-border); border-radius: 8px; color: var(--ai-muted); }
+.ai-stage svg { flex: none; margin-top: .1rem; }
+.ai-stage-text { display: grid; min-width: 0; }
+.ai-stage-label { font-weight: 600; color: var(--ai-text); }
+.ai-stage-state { font-size: .8125rem; }
+.ai-stage-done svg { color: var(--ai-success); }
+.ai-stage-current, .ai-stage-waiting { border-color: var(--ai-accent); box-shadow: inset 0 0 0 1px var(--ai-accent); background: var(--ai-surface-soft); }
+.ai-stage-current svg, .ai-stage-waiting svg { color: var(--ai-accent); }
+.ai-stage-failed { border-color: var(--ai-danger); }
+.ai-stage-failed svg, .ai-operator .ai-stage-failed .ai-stage-state { color: var(--ai-danger); }
+.ai-live { font-weight: 650; }
+.ai-steps { display: grid; gap: .35rem; font-size: .9375rem; }
+.ai-steps li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem .75rem; padding: .4rem .6rem; border-radius: 6px; background: var(--ai-surface-soft); }
+.ai-step-status { color: var(--ai-muted); font-size: .8125rem; font-weight: 600; }
+.ai-step-failed { color: var(--ai-danger); }
+
+/* Resultado */
+.ai-summary { white-space: pre-wrap; }
+.ai-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .75rem; }
+.ai-fact { display: grid; gap: .5rem; align-content: start; min-width: 0; padding: .9rem; border: 1px solid var(--ai-border); border-radius: 10px; }
+.ai-fact h3 { font-size: .9375rem; font-weight: 600; color: var(--ai-muted); }
+.ai-fact-value { font-size: clamp(1.35rem, 5vw, 1.75rem); font-weight: 750; line-height: 1.2; letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ai-operator .ai-fact-missing { color: var(--ai-muted); }
+.ai-fact-reason { font-size: .875rem; font-weight: 600; }
+.ai-pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .6rem .9rem; }
+.ai-pairs-compact { grid-template-columns: minmax(0, 1fr); gap: .4rem; }
+.ai-pairs > div { min-width: 0; }
+.ai-pairs dt { color: var(--ai-muted); font-size: .8125rem; font-weight: 600; }
+.ai-pairs dd { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.ai-plain-list { display: grid; gap: .3rem; }
+.ai-sources { display: grid; gap: .5rem; }
+.ai-sources li { display: grid; gap: .15rem; justify-items: start; padding: .6rem .75rem; border-radius: 8px; background: var(--ai-surface-soft); }
+.ai-source-label { font-weight: 600; }
+
+/* Proposta e operação */
+.ai-proposal { display: grid; gap: .9rem; min-width: 0; padding: 1rem; border: 1px solid var(--ai-border); border-radius: 10px; }
+.ai-effect { display: grid; gap: .75rem; min-width: 0; }
+.ai-effect-state { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+/* caption-side e cor explícitos: o Bootstrap põe a legenda da tabela embaixo e em cinza. */
+.ai-table { width: 100%; table-layout: fixed; border-collapse: collapse; caption-side: top; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+.ai-table caption { padding: 0 0 .4rem; text-align: left; font-weight: 650; color: var(--ai-text); }
+.ai-table :is(th, td) { padding: .5rem .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; border-bottom: 1px solid var(--ai-border); }
+.ai-table thead th { font-size: .8125rem; color: var(--ai-muted); background: var(--ai-surface-soft); }
+.ai-table thead th:first-child { width: 28%; }
+.ai-table tbody th { font-weight: 600; }
+.ai-table tbody td:last-child { font-weight: 700; }
+
+/* Rastreio e histórico */
+.ai-trace-steps { display: grid; gap: .5rem; }
+.ai-trace-steps li { display: grid; gap: .15rem; padding: .5rem .6rem; border-radius: 6px; background: var(--ai-surface-soft); }
+.ai-history { display: grid; gap: .5rem; }
+.ai-history li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .6rem; border: 1px solid var(--ai-border); border-radius: 8px; }
+.ai-history-text { display: grid; flex: 1 1 9rem; min-width: 0; }
+.ai-history-task { font-weight: 600; }
+.ai-history-summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Conteúdo dentro do AppDialog (montado em document.body, fora da página). */
+.ai-operator.ai-dialog { display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: 1rem; }
+
+@media (min-width: 640px) {
+  .ai-task-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .ai-layout { grid-template-columns: minmax(0, 2fr) minmax(17rem, 1fr); }
+}
+@media (max-width: 639px) {
+  .ai-operator { font-size: .9375rem; }
+  /* Campo com fonte menor que 16 px faz o Safari do iOS dar zoom na página ao focar. */
+  .ai-select, .ai-textarea { font-size: 1rem; }
+  .ai-panel { padding: .85rem; }
+  .ai-select { width: 100%; }
+  .ai-proposal { padding: .75rem; }
+  .ai-table { font-size: .875rem; }
+  .ai-table :is(th, td) { padding: .45rem .25rem; }
+  .ai-table thead th:first-child { width: 24%; }
+}
+/* Quem pede menos movimento não recebe transição nem animação nesta tela. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-operator *, .ai-operator *::before, .ai-operator *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

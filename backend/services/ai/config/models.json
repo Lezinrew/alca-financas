@@ -1,0 +1,59 @@
+{
+  "_comment": [
+    "Registro de modelos da plataforma de IA (contrato docs/contracts/ai-platform-v1.md, secao 7).",
+    "Este e o arquivo carregado por padrao. Contem SOMENTE rotas locais e NENHUMA esta homologada:",
+    "todas ficam em 'candidate' e so recebem pedidos com AI_ALLOW_CANDIDATE_MODELS=true (desenvolvimento e benchmark).",
+    "Para aprovar uma rota: rodar a homologacao (30 casos sinteticos em pt-BR), preencher 'evidence' com a referencia",
+    "do relatorio, declarar 'approved_purposes' e so entao trocar 'state' para 'approved'.",
+    "Chaves iniciadas por '_' sao comentarios. Rotas externas de exemplo estao em models.example.json.",
+    "priority: numero menor e tentado primeiro."
+  ],
+  "version": 1,
+  "routes": [
+    {
+      "alias": "local-qwen25-coder-14b",
+      "provider": "ollama",
+      "model_id": "qwen2.5-coder:14b",
+      "locality": "local",
+      "priority": 10,
+      "task_classes": ["simple_extraction", "complex_tools"],
+      "supports_tools": true,
+      "supports_json": true,
+      "supports_vision": false,
+      "context_window": 32768,
+      "state": "candidate",
+      "approved_purposes": [],
+      "digest": "9ec8897f747e246e970bc5cfdda85d22f1123dc2e3d34978a010a75968716849",
+      "evidence": null,
+      "extra": {
+        "num_ctx": 8192,
+        "seed": 7,
+        "_num_ctx": "Contexto alocado por pedido. 8192 e um valor conservador de desenvolvimento; medir RAM em /api/ps antes de subir (ferramentas rendem melhor com 32k).",
+        "_nota": "Modelo de codigo com 14B de parametros, fora da faixa 7B/8B prevista para a VPS. Candidato de bancada; portugues, ferramentas e hardware ainda nao medidos."
+      }
+    },
+    {
+      "alias": "local-gemma4",
+      "provider": "ollama",
+      "model_id": "gemma4:latest",
+      "locality": "local",
+      "priority": 20,
+      "task_classes": ["simple_extraction", "complex_tools", "vision"],
+      "supports_tools": true,
+      "supports_json": true,
+      "supports_vision": true,
+      "context_window": 131072,
+      "state": "candidate",
+      "approved_purposes": [],
+      "digest": "c6eb396dbd5992bbe3f5cdb947e8bbc0ee413d7c17e2beaae69f5d569cf982eb",
+      "evidence": null,
+      "extra": {
+        "num_ctx": 8192,
+        "seed": 7,
+        "think": false,
+        "_nota": "A tag 'latest' IMPEDE a aprovacao: o registro recusa 'approved' com ':latest' porque a tag e reapontada sem aviso (o digest acima e o build local de abril/2026, ja diferente do publicado). Para homologar, baixar uma tag especifica, registrar o novo model_id e o digest correspondente.",
+        "_think": "Modelo com raciocinio ('thinking'); desligado aqui porque piora a saida estruturada. Confirmar na homologacao."
+      }
+    }
+  ]
+}
