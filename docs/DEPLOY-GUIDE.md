@@ -23,7 +23,7 @@
 
 ### ⚠️ Scripts Legados (NÃO Usar)
 
-Scripts e docs antigos foram movidos para a pasta **`legacy/`** (ignorada pelo Git). Não use: `deploy-vps.sh`, `deploy-remote.sh`, `deploy-remote.py`, `deploy-cors-fix.sh`, `deploy-hostinger.sh`, etc.
+Scripts e docs antigos foram movidos para **`archives/`** (arquivo morto; não usar em operação). Não use: `deploy-vps.sh`, `deploy-remote.sh`, `deploy-remote.py`, `deploy-cors-fix.sh`, `deploy-hostinger.sh`, etc.
 
 ---
 

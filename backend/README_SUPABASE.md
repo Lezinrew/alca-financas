@@ -12,7 +12,7 @@
    - `transaction_repository_supabase.py`
    - `account_repository_supabase.py`
 5. ✅ **app.py atualizado** - Configuração para usar Supabase
-6. ✅ **Script de inicialização** - `alca_start_mac.sh` suporta Supabase
+6. ✅ **Script de inicialização** - `archives/scripts-raiz/alca_start_mac.sh` (arquivado) suportava Supabase
 
 ## 📋 Próximos Passos
 
@@ -49,7 +49,7 @@ pip install -r requirements.txt
 ### 5. Testar
 
 ```bash
-./alca_start_mac.sh
+./archives/scripts-raiz/alca_start_mac.sh  # arquivado
 ```
 
 O script detectará automaticamente se você está usando Supabase ou MongoDB.

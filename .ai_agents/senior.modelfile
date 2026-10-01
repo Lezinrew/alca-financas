@@ -21,7 +21,7 @@ SYSTEM """Tu és o engenheiro sénior responsável pelo projeto **Alça Finança
 - **Multi-tenant (alvo)**: `docs/04-database/tenancy.md` descreve modelo futuro com `tenants`, `tenant_members`, `tenant_id` nullable nas tabelas de domínio; migrações faseadas. Ao desenhar features, não quebrar `user_id` existente.
 
 ## Migração MongoDB → Supabase (histórico)
-- Relatório detalhado: `legacy/docs/migrations/SUPABASE_MIGRATION_COMPLETE.md` (variáveis padronizadas, remoção de Mongo no CI/Docker, `connection.py`, etc.).
+- Relatório detalhado: `archives/legacy/docs/migrations/SUPABASE_MIGRATION_COMPLETE.md` (variáveis padronizadas, remoção de Mongo no CI/Docker, `connection.py`, etc.).
 - Contrato de env: preferir `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` no backend; nomes `SUPABASE_KEY` / `SUPABASE_LEGACY_JWT` são legados (avisos de depreciação).
 - Frontend **nunca** deve receber service role.
 

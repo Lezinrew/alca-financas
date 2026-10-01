@@ -26,14 +26,14 @@
   - Convergência: todos apontam coexistência Flask + FastAPI.
   - Ambiguidade: falta decisão formal se `services/chatbot/app.py` será descontinuado.
 - **Contrato de resposta de chat**
-  - `RUNTIME_ALIGNMENT_REPORT.md` indica possível divergência de shape entre `ChatWidget` e `Chatbot.tsx`.
-  - `API_CONSUMPTION_MAP.md` confirma ambos chamando `/api/chatbot/chat`, mas destaca diferença na estratégia de token (manual vs interceptor).
+  - `archives/relatorios/RUNTIME_ALIGNMENT_REPORT.md` indica possível divergência de shape entre `ChatWidget` e `Chatbot.tsx`.
+  - `archives/relatorios/API_CONSUMPTION_MAP.md` confirma ambos chamando `/api/chatbot/chat`, mas destaca diferença na estratégia de token (manual vs interceptor).
 - **JWT estratégia única**
   - Memória/runtime indicam convergência para `SUPABASE_JWT_SECRET`.
   - Auditoria de hardcode mostra persistência operacional de `JWT_SECRET` legado em scripts.
 - **Risco mais crítico imediato**
-  - `HARDCODE_AUDIT.md` prioriza exposição de segredo (segurança) como P0.
-  - `RUNTIME_ALIGNMENT_REPORT.md` prioriza unificação arquitetural do chatbot/JWT.
+  - `archives/relatorios/HARDCODE_AUDIT.md` prioriza exposição de segredo (segurança) como P0.
+  - `archives/relatorios/RUNTIME_ALIGNMENT_REPORT.md` prioriza unificação arquitetural do chatbot/JWT.
   - Consolidação: ambos são P0 por impacto direto (segurança e runtime).
 - **CORS**
   - Backend Flask cobre `localhost` e `127.0.0.1`.
@@ -154,4 +154,4 @@
 
 ### qual documento deve virar fonte principal de contexto
 
-- `EXECUTION_BASELINE.md` (este documento), com `PROJECT_MEMORY_UNIVERSAL.md` como memória histórica complementar.
+- `EXECUTION_BASELINE.md` (este documento), com `archives/relatorios/PROJECT_MEMORY_UNIVERSAL.md` como memória histórica complementar.
