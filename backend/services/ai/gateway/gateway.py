@@ -244,8 +244,13 @@ class DefaultModelGateway(ModelGateway):
             timeout = float(override)
         return timeout
 
+    @property
+    def registry(self) -> ModelRegistry:
+        """Registro de modelos em uso (a montagem liga nele o dono do plano)."""
+        return self._registry
+
     def _cost_known(self, route: ModelRoute) -> bool:
-        return route.is_local or (
+        return route.is_local or route.is_subscription or (
             isinstance(route.max_cost_micros_per_call, int)
             and not isinstance(route.max_cost_micros_per_call, bool)
             and route.max_cost_micros_per_call > 0
@@ -261,7 +266,9 @@ class DefaultModelGateway(ModelGateway):
         for route in routes[index + 1:]:
             if route.provider not in self._adapters or self._is_suspended(route) or self._is_route_suspended(route):
                 continue
-            if not self._cost_known(route) or (not route.is_local and self._ledger is None):
+            if not self._cost_known(route) or (
+                not route.is_local and not route.is_subscription and self._ledger is None
+            ):
                 continue
             if self._circuit.state(route.alias) == OPEN or self._cooldown_remaining(route.alias) > 0:
                 continue
@@ -315,7 +322,7 @@ class DefaultModelGateway(ModelGateway):
                 ctx.privacy, request.redaction_verified
             ):
                 return "privacy"
-            if self._ledger is None:
+            if self._ledger is None and not route.is_subscription:
                 # Sem livro de orçamento não existe reserva nem teto: a rota
                 # paga rodaria sem nenhum controle de custo. Não roda.
                 return "no_budget_ledger"
@@ -359,7 +366,8 @@ class DefaultModelGateway(ModelGateway):
 
     def _actual_cost(self, route: ModelRoute, result: AdapterResult) -> int:
         """Custo real em micros da moeda do orçamento."""
-        if route.is_local:
+        if route.is_local or route.is_subscription:
+            # Assinatura: a franquia mensal já foi paga; não há custo por chamada.
             return 0
         reported_currency = str(route.extra.get("cost_currency", "USD")).upper()
         if (
@@ -393,7 +401,7 @@ class DefaultModelGateway(ModelGateway):
           de ``complete``, e as rotas seguintes (uma rota local não depende do
           livro) continuam sendo tentadas.
         """
-        if route.is_local or self._ledger is None:
+        if route.is_local or route.is_subscription or self._ledger is None:
             return None, None
         failure: Optional[str] = None
         try:
@@ -771,7 +779,9 @@ class DefaultModelGateway(ModelGateway):
         return validate_structured_output(result.content, schema)
 
 
-def build_gateway(pool, settings: AiSettings) -> DefaultModelGateway:
+def build_gateway(
+    pool, settings: AiSettings, *, adapters: Optional[Dict[str, ProviderAdapter]] = None,
+) -> DefaultModelGateway:
     """Monta o gateway padrão a partir da configuração.
 
     Lê o registro de modelos do caminho configurado; não abre conexão com
@@ -783,7 +793,7 @@ def build_gateway(pool, settings: AiSettings) -> DefaultModelGateway:
 
     return DefaultModelGateway(
         registry=ModelRegistry.from_settings(settings),
-        adapters=build_default_adapters(settings),
+        adapters=build_default_adapters(settings) if adapters is None else adapters,
         circuit=CircuitBreaker(settings),
         budget_ledger=BudgetLedger(pool, settings) if pool is not None else None,
         settings=settings,

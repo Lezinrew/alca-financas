@@ -280,7 +280,13 @@ def main(argv: Optional[Sequence[str]] = None, env: Optional[Mapping[str, str]] 
         logger.error("worker_not_started reason=platform_unavailable")
         return 2
 
-    platform = build_platform()
+    try:
+        from database.v2_connection import init_v2_pool
+
+        platform = build_platform(init_v2_pool(), settings)
+    except Exception as exc:
+        logger.error("worker_not_started reason=platform_initialization_failed error_type=%s", type(exc).__name__)
+        return 2
     worker = getattr(platform, "worker", None)
     if worker is None:
         worker = Worker(platform.pool, platform.settings, platform.orchestrator)

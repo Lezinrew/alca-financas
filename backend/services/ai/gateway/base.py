@@ -117,6 +117,15 @@ class ModelRoute:
     def is_local(self) -> bool:
         return self.locality == LOCALITY_LOCAL
 
+    @property
+    def is_subscription(self) -> bool:
+        """Rota paga pela assinatura mensal do titular, sem custo por chamada.
+
+        Não reserva orçamento (não há o que cobrar), mas continua sendo tráfego
+        externo: vale toda a política de privacidade das rotas externas.
+        """
+        return self.extra.get("billing") == "subscription"
+
 
 @dataclass
 class Usage:

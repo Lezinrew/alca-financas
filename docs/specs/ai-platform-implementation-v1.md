@@ -1,8 +1,13 @@
 # Spec de implementação: plataforma de IA v1
 
 **Contrato de referência:** [ai-platform-v1.md](../contracts/ai-platform-v1.md).
-**Estado:** implementação local parcial, interrompida em 01/10/2026; nada ativado em produção.
-As seções 4 (API HTTP) e a montagem em `platform.py` descrevem o **desenho**: `backend/routes/ai.py`, `backend/services/ai/platform.py` e `backend/services/ai/benchmark/` **ainda não foram implementados**. O estado real de cada parte está no [runbook](../runbooks/ai-platform.md).
+**Estado:** implementação local parcial em 01/10/2026; fatia vertical de leitura integrada, nada ativado em produção.
+A montagem em `platform.py` e as cinco rotas de status/execuções da seção 4 estão implementadas.
+Rotas de propostas, operações e grants e `backend/services/ai/benchmark/` permanecem como **desenho**, sem implementação HTTP.
+O estado e as evidências de cada parte estão no [runbook](../runbooks/ai-platform.md).
+O teste opt-in de oito perguntas com Ollama real existe em
+`backend/tests/ai/test_ai_ollama_local_read.py`; o candidato Qwen foi reprovado
+no perfil local testado. [Resultado](../validation/ai-ollama-read-2026-10-01.md).
 **Objetivo deste documento:** detalhar, de forma verificável, como o contrato foi
 traduzido em código: módulos, API HTTP, estados e regras que os testes cobrem.
 Quando este documento e o contrato divergirem, vale o contrato.
@@ -63,6 +68,13 @@ Quando este documento e o contrato divergirem, vale o contrato.
 ## 4. API HTTP (`/api/ai/v1`)
 
 Todas as respostas de erro: `{"error": {"code", "retryable", "safe_message", "trace_id"}}`.
+
+Na fatia entregue, corpos JSON têm limite de 64 KiB e propriedades extras são
+recusadas. As respostas das cinco rotas incluem `X-Trace-Id` e
+`Cache-Control: no-store`. A listagem devolve `{runs, next_cursor}`. O trace da
+execução permanece estável nos reenvios; o cabeçalho identifica cada requisição
+HTTP. `POST /runs` aceita somente `local_only` nesta etapa, conforme o cliente
+atual. Nenhuma flag é ligada pela montagem ou pelos testes.
 
 | Método e rota | Semântica |
 | --- | --- |

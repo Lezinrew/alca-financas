@@ -80,6 +80,9 @@ class AiSettings:
     budget_currency: str = "USD"
     budget_timezone: str = "America/Sao_Paulo"
     worker_id: Optional[str] = None
+    # E-mail do titular cujo plano mensal (Claude Code) atende às rotas por
+    # assinatura. Só as execuções desse usuário usam essas rotas.
+    plan_owner_email: Optional[str] = None
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "AiSettings":
@@ -113,6 +116,7 @@ class AiSettings:
             budget_currency=((env.get("AI_BUDGET_CURRENCY") or "USD").strip().upper() or "USD")[:3],
             budget_timezone=(env.get("AI_BUDGET_TIMEZONE") or "America/Sao_Paulo").strip(),
             worker_id=(env.get("AI_WORKER_ID") or "").strip() or None,
+            plan_owner_email=(env.get("AI_PLAN_OWNER_EMAIL") or "").strip().lower() or None,
         )
 
     def resolved_quarantine_dir(self) -> Path:

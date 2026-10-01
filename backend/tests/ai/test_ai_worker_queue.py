@@ -348,7 +348,9 @@ def test_main_builds_the_platform_late_and_runs_once(pool, world, settings, monk
     tools = ToolKit(pool, settings).with_finance_read({"a": "10.00"})
     built = []
 
-    def build_platform():
+    def build_platform(database_pool, platform_settings):
+        assert database_pool is pool
+        assert platform_settings.enabled
         built.append(True)
         return types.SimpleNamespace(
             pool=pool, settings=settings,
@@ -359,6 +361,8 @@ def test_main_builds_the_platform_late_and_runs_once(pool, world, settings, monk
     fake = types.ModuleType("services.ai.platform")
     fake.build_platform = build_platform
     monkeypatch.setitem(sys.modules, "services.ai.platform", fake)
+
+    monkeypatch.setattr("database.v2_connection.init_v2_pool", lambda: pool)
 
     assert worker_module.main(["--once"], env={"AI_ENABLED": "true"}) == 0
 

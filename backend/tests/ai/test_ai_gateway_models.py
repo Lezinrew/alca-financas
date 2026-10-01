@@ -95,8 +95,18 @@ def changed(base, **changes):
 def test_default_registry_file_loads_with_only_local_candidates():
     routes = load_model_routes(CONFIG_DIR / "models.json")
     by_alias = {route.alias: route for route in routes}
-    assert set(by_alias) == {"local-qwen25-coder-14b", "local-gemma4"}
-    assert all(route.is_local and route.provider == "ollama" and route.state == "candidate" for route in routes)
+    assert set(by_alias) == {"local-qwen25-coder-14b", "local-gemma4", "plano-claude", "local-qwen25-7b"}
+    # Nada homologado: todas as rotas são candidatas.
+    assert all(route.state == "candidate" for route in routes)
+    local = [route for route in routes if route.is_local]
+    assert len(local) == 3 and all(route.provider == "ollama" for route in local)
+    assert by_alias["local-qwen25-7b"].digest == "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+    # A única rota externa é a da assinatura do titular: sem chave de API, sem
+    # custo por chamada, e só para pedidos com privacidade cloud_allowed.
+    plan = by_alias["plano-claude"]
+    assert plan.provider == "claude_code_cli" and plan.is_subscription and not plan.is_local
+    assert plan.credential_env is None and plan.privacy == ("cloud_allowed",)
+    assert not plan.model_id.endswith("latest")
 
     qwen = by_alias["local-qwen25-coder-14b"]
     assert qwen.model_id == "qwen2.5-coder:14b" and qwen.context_window == 32768
