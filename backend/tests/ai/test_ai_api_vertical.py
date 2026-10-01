@@ -388,10 +388,12 @@ def test_model_server_offline_fails_run_safely(api):
 
 def test_unexpected_database_error_has_safe_envelope(api, caplog):
     # Pool real fechado provoca falha de infraestrutura, sem substituir lógica.
+    # minconn=0: não abre conexão (connection.dsn mascara a senha, e o
+    # PostgreSQL do CI exige senha); o pool fechado já recusa getconn().
     from psycopg2.pool import ThreadedConnectionPool
     connection = api.pool.getconn()
     try:
-        broken_pool = ThreadedConnectionPool(1, 1, dsn=connection.dsn)
+        broken_pool = ThreadedConnectionPool(0, 1, dsn=connection.dsn)
     finally:
         api.pool.putconn(connection)
     broken_pool.closeall()
