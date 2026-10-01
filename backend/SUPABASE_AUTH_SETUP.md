@@ -22,7 +22,7 @@ SUPABASE_KEY=sua-service-role-key
 ### 2. Reiniciar o Backend
 
 ```bash
-./alca_start_mac.sh
+./archives/scripts-raiz/alca_start_mac.sh  # arquivado
 ```
 
 ## 📋 O que Mudou

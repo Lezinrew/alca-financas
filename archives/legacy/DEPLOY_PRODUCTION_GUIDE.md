@@ -26,8 +26,8 @@
 # ⚠️  NÃO commitar ao git!
 # Copie manualmente para o servidor
 
-SECRET_KEY=7be987749f78065916208fcdc892a9a67d75e980b8ff352796def22fc3d1b114
-JWT_SECRET=d64e4a0d67f2c9a3e854cd8cd9284c3f226df8d30fa727b3771d07e5b91e8d0a
+SECRET_KEY=<gerar com: openssl rand -hex 32>
+JWT_SECRET=<gerar com: openssl rand -hex 32>
 ```
 
 ---
@@ -101,8 +101,8 @@ WHERE tablename IN ('users', 'categories', 'accounts', 'transactions');
    SUPABASE_SERVICE_ROLE_KEY=eyJ... (do Supabase prod)
 
    # Security (usar valores gerados acima)
-   SECRET_KEY=7be987749f78065916208fcdc892a9a67d75e980b8ff352796def22fc3d1b114
-   JWT_SECRET=d64e4a0d67f2c9a3e854cd8cd9284c3f226df8d30fa727b3771d07e5b91e8d0a
+   SECRET_KEY=<gerar com: openssl rand -hex 32>
+   JWT_SECRET=<gerar com: openssl rand -hex 32>
    JWT_EXPIRES_HOURS=24
 
    # URLs
