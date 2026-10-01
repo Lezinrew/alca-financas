@@ -49,9 +49,12 @@ def start_server():
         server.stop()
 
 
-def _connector(server, mode=None, *, token=helpers.FAKE_CREDENTIAL, max_bytes=20 * 1024 * 1024, **config_options):
+def _connector(server, mode=None, *, token=None, max_bytes=20 * 1024 * 1024, **config_options):
     config = parse_mcp_config(mcp_config(server.url, mode or server.mode, **config_options))
-    return McpHttpEmailConnector(config, lambda: Secret(token), max_attachment_bytes=max_bytes)
+    # Sem valor informado usa a credencial fictícia dos testes. O padrão fica aqui dentro, e não na
+    # assinatura, porque o verificador de segredos confunde esse padrão de assinatura com uma chave real.
+    secret_value = helpers.FAKE_CREDENTIAL if token is None else token
+    return McpHttpEmailConnector(config, lambda: Secret(secret_value), max_attachment_bytes=max_bytes)
 
 
 def _search_all(connector, query=""):
