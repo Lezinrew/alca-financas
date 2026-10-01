@@ -27,6 +27,7 @@ except ImportError:
     logger.warning("Supabase Auth routes não disponíveis (opcional)")
 
 from routes.auth import bp as auth_bp
+from routes.auth_v2 import bp as auth_v2_bp
 from routes.categories import bp as categories_bp
 from routes.transactions import bp as transactions_bp
 from routes.accounts import bp as accounts_bp
@@ -40,8 +41,17 @@ from routes.goals import bp as goals_bp
 from routes.financial_expenses import bp as financial_expenses_bp
 from routes.merchant_aliases import bp as merchant_aliases_bp
 
+try:
+    from routes.ai import bp as ai_bp
+except Exception:
+    ai_bp = None
+    logger.warning("Rotas de IA indisponíveis; aplicativo segue sem IA")
+
 # Permite subir o app (CI/testes/smoke) sem tentar conectar no Supabase
 SKIP_DB_INIT = os.getenv("SKIP_DB_INIT", "false").strip().lower() == "true"
+ENABLE_POSTGRES_V2_AUTH_PREVIEW = (
+    os.getenv("ENABLE_POSTGRES_V2_AUTH_PREVIEW", "false").strip().lower() == "true"
+)
 
 app = Flask(__name__)
 # SECRET_KEY necessário para sessões (ex.: OAuth). Usa default seguro em dev se não definido.
@@ -113,7 +123,7 @@ CORS(
     app,
     supports_credentials=True,
     origins=cors_origins,
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "X-Tenant-Id", "Idempotency-Key"],
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 )
 
@@ -165,6 +175,14 @@ try:
         app.config['CATEGORIES'] = app.config['CATEGORY_REPO']
         app.config['TRANSACTIONS'] = app.config['TRANSACTION_REPO']
         app.config['ACCOUNTS'] = app.config['ACCOUNT_REPO']
+
+        if ENABLE_POSTGRES_V2_AUTH_PREVIEW:
+            from database.v2_connection import init_v2_pool
+            from services.auth_v2_service import AuthV2Service
+
+            app.config['POSTGRES_V2_POOL'] = init_v2_pool()
+            app.config['AUTH_V2_SERVICE'] = AuthV2Service(app.config['POSTGRES_V2_POOL'])
+            logger.info("✅ Prévia da autenticação PostgreSQL V2 inicializada em /api/v2/auth/*")
     else:
         logger.warning("⚠️  SKIP_DB_INIT=true: pulando init_db()/get_db() (CI/Testes/Smoke)")
         app.config['DB'] = None
@@ -174,6 +192,35 @@ except Exception as e:
     import logging
     logging.error(f"Erro ao inicializar banco de dados: {e}")
     raise
+
+
+# Montagem opcional: falha da IA nunca impede a inicialização financeira.
+try:
+    from services.ai.settings import AiSettings
+
+    ai_settings = AiSettings.from_env()
+    if ai_settings.enabled and ai_bp is not None:
+        from services.ai.platform import build_platform
+
+        if app.config.get('POSTGRES_V2_POOL') is None or app.config.get('AUTH_V2_SERVICE') is None:
+            # A IA usa o banco e a sessão V2; sem eles não há como autenticar nem gravar.
+            logger.warning(
+                "AI_ENABLED=true ignorado: a IA exige ENABLE_POSTGRES_V2_AUTH_PREVIEW=true e DATABASE_V2_URL"
+            )
+        else:
+            app.config['AI_PLATFORM'] = build_platform(app.config['POSTGRES_V2_POOL'], ai_settings)
+except Exception as ai_init_error:
+    app.config.pop('AI_PLATFORM', None)
+    logger.warning(
+        "Plataforma de IA desativada por falha de inicialização (%s)", type(ai_init_error).__name__
+    )
+
+if ai_bp is not None:
+    try:
+        app.register_blueprint(ai_bp, url_prefix='/api/ai/v1')
+    except Exception:
+        app.config.pop('AI_PLATFORM', None)
+        logger.warning("Registro das rotas de IA indisponível; aplicativo segue sem IA")
 
 
 @app.get('/api/health')
@@ -205,6 +252,10 @@ if not SKIP_DB_INIT:
             logger.warning("⚠️  USE_SUPABASE_AUTH=true mas módulo não disponível. Usando autenticação customizada.")
         else:
             logger.info("✅ Usando autenticação customizada")
+
+    # Prévia isolada: não substitui /api/auth nem autentica ainda as rotas financeiras.
+    if ENABLE_POSTGRES_V2_AUTH_PREVIEW:
+        app.register_blueprint(auth_v2_bp, url_prefix='/api/v2')
 
     app.register_blueprint(categories_bp)
     app.register_blueprint(transactions_bp)

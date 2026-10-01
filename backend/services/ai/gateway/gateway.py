@@ -771,7 +771,9 @@ class DefaultModelGateway(ModelGateway):
         return validate_structured_output(result.content, schema)
 
 
-def build_gateway(pool, settings: AiSettings) -> DefaultModelGateway:
+def build_gateway(
+    pool, settings: AiSettings, *, adapters: Optional[Dict[str, ProviderAdapter]] = None,
+) -> DefaultModelGateway:
     """Monta o gateway padrão a partir da configuração.
 
     Lê o registro de modelos do caminho configurado; não abre conexão com
@@ -783,7 +785,7 @@ def build_gateway(pool, settings: AiSettings) -> DefaultModelGateway:
 
     return DefaultModelGateway(
         registry=ModelRegistry.from_settings(settings),
-        adapters=build_default_adapters(settings),
+        adapters=build_default_adapters(settings) if adapters is None else adapters,
         circuit=CircuitBreaker(settings),
         budget_ledger=BudgetLedger(pool, settings) if pool is not None else None,
         settings=settings,
