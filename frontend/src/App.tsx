@@ -12,6 +12,7 @@ import ResetPassword from './components/auth/ResetPassword';
 // Componentes Principais
 import AppShell from './components/layout/AppShell';
 import { ChatWidget } from './components/chat/ChatWidget';
+import { AI_OPERATOR_ENABLED } from './components/ai/featureFlag';
 
 // Lazy loading para melhor performance
 import { lazy } from 'react';
@@ -22,6 +23,7 @@ const Categories = lazy(() => import('./components/categories/Categories'));
 const Settings = lazy(() => import('./components/settings/Settings'));
 const Profile = lazy(() => import('./components/profile/Profile'));
 const Import = lazy(() => import('./components/import/Import'));
+const AiOperatorPage = lazy(() => import('./components/ai/AiOperatorPage'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Accounts = lazy(() => import('./components/accounts/Accounts'));
 const Planning = lazy(() => import('./components/planning/Planning'));
@@ -161,6 +163,8 @@ const AppRoutes: React.FC = () => {
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="import" element={<Import />} />
+          {/* Operador de IA: a rota só existe quando VITE_ENABLE_AI_OPERATOR === 'true' (padrão desligado). */}
+          {AI_OPERATOR_ENABLED && <Route path="ai" element={<AiOperatorPage />} />}
 
           {/* Admin Routes */}
           <Route path="admin" element={<AdminRoute><Navigate to="/admin/dashboard" replace /></AdminRoute>} />

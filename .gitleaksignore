@@ -1,0 +1,2 @@
+# Falso positivo: argumento de teste com credencial ficticia (helpers.FAKE_CREDENTIAL), nao e segredo.
+44dc4f2ddc06cef85b1a7734d2471bd7966cddf3:backend/tests/ai/test_ai_email_mcp.py:generic-api-key:52
