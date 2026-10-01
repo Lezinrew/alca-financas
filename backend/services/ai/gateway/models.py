@@ -43,7 +43,9 @@ from .base import (
 )
 
 
-PROVIDERS = ("ollama", "openai_compatible", "anthropic")
+PROVIDERS = ("ollama", "openai_compatible", "anthropic", "claude_code_cli")
+# Provedores que usam a assinatura mensal do titular (uso individual).
+SUBSCRIPTION_PROVIDERS = ("claude_code_cli",)
 STATES = ("candidate", "approved", "suspended")
 STATE_CANDIDATE = "candidate"
 STATE_APPROVED = "approved"
@@ -336,6 +338,16 @@ def validate_route(route: ModelRoute) -> None:
         raise _fail(alias, "rota ollama deve ser local (Ollama Cloud não é suportado por este adaptador)")
     if route.provider == "anthropic" and route.locality != LOCALITY_EXTERNAL:
         raise _fail(alias, "rota anthropic deve ser external")
+    if route.provider in SUBSCRIPTION_PROVIDERS:
+        # O programa fala com o fornecedor: é tráfego externo, mesmo rodando aqui.
+        if route.locality != LOCALITY_EXTERNAL:
+            raise _fail(alias, "rota por assinatura deve ser external")
+        if not route.is_subscription:
+            raise _fail(alias, 'rota %s exige extra.billing = "subscription"' % route.provider)
+        if route.supports_vision:
+            raise _fail(alias, "rota por assinatura não envia imagens")
+    elif route.is_subscription:
+        raise _fail(alias, "extra.billing = subscription só vale para provedores de assinatura")
 
     if route.is_local:
         # Vale em QUALQUER estado: com allow_candidate_models uma candidata
@@ -353,12 +365,18 @@ def validate_route(route: ModelRoute) -> None:
     else:
         if Privacy.LOCAL_ONLY.value in route.privacy:
             raise _fail(alias, "rota externa não pode declarar privacy local_only")
-        if route.base_url is None:
-            raise _fail(alias, "rota externa exige base_url")
-        parts = _split_base_url(alias, route.base_url)
-        if parts.scheme != "https" and not is_private_host(parts.hostname or ""):
-            # A credencial vai no cabeçalho: sem TLS ela trafegaria em claro.
-            raise _fail(alias, "rota externa exige base_url https")
+        if route.is_subscription:
+            # Quem fala com o fornecedor é o programa oficial, com o login dele:
+            # não há URL nem credencial para o projeto configurar.
+            if route.base_url is not None or route.credential_env is not None:
+                raise _fail(alias, "rota por assinatura não usa base_url nem credential_env")
+        else:
+            if route.base_url is None:
+                raise _fail(alias, "rota externa exige base_url")
+            parts = _split_base_url(alias, route.base_url)
+            if parts.scheme != "https" and not is_private_host(parts.hostname or ""):
+                # A credencial vai no cabeçalho: sem TLS ela trafegaria em claro.
+                raise _fail(alias, "rota externa exige base_url https")
 
     if route.state == STATE_APPROVED:
         _validate_approved(route)
@@ -384,7 +402,7 @@ def _validate_approved(route: ModelRoute) -> None:
         if not route.digest:
             raise _fail(alias, "rota ollama aprovada precisa de digest de 64 hex")
 
-    if not route.is_local:
+    if not route.is_local and not route.is_subscription:
         if not route.credential_env:
             raise _fail(alias, "rota externa aprovada precisa de credential_env")
         if route.max_cost_micros_per_call is None or route.max_cost_micros_per_call <= 0:
@@ -488,6 +506,12 @@ class ModelRegistry:
                 return "privacy"
             if not self._settings.cloud_enabled:
                 return "cloud_disabled"
+        if route.is_subscription:
+            # Os termos do plano só admitem uso individual: pedido de outro
+            # ator nunca passa pelas credenciais do titular do plano.
+            owner_id = self._plan_owner_id()
+            if owner_id is None or str(ctx.actor_id) != owner_id:
+                return "not_plan_owner"
         if ctx.privacy.value not in route.privacy:
             return "privacy"
         if route.state == STATE_SUSPENDED:
@@ -501,6 +525,20 @@ class ModelRegistry:
             # Propósito desconhecido é tratado com o mesmo rigor da escrita.
             return "purpose"
         return None
+
+    def set_plan_owner_resolver(self, resolver) -> None:
+        """Função sem argumentos que devolve o id do ator dono do plano, ou None."""
+        self._plan_owner_resolver = resolver
+
+    def _plan_owner_id(self):
+        resolver = getattr(self, "_plan_owner_resolver", None)
+        if resolver is None:
+            return None
+        try:
+            owner = resolver()
+        except Exception:  # noqa: BLE001 - sem dono identificado, a rota não roda
+            return None
+        return str(owner) if owner else None
 
     def eligible(self, request: ModelRequest, ctx: ExecutionContext) -> Eligibility:
         routes: List[ModelRoute] = []

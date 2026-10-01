@@ -54,6 +54,47 @@
         "_nota": "A tag 'latest' IMPEDE a aprovacao: o registro recusa 'approved' com ':latest' porque a tag e reapontada sem aviso (o digest acima e o build local de abril/2026, ja diferente do publicado). Para homologar, baixar uma tag especifica, registrar o novo model_id e o digest correspondente.",
         "_think": "Modelo com raciocinio ('thinking'); desligado aqui porque piora a saida estruturada. Confirmar na homologacao."
       }
+    },
+    {
+      "alias": "plano-claude",
+      "provider": "claude_code_cli",
+      "model_id": "claude-sonnet-5-5",
+      "locality": "external",
+      "priority": 1,
+      "task_classes": ["simple_extraction", "complex_tools"],
+      "supports_tools": true,
+      "supports_json": true,
+      "supports_vision": false,
+      "context_window": 200000,
+      "state": "candidate",
+      "approved_purposes": [],
+      "privacy": ["cloud_allowed"],
+      "evidence": "docs/validation/ai-ollama-read-2026-10-01.md: leitura financeira 8/8 com dados sinteticos (8-53 s por pergunta). Benchmark geral de 30 casos pendente.",
+      "extra": {
+        "billing": "subscription",
+        "_nota": "Usa o Claude Code oficial logado na assinatura do titular (AI_PLAN_OWNER_EMAIL). Sem custo por chamada, mas e trafego externo: so roda com AI_CLOUD_ENABLED=true e privacidade cloud_allowed, e apenas para o titular do plano. Ainda nao homologada."
+      }
+    },
+    {
+      "alias": "local-qwen25-7b",
+      "provider": "ollama",
+      "model_id": "qwen2.5:7b",
+      "locality": "local",
+      "priority": 5,
+      "task_classes": ["simple_extraction", "complex_tools"],
+      "supports_tools": true,
+      "supports_json": true,
+      "supports_vision": false,
+      "context_window": 32768,
+      "state": "candidate",
+      "approved_purposes": [],
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "evidence": "docs/validation/ai-ollama-read-2026-10-01.md: leitura financeira 7/8 com dados sinteticos (3-12 s por pergunta); no caso 4 escolheu spending_by_category e omitiu as entradas. Nao homologado. Benchmark geral de 30 casos pendente.",
+      "extra": {
+        "num_ctx": 8192,
+        "seed": 7,
+        "_nota": "Modelo geral de 7B (faixa prevista para a VPS), Q4_K_M. Melhor candidato local ate agora; medir RAM/latencia na VPS antes de qualquer aprovacao."
+      }
     }
   ]
 }

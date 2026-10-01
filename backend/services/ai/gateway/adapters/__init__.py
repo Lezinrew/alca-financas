@@ -472,6 +472,7 @@ def build_default_adapters(settings: Any) -> Dict[str, ProviderAdapter]:
     """Um adaptador por provedor suportado. Nada é conectado aqui."""
     # Import tardio: os módulos dos adaptadores importam os helpers acima.
     from .anthropic import AnthropicAdapter
+    from .claude_code_cli import ClaudeCodeCliAdapter
     from .ollama import OllamaAdapter
     from .openai_compatible import OpenAICompatibleAdapter
 
@@ -479,4 +480,5 @@ def build_default_adapters(settings: Any) -> Dict[str, ProviderAdapter]:
         "ollama": OllamaAdapter(default_base_url=getattr(settings, "ollama_base_url", None)),
         "openai_compatible": OpenAICompatibleAdapter(),
         "anthropic": AnthropicAdapter(),
+        "claude_code_cli": ClaudeCodeCliAdapter(),
     }

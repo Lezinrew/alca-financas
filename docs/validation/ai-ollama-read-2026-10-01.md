@@ -116,3 +116,24 @@ ou corrigir a integração com uma especificação própria e novos testes de
 fronteira. Não ativar o candidato reprovado nem aceitar texto como comando para
 fazer o teste passar. PostgreSQL 17 com extensões reais e desempenho da VPS
 continuam pendentes.
+
+## Rodadas seguintes (mesmo dia, mesmas oito perguntas e critérios)
+
+| Rota | Modelo | Resultado | Tempo por pergunta |
+|---|---|---|---|
+| `local-qwen25-coder-14b` (reexecução pelo titular) | `qwen2.5-coder:14b` | 0/8 — nenhuma chamada de `finance.read` | 10–40 s |
+| `plano-claude` (assinatura, `test_ai_claude_plan_read.py`) | `claude-sonnet-5-5` | 8/8 | 8–53 s |
+| `local-qwen25-7b` | `qwen2.5:7b` (Q4_K_M, digest `845dbda0ea48…697e`) | 7/8 | 3–12 s |
+
+`qwen2.5:7b`: em todos os casos houve uma chamada nativa de `finance.read`,
+nenhuma gravação (9 lançamentos antes e depois) e nenhum aviso. Nos sete casos
+aprovados os fatos bateram com o banco (entradas 1000.30, saídas 100.30,
+líquido 900.00, ruído excluído). Caso 4 ("Quanto entrou e quanto saiu... pelo
+extrato OFX pago?"): o modelo escolheu `spending_by_category` e respondeu só a
+saída (100.30, correta), sem as entradas — reprovado pelo critério, que não foi
+afrouxado. O download pelo `ollama pull` falhou por IPv6 (conexão encerrada pelo
+registro); os blobs foram obtidos por IPv4 e conferidos por sha256 contra o
+manifesto.
+
+Nenhuma rota foi aprovada: todas seguem `candidate`. Oito perguntas não
+substituem o benchmark de 30 casos.

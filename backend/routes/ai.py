@@ -61,7 +61,9 @@ class CreateRun(RequestModel):
     task: Literal["finance_question", "statement_import"]
     message: str = Field(min_length=1, max_length=runs.MESSAGE_MAX_CHARS)
     financial_space_id: Optional[str] = None
-    privacy: Literal["local_only"] = "local_only"
+    # cloud_allowed só tem efeito com AI_CLOUD_ENABLED e rota externa elegível;
+    # sem isso a execução termina em model_unavailable, nunca sai da máquina.
+    privacy: Literal["local_only", "cloud_allowed"] = "local_only"
     input_refs: List[str] = Field(default_factory=list, max_length=runs.INPUT_REFS_MAX)
 
 
@@ -188,7 +190,7 @@ def _tenant():
         raise
 
 
-def _context(space_id=None, run_id=None):
+def _context(space_id=None, run_id=None, privacy=Privacy.LOCAL_ONLY):
     platform = g.ai_platform
     tenant_id = _tenant()
     if run_id is not None and space_id is None:
@@ -199,7 +201,7 @@ def _context(space_id=None, run_id=None):
         return scope.resolve_scope(
             platform.pool, user_id=str(g.ai_session["id"]),
             requested_tenant_id=tenant_id, requested_space_id=space_id,
-            privacy=Privacy.LOCAL_ONLY, trace_id=g.ai_trace_id,
+            privacy=privacy, trace_id=g.ai_trace_id,
         )
     except AiError as exc:
         if exc.code == "scope_denied":
@@ -232,7 +234,7 @@ def status():
 @limiter.limit(CREATE_LIMIT, key_func=_rate_key)
 def create_run():
     payload = _body(CreateRun)
-    ctx = _context(payload.financial_space_id)
+    ctx = _context(payload.financial_space_id, privacy=Privacy(payload.privacy))
     accepted = runs.create_run(
         g.ai_platform.pool, ctx, task=payload.task, message=payload.message,
         input_refs=payload.input_refs, idempotency_key=request.headers.get("Idempotency-Key"),

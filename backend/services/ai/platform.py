@@ -27,6 +27,36 @@ class AiPlatform:
     worker: Worker
 
 
+def _plan_owner_resolver(pool, settings: AiSettings):
+    """Resolve o id do titular do plano pelo e-mail, com cache curto.
+
+    A consulta é tardia (o usuário pode ser criado depois da subida) e só
+    acontece quando existe rota por assinatura candidata a atender um pedido.
+    """
+    import time
+
+    from .db import plain_tx
+
+    cache = {"at": 0.0, "id": None}
+
+    def resolve():
+        if not settings.plan_owner_email or pool is None:
+            return None
+        now = time.monotonic()
+        if cache["id"] is not None and now - cache["at"] < 60:
+            return cache["id"]
+        with plain_tx(pool) as cursor:
+            cursor.execute(
+                "SELECT id FROM users WHERE email = %s AND status = 'active' AND deleted_at IS NULL",
+                (settings.plan_owner_email,),
+            )
+            row = cursor.fetchone()
+        cache.update(at=now, id=str(row["id"]) if row else None)
+        return cache["id"]
+
+    return resolve
+
+
 def build_platform(
     pool, settings: Optional[AiSettings] = None, *, adapters=None,
     email_connector_factory=None, credential_store=None,
@@ -43,5 +73,6 @@ def build_platform(
     registry.register_all(build_import_tools(pool, settings))
     registry.register_all(build_misc_tools(pool, settings))
     gateway = build_gateway(pool, settings, adapters=adapters)
+    gateway.registry.set_plan_owner_resolver(_plan_owner_resolver(pool, settings))
     orchestrator = Orchestrator(pool, settings, registry, gateway)
     return AiPlatform(settings, pool, registry, gateway, orchestrator, Worker(pool, settings, orchestrator))
