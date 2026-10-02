@@ -382,11 +382,8 @@ def find_or_create_account(
 
     institution_lower = institution.lower()
 
-    if hasattr(accounts, 'find') and callable(accounts.find):
-        existing_accounts = list(accounts.find({'user_id': user_id, 'is_active': True}))
-    else:
-        raw = (accounts.find_all({'user_id': user_id}) or []) if hasattr(accounts, 'find_all') else []
-        existing_accounts = [a for a in raw if a.get('is_active', a.get('active', True))]
+    raw = (accounts.find_all({'user_id': user_id}) or []) if hasattr(accounts, 'find_all') else []
+    existing_accounts = [a for a in raw if a.get('is_active', a.get('active', True))]
     
     # Tenta encontrar conta existente por:
     # 1. Número da conta e instituição (mais preciso)
@@ -466,15 +463,13 @@ def find_or_create_account(
         account_data['closing_day'] = 10  # Padrão
         account_data['due_day'] = 15  # Padrão
 
+    if account_service is None:
+        import logging
+        logging.error('find_or_create_account sem account_service: conta não criada')
+        return None, False
+
     try:
-        if account_service is not None:
-            new_account = account_service.create_account(user_id, account_data, tenant_id=tenant_id)
-            return new_account.get('id'), True
-        from repositories.account_repository import AccountRepository
-        from services.account_service import AccountService
-        account_repo = AccountRepository(accounts)
-        account_svc = AccountService(account_repo, None)
-        new_account = account_svc.create_account(user_id, account_data, tenant_id=tenant_id)
+        new_account = account_service.create_account(user_id, account_data, tenant_id=tenant_id)
         return new_account.get('id'), True
     except Exception as e:
         # Log erro para facilitar debugging em produção
