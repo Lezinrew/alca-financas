@@ -13,16 +13,9 @@ def hash_password(password: str) -> str:
 
 
 def _normalize_password_hash(hashed):
-    """Converte hash de senha para bytes (MongoDB Binary, Supabase BYTEA hex, ou bytes)."""
+    """Converte hash de senha para bytes (Supabase BYTEA hex, str ou bytes)."""
     if not hashed:
         return None
-    # MongoDB Binary
-    try:
-        from bson import Binary
-        if isinstance(hashed, Binary):
-            return hashed.as_bytes()
-    except ImportError:
-        pass
     if isinstance(hashed, bytes):
         return hashed
     if isinstance(hashed, str):
@@ -34,7 +27,7 @@ def _normalize_password_hash(hashed):
             return bytes.fromhex(s)
         except (ValueError, TypeError):
             pass
-        # Fallback: tratar como UTF-8 (ex.: MongoDB que gravou como string)
+        # Fallback: hash bcrypt gravado como texto ("$2b$...")
         return hashed.encode('utf-8')
     if hasattr(hashed, 'tobytes'):
         return bytes(hashed)

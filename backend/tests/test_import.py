@@ -57,40 +57,69 @@ def test_extract_account_info_csv_unknown():
     assert info['account_type'] == 'checking'  # Padrão
 
 
-def test_find_or_create_account_finds_existing(db):
+def test_find_or_create_account_finds_existing():
     """Test find_or_create_account finds existing account"""
     import uuid
-    
-    accounts_collection = db['accounts']
+
     user_id = 'test-user-456'
-    
-    # Create existing account
     existing_account_id = str(uuid.uuid4())
-    accounts_collection.insert_one({
-        '_id': existing_account_id,
+    # Repositório com a mesma interface do Supabase (find_all).
+    accounts_repo = Mock()
+    accounts_repo.find_all.return_value = [{
+        'id': existing_account_id,
         'user_id': user_id,
         'name': 'Nubank - Cartão 12345',
         'type': 'credit_card',
         'institution': 'Nubank',
         'is_active': True,
-        'balance': 0
-    })
-    
+    }]
+    account_service = Mock()
+
     account_info = {
         'institution': 'Nubank',
         'account_number': '12345',
         'account_type': 'credit_card'
     }
-    
+
     account_id, was_created = find_or_create_account(
-        accounts_collection,
+        accounts_repo,
         user_id,
         account_info,
-        filename='nubank_12345.csv'
+        filename='nubank_12345.csv',
+        account_service=account_service,
     )
-    
+
     assert account_id == existing_account_id
     assert was_created is False
+    accounts_repo.find_all.assert_called_once_with({'user_id': user_id})
+    account_service.create_account.assert_not_called()
+
+
+def test_find_or_create_account_creates_through_service():
+    """Sem conta parecida, cria pelo serviço (Supabase) com o tenant."""
+    accounts_repo = Mock()
+    accounts_repo.find_all.return_value = []
+    account_service = Mock()
+    account_service.create_account.return_value = {'id': 'nova-conta'}
+
+    account_id, was_created = find_or_create_account(
+        accounts_repo, 'user-1', {'institution': 'Nubank', 'account_number': '9876',
+                                  'account_type': 'checking'},
+        account_service=account_service, tenant_id='tenant-1',
+    )
+
+    assert (account_id, was_created) == ('nova-conta', True)
+    _, kwargs = account_service.create_account.call_args
+    assert kwargs == {'tenant_id': 'tenant-1'}
+
+
+def test_find_or_create_account_without_service_does_not_create():
+    accounts_repo = Mock()
+    accounts_repo.find_all.return_value = []
+
+    assert find_or_create_account(
+        accounts_repo, 'user-1', {'institution': 'Nubank', 'account_type': 'checking'}
+    ) == (None, False)
 
 
 def test_find_or_create_account_none_info():
