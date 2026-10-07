@@ -46,3 +46,18 @@ Integração no main pendente no [PR #5](https://github.com/Lezinrew/alca-financ
 Rollback disponível no backup original acima: extrair em diretório separado, restaurar artefato frontend e Nginx salvos, validar Compose/Nginx e recriar somente frontend, verificando HTTP e sessão. A extração e comparação foram executadas; uma reversão real em produção não foi executada.
 
 Evidência visual pública salva localmente em `C:/Users/lezin/.codex/artifacts/mobile-seo-2026-10-07/pagespeed-final.jpg`, fora do Git. Relatório não inclui credenciais, extratos ou valores financeiros pessoais. Não foi realizado novo login real, importação financeira ou medição de todas as rotas autenticadas.
+
+
+## Continuação — integração e publicação do main
+
+PR #5 integrado em 07/10/2026, merge 8061f7c. As nove verificações do PR e o CI do main passaram. O commit publicado tem árvore idêntica à revisão 939c3aa validada no PR. Build real no servidor: 36,53 s; publicação pelo novo script com Nginx/Compose validados, HTTP 200, sessão existente conferida e ID do backend preservado. Backup: /apps/alca-backups/8061f7cb1657ab79b1efa5817f9ff03895561363-20261007T134658Z/frontend-before.tar.gz.
+
+O risco de sobrescrever as correções por falta de integração do PR #5 foi resolvido. Preload mobile presente no HTML público. Novas coletas:
+
+- [10:49](https://pagespeed.web.dev/analysis/https-alcahub-cloud/m1u6s97105?form_factor=mobile): NO_LCP; desempenho/LCP/TBT indisponíveis. Excluída da comparação.
+- [10:50](https://pagespeed.web.dev/analysis/https-alcahub-cloud/u1u40d7x95?form_factor=mobile): desempenho 89, SEO/acessibilidade/boas práticas 100, FCP 2,422 s, LCP 2,722 s, TBT 0 ms, CLS 0, SI 5,111 s.
+- [Coleta seguinte](https://pagespeed.web.dev/analysis/https-alcahub-cloud/16m2iuhybj?form_factor=mobile): NO_LCP; excluída da comparação. Não existe mediana válida de três coletas desta revisão, nem evidência de ganho do preload isolado.
+
+Auditoria npm de instalação apontou 34 alertas incluindo ferramentas de desenvolvimento. Auditoria --omit=dev do lockfile vigente: sete alertas (seis altos, um moderado), nenhum crítico. Lockfile não foi alterado nesta entrega; alertas requerem análise específica de aplicabilidade/atualização. A nota de boas práticas do Lighthouse não substitui essa análise.
+
+Próxima hipótese limitada: remover a animação de entrada do login apenas até 640 px. A animação existente parte de opacity 0, dura 600 ms e inclui delays de 50/150/280 ms. A mudança não altera login ou layout; seu ganho deve ser medido após publicação, sem inferência de resultado.
