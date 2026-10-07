@@ -84,9 +84,9 @@ const Login: React.FC = () => {
               <img
                 src="/alcahub-logo-v1-240.webp"
                 srcSet="/alcahub-logo-v1-240.webp 240w, /alcahub-logo-v1-480.webp 480w"
-                sizes="(min-width: 1024px) 120px, 168px"
-                width={3320}
-                height={2168}
+                sizes="96px"
+                width={240}
+                height={157}
                 {...{ fetchpriority: 'high' }}
                 alt="Alça Finanças"
                 className="login-form-panel__logo-mobile"

@@ -20,8 +20,8 @@ const LoginVisualPanel: React.FC = () => {
               src="/alcahub-logo-v1-240.webp"
               srcSet="/alcahub-logo-v1-240.webp 240w, /alcahub-logo-v1-480.webp 480w"
               sizes="120px"
-              width={3320}
-              height={2168}
+              width={240}
+              height={157}
               alt="Alça Finanças"
               className="login-visual-panel__logo"
             />

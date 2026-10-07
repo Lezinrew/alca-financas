@@ -24,8 +24,8 @@ describe('Login', () => {
     expect(screen.getAllByRole('main')).toHaveLength(1);
     const logo = screen.getByAltText('Alça Finanças');
     expect(logo).toHaveAttribute('src', '/alcahub-logo-v1-240.webp');
-    expect(logo).toHaveAttribute('width', '3320');
-    expect(logo).toHaveAttribute('height', '2168');
+    expect(logo).toHaveAttribute('width', '240');
+    expect(logo).toHaveAttribute('height', '157');
     expect(logo).not.toHaveAttribute('loading', 'lazy');
   });
   it('toggle de senha é acessível e alterna o tipo do campo', async () => {

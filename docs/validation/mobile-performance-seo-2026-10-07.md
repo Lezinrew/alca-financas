@@ -17,6 +17,12 @@ Referências: ADR 0009 e RFC 0004, aprovadas pelo titular.
 
 ## Limites e publicação
 
-Publicação e nova medição ainda pendentes neste registro inicial. Backend, banco, flags, regras financeiras e alterações locais de outras frentes não fazem parte desta mudança. A lista expansível de contas continua em entrega independente, sem alegação de publicação.
+Primeira publicação executada: `9b11103`, com build separado no servidor e variáveis públicas existentes usadas sem alteração/exposição de `.env`. Backend, banco, flags, regras financeiras e alterações locais de outras frentes não fazem parte desta mudança. A lista expansível de contas continua em entrega independente, sem alegação de publicação.
 
-Não há nova nota PageSpeed confirmada nesta etapa. A meta 90 de desempenho e 95 de SEO não é uma conclusão. Evidências visuais de produção e comparação serão acrescentadas após execução.
+Backup: `/apps/alca-backups/mobile-seo-9b11103/frontend-before.tar.gz` (artefato, Nginx e Compose; sem `.env`). Extração em diretório separado e comparação de `index.html`/Nginx executadas com sucesso. Nova configuração validada em container Nginx isolado na rede existente; Compose validado antes da troca. Apenas frontend foi recriado; ID do backend permaneceu igual. Assets anteriores conservados para abas já abertas.
+
+HTTP público após publicação: entrada, robots, release, duas imagens, CSS Bootstrap, fonte de ícones e health retornaram 200 com tipos corretos; robots é `text/plain`. Sessão existente continuou válida: contas a pagar manteve os quatro registros e R$ 2.346,67 da competência outubro, transações e dashboard carregaram. Tela de importação foi aberta sem enviar arquivo; execução de importação e novo login com credenciais reais não foram realizados.
+
+Primeira coleta: [PageSpeed 10:16 BRT](https://pagespeed.web.dev/analysis/https-alcahub-cloud/cihzw3u2fi?form_factor=mobile), Lighthouse 13.5.0/Moto G Power/4G lenta. Desempenho 89, acessibilidade 100, boas práticas 96, SEO 100; FCP 2,4 s, LCP 2,7 s, TBT 140 ms, CLS 0. A coleta revelou uma divergência nas dimensões declaradas da imagem oculta do painel desktop. Dimensões foram ajustadas para 240 × 157, iguais ao WebP base, e `sizes` mobile para os 96 pixels efetivamente usados. Nova coleta pendente após esse ajuste. Essa medição intermediária não compõe a mediana final.
+
+A API PageSpeed retornou HTTP 429; a interface web conseguiu medir. As metas de desempenho/LCP ainda não foram comprovadas. CSS/JS não usado permanece como oportunidade mensurada; nenhuma conclusão antecipada de 90 ou LCP ≤ 2,5 s.
