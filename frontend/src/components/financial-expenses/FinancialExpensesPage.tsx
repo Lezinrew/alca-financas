@@ -17,8 +17,23 @@ const money = (value: number | string) => Number(value) || 0;
 function FinancialSummary({ data, loading, error, retry }: {
   data: ExpenseOverview | null; loading: boolean; error: string; retry: () => void;
 }) {
+  const paidCount = data?.counts.paid ?? 0;
+  const totalCount = data?.total ?? 0;
+  const progress = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
+  const openCount = (data?.counts.pending ?? 0) + (data?.counts.partial ?? 0);
+  const overdueCount = data?.counts.overdue ?? 0;
+
   return <section aria-label="Resumo das contas filtradas" aria-busy={loading}>
     {error && <div className="payables-error" role="alert">Resumo indisponível. {error} <button className="payables-button" onClick={retry}>Tentar novamente</button></div>}
+    <div className="payables-summary-heading">
+      <div>
+        <p className="payables-summary-eyebrow">Contas a pagar</p>
+        <p className="payables-muted text-sm">Resumo das contas selecionadas</p>
+      </div>
+      {!loading && data && <span className={`payables-health ${overdueCount > 0 ? 'payables-health-attention' : ''}`}>
+        {overdueCount > 0 ? `${overdueCount} atrasada${overdueCount === 1 ? '' : 's'}` : openCount > 0 ? 'Em dia' : 'Tudo pago'}
+      </span>}
+    </div>
     <div className="payables-summary">
       {([
         ['Previsto', data?.expected, 'Valor das contas, exceto canceladas'],
@@ -28,6 +43,15 @@ function FinancialSummary({ data, loading, error, retry }: {
         <h2>{label}</h2><p className="payables-metric">{value == null ? '—' : formatCurrency(value)}</p><p className="payables-muted text-sm">{detail}</p>
       </article>)}
     </div>
+    {data && totalCount > 0 && <div className="payables-progress-block">
+      <div className="payables-progress" role="progressbar" aria-label="Progresso das contas pagas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <div className="payables-progress-label">
+        <span>{paidCount} de {totalCount} contas pagas</span>
+        <strong>{progress}%</strong>
+      </div>
+    </div>}
     <p className="payables-muted mt-3 text-sm">Valores registrados nas contas selecionadas; não representam conciliação bancária nem pagamentos feitos necessariamente neste mês.</p>
     <div role="status" aria-live="polite" className="payables-counts mt-4">
       {loading ? 'Atualizando resumo…' : data ? <>
@@ -123,6 +147,8 @@ export default function FinancialExpensesPage() {
       <div><p className="text-xl font-semibold">Seu mês, com clareza</p><p className="payables-muted mt-1">Acompanhe suas contas e registre o que já foi pago.</p></div>
       <button className="payables-button payables-button-primary" onClick={() => setEditing(null)}><Plus size={18} aria-hidden="true" />Nova conta</button>
     </div>
+    {authLoading && <p role="status">Verificando acesso…</p>}
+    <FinancialSummary {...overview} retry={refresh} />
     <section className="payables-panel" aria-label="Visão e filtros">
       <div className="payables-toolbar justify-between">
         <div className="payables-view-switch" role="group" aria-label="Visão das contas">
@@ -149,8 +175,6 @@ export default function FinancialExpensesPage() {
       {filtersChanged && <p className="payables-notice mt-3" role="status">Há filtros ainda não aplicados. Clique em Aplicar para atualizar.</p>}
       {hasFilters && <p className="payables-muted mt-3 text-sm">Filtros aplicados: {[filters.category, filters.responsible && `Responsável: ${filters.responsible}`, statusLabels[filters.status], filters.recurring && (filters.recurring === 'yes' ? 'Recorrentes' : 'Avulsas')].filter(Boolean).join(' · ')}</p>}
     </section>
-    {authLoading && <p role="status">Verificando acesso…</p>}
-    <FinancialSummary {...overview} retry={refresh} />
     {notice && <p className="payables-notice" role="status">{notice}</p>}
     <section aria-label="Lista de contas">
       <div className="flex flex-wrap justify-between items-center gap-2 mb-4"><h2 className="text-lg font-semibold">{view === 'month' ? `Contas de ${label}` : 'Todas as contas'}</h2><button className="payables-button" onClick={refresh} disabled={list.loading}>Atualizar</button></div>

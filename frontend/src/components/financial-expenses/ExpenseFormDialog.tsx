@@ -32,7 +32,9 @@ function initialValues(expense: FinancialExpense | null, month: number, year: nu
     installment_current: String(expense?.installment_current ?? ''), installment_total: String(expense?.installment_total ?? ''),
     is_recurring: expense?.is_recurring ? 'yes' : 'no', status: expense?.status ?? 'pending',
   };
-  for (const field of optionalText) result[field] = expense?.[field] ?? (field === 'source_type' ? 'manual' : '');
+  for (const field of optionalText) {
+    result[field] = expense ? expense[field] ?? '' : field === 'source_type' ? 'manual' : '';
+  }
   return result;
 }
 
@@ -77,6 +79,9 @@ export function ExpenseFormDialog({ expense, onClose, onSaved, defaultMonth, def
     if (Boolean(values.competency_month) !== Boolean(values.competency_year)) {
       setError('Informe mês e ano da competência juntos, ou deixe ambos vazios.'); return;
     }
+    if (Boolean(values.installment_current) !== Boolean(values.installment_total)) {
+      setError('Informe a parcela atual e o total de parcelas juntos, ou deixe ambos vazios.'); return;
+    }
     if (values.installment_current && values.installment_total && Number(values.installment_current) > Number(values.installment_total)) {
       setError('A parcela atual não pode superar o total de parcelas.'); return;
     }
@@ -118,7 +123,7 @@ export function ExpenseFormDialog({ expense, onClose, onSaved, defaultMonth, def
           {field('due_date', 'Vencimento', 'date')}
           {field('paid_at', 'Pago em', 'datetime-local')}
           {field('competency_month', 'Competência (mês)', 'number', false, 1, 12)}
-          {field('competency_year', 'Competência (ano)', 'number', false, 1, 9999)}
+          {field('competency_year', 'Competência (ano)', 'number', false, 2000, 2100)}
         </div>
         <label className="flex min-h-[44px] items-center gap-2"><input name="is_recurring" type="checkbox" checked={values.is_recurring === 'yes'} onChange={event => change('is_recurring', event.target.checked ? 'yes' : 'no')} />Conta recorrente</label>
         {field('recurrence_type', 'Tipo de recorrência')}

@@ -33,6 +33,20 @@ describe('ExpenseFormDialog', () => {
     expect(financialExpensesAPI.update).toHaveBeenCalledWith(expense.id, expect.objectContaining({ paid_at: new Date('2026-09-13T11:45').toISOString() }));
   });
 
+  it('preserva origem vazia ao editar uma conta histórica', async () => {
+    render(<ExpenseFormDialog {...props()} expense={{ ...expense, source_type: null }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar conta' }));
+    expect(financialExpensesAPI.update).toHaveBeenCalledWith(expense.id, expect.objectContaining({ source_type: null }));
+  });
+
+  it('exige os dois campos de parcelamento', async () => {
+    render(<ExpenseFormDialog {...props()} />);
+    fireEvent.change(screen.getByLabelText('Parcela atual'), { target: { value: '2' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar conta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('parcela atual e o total');
+    expect(financialExpensesAPI.update).not.toHaveBeenCalled();
+  });
+
   it('solicita confirmação antes de descartar alterações por Escape', async () => {
     const callbacks = props();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
