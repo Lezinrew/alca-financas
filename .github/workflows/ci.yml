@@ -193,6 +193,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Validate frontend deployment and rollback
+        run: |
+          bash -n scripts/prod/deploy-frontend-atomic.sh
+          bash scripts/prod/tests/deploy-frontend-atomic.test.sh "$PWD/scripts/prod/deploy-frontend-atomic.sh"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
