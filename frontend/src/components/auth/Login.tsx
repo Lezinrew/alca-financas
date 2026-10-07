@@ -74,7 +74,7 @@ const Login: React.FC = () => {
   const errorId = 'login-error-message';
 
   return (
-    <div className="login-page">
+    <main className="login-page">
       <LoginVisualPanel />
 
       <div className="login-form-panel">
@@ -82,7 +82,12 @@ const Login: React.FC = () => {
           <div className="login-form-panel__brand-mobile login-stagger-1">
             <span className="login-logo-badge">
               <img
-                src="/alcahub-logo.png"
+                src="/alcahub-logo-v1-240.webp"
+                srcSet="/alcahub-logo-v1-240.webp 240w, /alcahub-logo-v1-480.webp 480w"
+                sizes="96px"
+                width={240}
+                height={157}
+                {...{ fetchpriority: 'high' }}
                 alt="Alça Finanças"
                 className="login-form-panel__logo-mobile"
               />
@@ -225,7 +230,7 @@ const Login: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

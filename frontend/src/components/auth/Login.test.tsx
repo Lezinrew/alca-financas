@@ -19,6 +19,15 @@ const renderLogin = (state?: unknown) =>
   );
 
 describe('Login', () => {
+  it('expõe um marco principal e uma logo dimensionada sem carregar o PNG original', () => {
+    renderLogin();
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    const logo = screen.getByAltText('Alça Finanças');
+    expect(logo).toHaveAttribute('src', '/alcahub-logo-v1-240.webp');
+    expect(logo).toHaveAttribute('width', '240');
+    expect(logo).toHaveAttribute('height', '157');
+    expect(logo).not.toHaveAttribute('loading', 'lazy');
+  });
   it('toggle de senha é acessível e alterna o tipo do campo', async () => {
     renderLogin();
     const toggle = screen.getByRole('button', { name: 'Mostrar senha' });

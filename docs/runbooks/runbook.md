@@ -28,6 +28,19 @@
 
 ## 3. Última execução relevante
 
+**07/10/2026 — desempenho mobile/SEO:** frontend publicado isoladamente a
+partir de `2b434ec` (PR #5, branch `codex/mobile-performance-seo`), com WebP,
+metadescrição, marco principal e robots em texto. Bootstrap/ícones mantêm
+versões anteriores, agora locais. Backend não foi recriado, banco e flags não
+foram alterados. Backup com extração/comparação validada:
+`/apps/alca-backups/mobile-seo-9b11103/frontend-before.tar.gz`;
+backup da revisão intermediária:
+`/apps/alca-backups/mobile-seo-2b434ec/frontend-before.tar.gz`.
+Checkout da VPS alinhado ao commit publicado em HEAD destacado e limpo.
+Integração do PR ao main permanece pendente: um futuro deploy de main anterior
+ao merge poderá substituir essas correções. Evidências, números e limites:
+`docs/validation/mobile-performance-seo-2026-10-07.md`.
+
 
 | Data       | Evento                                                                                                                                                                                                                                                                                                                                                 |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

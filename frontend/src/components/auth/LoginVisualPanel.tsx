@@ -17,7 +17,11 @@ const LoginVisualPanel: React.FC = () => {
         <div className="login-visual-panel__brand login-stagger-1">
           <span className="login-logo-badge">
             <img
-              src="/alcahub-logo.png"
+              src="/alcahub-logo-v1-240.webp"
+              srcSet="/alcahub-logo-v1-240.webp 240w, /alcahub-logo-v1-480.webp 480w"
+              sizes="120px"
+              width={240}
+              height={157}
               alt="Alça Finanças"
               className="login-visual-panel__logo"
             />
