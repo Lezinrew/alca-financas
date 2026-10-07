@@ -37,8 +37,9 @@ foram alterados. Backup com extração/comparação validada:
 backup da revisão intermediária:
 `/apps/alca-backups/mobile-seo-2b434ec/frontend-before.tar.gz`.
 Checkout da VPS alinhado ao commit publicado em HEAD destacado e limpo.
-Integração do PR ao main permanece pendente: um futuro deploy de main anterior
-ao merge poderá substituir essas correções. Evidências, números e limites:
+PR #5 integrado no main em 8061f7c e publicado pelo script com build em
+checkout descartável e rollback do frontend. Sessão existente e HTTP conferidos.
+A meta de LCP segue pendente; nova otimização mobile em validação. Evidências:
 `docs/validation/mobile-performance-seo-2026-10-07.md`.
 
 
