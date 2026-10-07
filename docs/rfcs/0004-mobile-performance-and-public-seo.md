@@ -73,3 +73,12 @@ Fora de escopo: campanhas/marketing, indexação de áreas privadas, autenticaç
 Plano aprovado pelo titular em 07/10/2026. A execução e seus limites serão registrados em `docs/validation/mobile-performance-seo-2026-10-07.md`; os resultados históricos de outros testes não valem como validação desta mudança.
 
 Execução publicada em 07/10/2026 (2b434ec). Desempenho e SEO atingiram as metas; LCP ficou em 2,6 s e não atingiu 2,5 s. Integração no main pendente no PR #5. Evidências no relatório de validação.
+
+
+## Continuação aprovada em 07/10/2026
+
+Antecipar descoberta da logo com preload responsivo somente no mobile. Integrar o PR após CI e medir novamente, sem assumir ganho antes da coleta.
+
+Ao preparar a integração, o workflow existente apagava o artefato publicado antes do build e recriava backend para qualquer mudança. A continuação usa build em checkout descartável, backup privado sem .env, validação Nginx/Compose, troca do artefato e restauração automática em falha. Backend só é recriado quando seus arquivos/Compose mudam; nesse caminho, imagem e frontend/configuração anteriores são salvos. Nenhuma migration ou mudança de credencial.
+
+Três ensaios com Git real e Docker/HTTP simulados em diretórios sintéticos descartáveis passaram: falha de build conserva o artefato; sucesso mantém assets antigos; falha de recriação restaura commit e artefato anterior. Não equivalem a uma falha real do Docker em produção. Script: scripts/prod/deploy-frontend-atomic.sh. Backups e releases são retidos para recuperação; sua limpeza exige rotina posterior.

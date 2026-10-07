@@ -77,13 +77,25 @@ jobs:
           timeout: 120s
           script: |
             set -e
-            gunzip -c /tmp/backend-images.tar.gz | docker load
-            rm -f /tmp/backend-images.tar.gz
             cd /apps/alca-financas
             git fetch origin
-            git reset --hard ${{ env.DEPLOY_SHA }}
-            git clean -fd
-            docker compose -f docker-compose.prod.yml up -d --force-recreate backend
+            if git diff --quiet HEAD ${{ env.DEPLOY_SHA }} -- backend/ docker-compose.prod.yml Dockerfile requirements.txt; then
+              echo "Backend unchanged: preserving the running container"
+              exit 0
+            fi
+            test -z "$(git status --porcelain --untracked-files=no)" || exit 1
+            docker compose -f docker-compose.prod.yml config -q
+            umask 077
+            backup_dir="/apps/alca-backups/backend-${{ env.DEPLOY_SHA }}-$(date -u +%Y%m%dT%H%M%SZ)"
+            mkdir -p "$backup_dir"
+            tar -czf "$backup_dir/frontend-config-before.tar.gz" build/frontend nginx.conf docker-compose.prod.yml
+            old_image=$(docker inspect --format '{{.Image}}' alca-financas-backend-1)
+            docker image save "$old_image" | gzip > "$backup_dir/backend-image-before.tar.gz"
+            gunzip -c /tmp/backend-images.tar.gz | docker load
+            rm -f /tmp/backend-images.tar.gz
+            git switch --detach ${{ env.DEPLOY_SHA }}
+            docker compose -f docker-compose.prod.yml config -q
+            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
 
   deploy-frontend:
     name: Deploy Frontend
@@ -113,37 +125,11 @@ jobs:
             set -e
             cd /apps/alca-financas
             git fetch origin
-            git reset --hard ${{ env.DEPLOY_SHA }}
-            git clean -fd
-
-            echo "==> Limpando builds antigos"
-            rm -rf frontend/dist build/frontend
-            mkdir -p build/frontend
-
-            echo "==> Buildando frontend (Vite precisa de VITE_SUPABASE_* no build)"
-            if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-              echo "ERRO: Defina os secrets VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no ambiente production do GitHub."
-              exit 1
-            fi
-            docker run --rm \
-              -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
-              -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
-              -v /apps/alca-financas/frontend:/app \
-              -w /app \
-              node:22-alpine \
-              sh -lc "npm ci && npm run build"
-
-            echo "==> Copiando dist para build/frontend"
-            cp -a frontend/dist/. build/frontend/
-            # Nginx no container (user nginx) precisa ler os ficheiros; build como root → 403 sem isto
-            chmod -R a+rX build/frontend
-            test -f build/frontend/index.html || { echo "ERRO: build/frontend/index.html ausente após o build"; exit 1; }
-
-            echo "==> Recriando container frontend"
-            docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
-
-            echo "==> Validando index.html servido pelo nginx"
-            docker compose -f docker-compose.prod.yml exec -T frontend sed -n '1,20p' /usr/share/nginx/html/index.html
+            # Run the target script without resetting the live checkout first.
+            script_file=$(mktemp /tmp/alca-frontend-deploy.XXXXXX)
+            trap 'rm -f "$script_file"' EXIT
+            git show ${{ env.DEPLOY_SHA }}:scripts/prod/deploy-frontend-atomic.sh > "$script_file"
+            bash "$script_file" ${{ env.DEPLOY_SHA }}
 
   smoke-tests:
     name: Production Smoke Tests
