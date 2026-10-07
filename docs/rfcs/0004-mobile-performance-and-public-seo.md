@@ -71,3 +71,5 @@ Fora de escopo: campanhas/marketing, indexação de áreas privadas, autenticaç
 ## Aprovação e evidências
 
 Plano aprovado pelo titular em 07/10/2026. A execução e seus limites serão registrados em `docs/validation/mobile-performance-seo-2026-10-07.md`; os resultados históricos de outros testes não valem como validação desta mudança.
+
+Execução publicada em 07/10/2026 (2b434ec). Desempenho e SEO atingiram as metas; LCP ficou em 2,6 s e não atingiu 2,5 s. Integração no main pendente no PR #5. Evidências no relatório de validação.
